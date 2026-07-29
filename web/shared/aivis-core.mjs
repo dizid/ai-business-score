@@ -154,7 +154,7 @@ export function extractText(json) {
 // ---------- Aggregation ----------
 // Shared by both callers: takes prospect + array of { ok, text?, usage?,
 // error?, model, promptIndex } and produces cited counts, heuristic ranking,
-// and raw responses for the mandatory manual skim.
+// per-competitor tallies, and raw responses for the mandatory manual skim.
 export function aggregateProspect(prospect, callResults) {
   const completed = callResults.filter((r) => r.ok);
   const failed = callResults.filter((r) => !r.ok);
@@ -162,6 +162,9 @@ export function aggregateProspect(prospect, callResults) {
   let citedCount = 0;
   let ambiguousBrandFlag = false;
   const perPromptRank = [];
+  const competitorTallies = prospect.competitors.map((name) => ({
+    name, mentionCount: 0, beatBrandCount: 0,
+  }));
 
   for (const r of completed) {
     const brandMatch = findBrandMention(r.text, prospect);
@@ -169,18 +172,29 @@ export function aggregateProspect(prospect, callResults) {
     const cited = brandMatch.ambiguous ? false : brandMatch.mentioned;
     if (cited) citedCount++;
 
+    // Competitor detection runs on EVERY completed response, not just when
+    // the brand itself was cited — a response that mentions a competitor
+    // while the brand is completely absent is the single most useful
+    // scoreboard signal ("competitor cited 4x, you 0x"), and it would be
+    // silently lost if this stayed gated on `cited` like the rank logic.
+    let beatenBy = false;
+    prospect.competitors.forEach((c, i) => {
+      const m = findMentions(r.text, c);
+      if (m.ambiguous || !m.mentioned) return;
+      competitorTallies[i].mentionCount++;
+      const brandWasFirst = cited && brandMatch.firstIndex < m.firstIndex;
+      if (!brandWasFirst) {
+        competitorTallies[i].beatBrandCount++;
+        beatenBy = true;
+      }
+    });
+
     // Heuristic-only ranking: first-mention order between brand and
     // competitors. Detection is presence-only (not sentiment-aware) per the
     // design doc's explicit limitation — this is a starting point for the
-    // mandatory manual skim, not a verified rank.
-    let rank = 'not-mentioned';
-    if (cited) {
-      const competitorMatches = prospect.competitors
-        .map((c) => findMentions(r.text, c))
-        .filter((m) => !m.ambiguous && m.mentioned);
-      const beatenBy = competitorMatches.find((m) => m.firstIndex < brandMatch.firstIndex);
-      rank = beatenBy ? 'beaten' : 'ranked-1';
-    }
+    // mandatory manual skim, not a verified rank. Unchanged from before:
+    // still gated on `cited`, only the tallying above became unconditional.
+    const rank = cited ? (beatenBy ? 'beaten' : 'ranked-1') : 'not-mentioned';
     perPromptRank.push({ promptIndex: r.promptIndex, rank });
   }
 
@@ -192,9 +206,92 @@ export function aggregateProspect(prospect, callResults) {
     citedCount,
     ambiguousBrandFlag,
     perPromptRank,
+    competitorTallies,
     rawResponses: completed.map((r) => ({ model: r.model, promptIndex: r.promptIndex, text: r.text })),
     totalTokens: completed.reduce((sum, r) => sum + (r.usage?.total_tokens ?? 0), 0),
   };
+}
+
+// ---------- Score ----------
+// 0-100, weighted toward being the FIRST mention, not just any mention.
+// "Beaten" (cited but a competitor was mentioned first) earns partial credit
+// — it's a real signal (you're in the AI's consideration set) but should
+// land well below a brand that's often mentioned first. completedCalls===0
+// returns null (never a fake 0) — a 0 must mean "genuinely invisible across
+// N real checks," not "the API failed and we have no data."
+const SCORE_BEATEN_WEIGHT = 0.4;
+
+export function computeScore(perPromptRank, completedCalls) {
+  if (completedCalls === 0) return null;
+  const ranked1Count = perPromptRank.filter((r) => r.rank === 'ranked-1').length;
+  const beatenCount = perPromptRank.filter((r) => r.rank === 'beaten').length;
+  return Math.round(100 * (ranked1Count + SCORE_BEATEN_WEIGHT * beatenCount) / completedCalls);
+}
+
+// Presentation band for a score — used to pick color/label, kept as a pure
+// mapping so result.html and any future caller stay in sync with one table.
+export function scoreBand(score) {
+  if (score === null) return 'unavailable';
+  if (score >= 80) return 'leading';
+  if (score >= 50) return 'visible';
+  if (score >= 1) return 'weak';
+  return 'invisible';
+}
+
+// ---------- Tailored advice (rule-based, not a live LLM call) ----------
+// Returns structured scenario data (id/tone/params), not freeform text — the
+// English copy lives in result.html's ADVICE_COPY lookup, same pattern the
+// page already uses for its hardcoded headline sentences. This keeps the
+// FACT selected frozen at scan time (a shared link never changes what it
+// shows) while wording can improve later without invalidating old links.
+// Deliberately synchronous/instant: adding a live "advice" LLM call here
+// would need the aggregated results as input, so it couldn't join the
+// existing parallel batch — it would add a full sequential 15-20s+ on top of
+// a function-timeout budget that was already hard-won empirically. Ambiguous
+// brand name and failed calls are NOT advice cards — they're data-quality
+// caveats shown as warning banners elsewhere, not business findings.
+export function selectAdvice(agg) {
+  if (agg.completedCalls === 0) {
+    return [{ id: 'no-data', tone: 'neutral', params: {} }];
+  }
+
+  const ranked1 = agg.perPromptRank.filter((r) => r.rank === 'ranked-1').length;
+  const beaten = agg.perPromptRank.filter((r) => r.rank === 'beaten').length;
+  const cards = [];
+
+  if (agg.citedCount === 0) {
+    cards.push({ id: 'zero-citations', tone: 'critical', params: { completedCalls: agg.completedCalls } });
+  } else if (beaten > 0 && ranked1 === 0) {
+    const topRival = [...agg.competitorTallies].sort((a, b) => b.beatBrandCount - a.beatBrandCount)[0];
+    cards.push({
+      id: 'consistently-beaten',
+      tone: 'warning',
+      params: {
+        beaten,
+        completedCalls: agg.completedCalls,
+        topCompetitorName: topRival && topRival.beatBrandCount > 0 ? topRival.name : null,
+      },
+    });
+  } else if (ranked1 === agg.completedCalls) {
+    cards.push({ id: 'leading', tone: 'positive', params: { completedCalls: agg.completedCalls } });
+  } else {
+    cards.push({
+      id: 'mixed',
+      tone: 'neutral',
+      params: { ranked1, beaten, notMentioned: agg.completedCalls - ranked1 - beaten, completedCalls: agg.completedCalls },
+    });
+  }
+
+  const topRival = [...agg.competitorTallies].sort((a, b) => b.mentionCount - a.mentionCount)[0];
+  if (topRival && topRival.mentionCount > 0 && cards.length < 3) {
+    cards.push({
+      id: 'top-rival',
+      tone: 'neutral',
+      params: { name: topRival.name, mentionCount: topRival.mentionCount, completedCalls: agg.completedCalls },
+    });
+  }
+
+  return cards.slice(0, 3);
 }
 
 export function requiredProspectFields() {
