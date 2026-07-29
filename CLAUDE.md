@@ -11,24 +11,40 @@ the result as a cold-email hook. Two implementations share one core:
 - **`proof-script/`** (Approach A) — a local CLI, run manually by one person
   against a hand-curated prospect list. No server, no DB, no accounts.
 - **`web/`** (Approach B) — a hosted version: a founder-facing form (gated by a
-  passphrase, not a real auth system) that runs a live check and redirects to a
-  shareable result page. Still no database — the result data is encoded
-  directly in the result URL's fragment, so viewing a link never re-computes or
-  re-calls the API. Deployed to Netlify as site `aivis-scan`.
+  passphrase, not a real auth system) that optionally auto-fills itself from a
+  single URL, then runs a live check and redirects to a shareable result page.
+  The result data is encoded directly in the result URL's fragment, so viewing
+  a link never re-computes or re-calls the API — and every scan is *also*
+  persisted to a Netlify Blobs store (see "Persistence" below) so the founder
+  can browse past scans without hoarding links. Deployed to Netlify as site
+  `aivis-scan`.
 - **`web/shared/aivis-core.mjs`** — the single source of truth for prompt
-  templates, models, brand-detection, and the Perplexity API call. Both
-  `proof-script/index.mjs` and `web/netlify/functions/scan.mts` import it.
-  Physically lives under `web/` (not a project-root `shared/`) because
-  Netlify's manual-upload deploy only includes files inside the uploaded
-  directory — the function needs it in-tree to bundle correctly.
+  templates, models, brand-detection, and the Perplexity API call. Imported
+  by `proof-script/index.mjs`, `web/netlify/functions/scan.mts`/`enrich.mts`,
+  and (since the Vite/Vue migration, 2026-07-29) the Vue app under
+  `web/src/`. Deliberately kept as plain untyped `.mjs` at this exact path —
+  `proof-script` runs via plain `node index.mjs` with zero deps and zero
+  transpilation, so it cannot load a `.ts` file. Converting or moving this
+  file would break proof-script outright; if it ever needs real types, give
+  proof-script its own build step first.
 
 The full rationale (why Approach A first, what was rejected, what's deferred)
 lives in the design doc at
 `~/.gstack/projects/ai-business-score/marc-none-no-git-repo-design-20260728-153615.md`
-and its eng-review addendum. Read it before proposing scope changes — several
-things that look like obvious improvements (a test suite, vertical prompt
-templating, a real database) were deliberately deferred based on evidence
-gathered there.
+and its eng-review addendum. Read it before proposing further scope changes —
+a test suite and vertical prompt templating are still deliberately deferred
+based on evidence gathered there. **The "real database" deferral has since
+been reversed** (2026-07-29): `web/` writes every scan to a Netlify Blobs
+store now (see "Persistence" below) — the original reasoning was scoped to
+"don't build a DB just to make the stateless-link design work," which still
+holds, but it didn't anticipate a second, separate need: a history view the
+founder can browse without a database at all wasn't possible, and Blobs was
+the lowest-ceremony way to add one (zero external accounts, no connection
+string, bundles into the existing Netlify site). Neon Postgres (this
+project's usual default per the company CLAUDE.md) was intentionally *not*
+used here — provisioning it requires authorizing the Neon MCP connection
+interactively, which wasn't available when this was built; revisit if the
+data model outgrows a flat key-value store.
 
 **Known limitation (web/ only):** real Perplexity calls with `web_search`
 grounding routinely take 15-20s, sometimes longer. The scan function runs 3
@@ -54,21 +70,39 @@ Setup: copy `proof-script/.env.example` to `proof-script/.env` and set
 `prospects.json` and fill in real prospects (schema: brand, website,
 competitors, category, use_case, region, customer_segment).
 
-**Hosted site** (from `web/`): no local dev command has been set up — changes
-are deployed straight to Netlify (site `aivis-scan`, team `dizid`) via the
-Netlify MCP tools' `deploy-site` operation, pointed at the `web/` directory.
-Env vars (`PERPLEXITY_API_KEY`, `SCAN_PASSPHRASE`) are set on the Netlify site,
-not read from any local `.env` in `web/`. `netlify.toml` sets `publish = "."`
-and `functions = "netlify/functions"`.
+**Hosted site** (from `web/`): as of the 2026-07-29 Vite/Vue migration, `web/`
+has a real build step:
 
-No build step, no lint config, no test framework anywhere in this repo — Node
-18+ only (uses native `fetch`; the Netlify function's TypeScript is transpiled
-by Netlify's own build, not a local toolchain). No `package.json`, zero npm
-dependencies. Formal automated tests were explicitly deferred (see eng-review
-in the design doc) in favor of `--dry-run` as the pre-flight check for
-`proof-script/` — this started as a same-day, likely-single-use script, not
-shipped product code (Approach B has since made it a bit more durable, but the
-same low-ceremony bar still applies).
+```bash
+npm install       # from web/, after any dependency change
+npm run dev       # Vite dev server on :5173, @netlify/vite-plugin emulates
+                   # functions/blobs/env vars locally (no netlify dev needed)
+npm run type-check  # vue-tsc --noEmit
+npm run build     # vue-tsc --noEmit && vite build -> web/dist/
+```
+
+Deploys now go through **git-connected Netlify CI** (site `aivis-scan`, team
+`dizid`), not the old manual `deploy-site` MCP upload — pushing to the linked
+branch triggers Netlify to run `npm run build` itself and publish `web/dist`.
+`netlify.toml` sets `command = "npm run build"`, `publish = "dist"`,
+`functions = "netlify/functions"`, `node_bundler = "esbuild"`. Env vars
+(`PERPLEXITY_API_KEY`, `SCAN_PASSPHRASE`) are still set on the Netlify site
+itself, not read from any local `.env` in `web/` — unaffected by the
+build-mechanism change.
+
+No lint config, no test framework anywhere in this repo — `proof-script/`
+stays zero-dep, plain `node index.mjs`, no build step (see the aivis-core.mjs
+note above for why that constraint is load-bearing). `web/`'s Netlify
+Functions (`scan.mts`/`enrich.mts`/`history.mts`) are still bundled
+independently by Netlify's own esbuild function bundler at deploy time — they
+import `../../shared/aivis-core.mjs` directly and are unaffected by the
+frontend's Vite build. Formal automated tests were explicitly deferred (see
+eng-review in the design doc) in favor of `--dry-run` as the pre-flight check
+for `proof-script/` and `vue-tsc`/manual browser verification for `web/` —
+this started as a same-day, likely-single-use script, not shipped product
+code (Approach B has since made it a lot more durable, but the same
+low-ceremony bar still applies to test *automation*, not to skipping
+verification — see each page's section below for what was actually checked).
 
 ## Architecture
 
@@ -125,6 +159,28 @@ The single source of truth, imported by both entry points:
   batch — it would add a full sequential 15-20s+ on top of an already
   tight function-timeout budget. Don't add one without new empirical
   timeout testing, the same way the 6-call/20s config was arrived at.
+- **Enrichment** (`buildEnrichPrompt`, `parseEnrichmentResponse`) — used only
+  by `web/netlify/functions/enrich.mts` (below), not by `proof-script`.
+  `buildEnrichPrompt` asks a model to research a bare URL and return the rest
+  of the prospect fields as JSON; `parseEnrichmentResponse` extracts the
+  first `{...}` block from the reply (models sometimes wrap it in markdown
+  fences) and always returns every field, defaulted to `''`/`[]` rather than
+  throwing — a field the model couldn't infer should come back blank for the
+  human to fill in, never a parse error that blocks the form.
+
+### `web/vite.config.ts` — multi-page app, not a Vue-Router SPA
+
+Three independent Vue app instances/entry points (`index.html`, `result.html`,
+`history.html`, each with its own `web/src/<page>/main.ts` + `App.vue`) via
+`build.rollupOptions.input` — deliberately not a single-page app with
+client-side routing. This preserves the pre-migration URL structure and,
+more importantly, keeps `index.html`'s step-2 `<form method="POST"
+action="/scan">` a genuine native browser navigation: only that (not a
+client-side route change, not `fetch`) reliably carries the `/scan`
+redirect's URL fragment through to `result.html`. `web/src/shared/theme.css`
+centralizes the dataviz-skill palette (`--bg`/`--accent`/`--good`/etc.) that
+used to be hand-copied into all three pages' `<style>` blocks — page-specific
+styles still live in each page's own `App.vue` `<style scoped>`.
 
 ### `proof-script/index.mjs` (Approach A)
 
@@ -141,6 +197,21 @@ row per prospect appended to `tracking.csv` (sent-date/replied/note columns
 left blank for manual fill-in). `results/` and `tracking.csv` are gitignored —
 run output, not source.
 
+### `web/netlify/functions/enrich.mts` — auto-fill from a single URL
+
+POST `/enrich`, gated by the same `SCAN_PASSPHRASE` (it also spends real
+Perplexity budget: one `web_search`-grounded call). Takes `{ website,
+passphrase }` as JSON, asks `openai/gpt-5-mini` to research the site via
+`buildEnrichPrompt`, and returns the guessed `brand`/`category`/`use_case`/
+`region`/`customer_segment`/`competitors` via `parseEnrichmentResponse`. Two
+deliberate choices: (1) it **always returns 200** even when the underlying
+call fails (`{ ok: false, error }`) — enrichment failing is never fatal to the
+flow, `index.html` just falls through to a blank form, so there's no reason to
+make the caller branch on HTTP status *and* a body flag; (2) every returned
+field is best-effort and meant to be reviewed, never trusted blindly — this
+is a typing-reduction feature, not an auto-submit feature. Nothing here is
+persisted; only a completed `/scan` gets saved.
+
 ### `web/netlify/functions/scan.mts` (Approach B)
 
 A Netlify function (TypeScript, V2 format, routed to `/scan` via in-code
@@ -150,21 +221,52 @@ fully in parallel (`Promise.all`, no retry — a single serverless invocation
 doesn't have the CLI's budget for retries), aggregates via the shared core,
 computes `score` and `advice` (pure, synchronous, zero added API calls — see
 above), then **302-redirects to
-`/result.html#d=<base64url-encoded-JSON>`** — the payload includes `brand`,
-`website`, `category`, `citedCount`, `completedCalls`, `failedCalls`,
+`/result.html#d=<base64url-encoded-JSON>`** — the payload includes `id`,
+`brand`, `website`, `category`, `citedCount`, `completedCalls`, `failedCalls`,
 `ambiguousBrandFlag`, `perPromptRank`, `competitorTallies`, `score`, `advice`,
 `rawResponses`, `generatedAt`. The result data lives in the URL fragment
 itself, so `web/result.html` (plain client-side JS, no framework) decodes and
 renders it without ever calling the API again. This is deliberate: two views
 of the same link always show the same result, sidestepping the
 LLM-nondeterminism/credibility risk that came up during `/plan-eng-review`.
-`web/index.html` is the founder-facing input form (plain HTML, native form
-POST — not `fetch`, since only a native browser navigation reliably carries a
-redirect's URL fragment through).
+
+**Persistence:** right before redirecting, the same `payload` (plus the
+`encoded` string used in the redirect URL) is written to a Netlify Blobs store
+named `aivis-scans`, keyed by `payload.id` (a `crypto.randomUUID()`). This
+write is wrapped in try/catch and only `console.error`s on failure — it must
+never block or fail the redirect the founder is actively waiting on, since the
+stateless shareable link already worked without it and shouldn't regress if
+Blobs has a bad day. `web/netlify/functions/history.mts` is the only reader.
+
+`web/index.html` (thin Vite entry shell, real UI in `web/src/index/App.vue`)
+is the founder-facing input form — a two-step flow: step 1 is just a website
+URL (+ passphrase), submitted via `fetch` to `/enrich`; step 2 shows the same
+seven fields as before, pre-filled from step 1's response but every field
+stays a plain editable `<input>` bound with `v-model`, plus a "skip, fill in
+manually" escape hatch that jumps straight to step 2 blank. Step 2's submit
+is still a native `<form method="POST" action="/scan">` — the `@submit`
+handler updates UI state only and must never call `preventDefault()`, since
+only a native browser navigation reliably carries the `/scan` redirect's URL
+fragment through (see the `vite.config.ts` note above).
+
+### `web/netlify/functions/history.mts` + `web/history.html`
+
+POST `/history` (passphrase in the JSON body, not a query string — avoids
+leaking it into access logs/browser history) lists every record in the
+`aivis-scans` Blobs store, sorted by `generatedAt` descending (plain string
+comparison — the field is always an ISO timestamp). `web/history.html` (thin
+shell; UI in `web/src/history/App.vue`) is a passphrase-gated page that calls
+it and renders each scan as a card (brand, category, date, score) linking to
+`/result.html#d=<encoded>` using the `encoded` string that was persisted
+alongside — the history page never re-derives or re-encodes the payload
+itself, it just replays the exact fragment `/scan` already built. The
+score-to-color mapping imports `scoreBand` from `aivis-core.mjs` rather than
+re-deriving the 80/50/1 thresholds locally.
 
 ### `web/result.html` — dashboard rendering
 
-`validatePayload()` extends the same fail-closed pattern for every new field:
+Thin Vite entry shell; the actual page is `web/src/result/App.vue`.
+`validatePayload()` extends the same fail-closed pattern for every field:
 `score` bounds-checked 0-100 or `null`; `competitorTallies` capped at 12
 entries with cross-field sanity bounds (`mentionCount <= completedCalls`,
 `beatBrandCount <= mentionCount`); `advice` capped at 3 entries, `id`/`tone`
@@ -173,20 +275,23 @@ individually at render time (not trusted blindly) so a malformed-but-schema-
 valid advice item degrades gracefully instead of throwing. The payload is
 inherently unsigned/forgeable — anyone can craft a `#d=` link — so this
 validation is the only thing standing between a hostile link and whatever
-renders; extend it, don't bypass it, when adding fields.
+renders; extend it, don't bypass it, when adding fields. Headline and advice
+copy are rendered via Vue template branches (auto-escaping), not raw HTML
+string concatenation + `v-html` — removes a whole class of escaping mistakes
+the old hand-rolled `esc()` approach depended on getting right every time.
 
 Visual design follows the `dataviz` skill's reference palette (chart chrome +
 fixed status colors: good/warning/serious/critical), used verbatim, not
-re-derived. Score ring: hand-rolled SVG circular meter (`stroke-dasharray`/
-`stroke-dashoffset`), track color-independent from fill, banded by
-`scoreBand()` (duplicated by hand from `aivis-core.mjs` — this file has no
-module import graph by design, see the "no build step" note above; keep the
-two in sync manually if the bands ever change). Scoreboard: an **emphasis**
-bar chart (brand in accent blue, competitors in a de-emphasis gray — "one
-series is the point, rest are context," per the skill's form-choice
-guidance), brand always pinned first, competitors sorted by `mentionCount`
-descending. Advice cards: status-colored left border + an explicit text tag
-(`Priority`/`Watch this`/`Working well`/`Also worth noting`) — never color
-alone, matching the skill's status-color rule. `web/index.html`'s palette
-mirrors this file's CSS custom properties so the form and result page read as
-one product.
+re-derived — centralized once in `web/src/shared/theme.css` (see the
+`vite.config.ts` note above). Score ring: hand-rolled SVG circular meter
+(`stroke-dasharray`/`stroke-dashoffset`), track color-independent from fill,
+banded by `scoreBand()` **imported directly from `aivis-core.mjs`** (no
+longer hand-duplicated — the old "this file has no module import graph by
+design, keep the two in sync manually" caveat no longer applies now that the
+page is a real ES module). Scoreboard: an **emphasis** bar chart (brand in
+accent blue, competitors in a de-emphasis gray — "one series is the point,
+rest are context," per the skill's form-choice guidance), brand always
+pinned first, competitors sorted by `mentionCount` descending. Advice cards:
+status-colored left border + an explicit text tag (`Priority`/`Watch
+this`/`Working well`/`Also worth noting`) — never color alone, matching the
+skill's status-color rule.

@@ -10,6 +10,7 @@
 // public POST endpoint that costs real money per call can't be hit by bots.
 
 import type { Config } from '@netlify/functions';
+import { getStore } from '@netlify/blobs';
 import {
   PROMPT_TEMPLATES,
   MODELS,
@@ -96,6 +97,7 @@ export default async (req: Request) => {
   const advice = selectAdvice(agg);
 
   const payload = {
+    id: crypto.randomUUID(),
     brand: agg.prospect.brand,
     website: normalizeUrl(agg.prospect.website),
     category: agg.prospect.category,
@@ -112,6 +114,17 @@ export default async (req: Request) => {
   };
 
   const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+
+  // Persist a copy for the /history view. Purely additive — the redirect
+  // below still carries the full result in the URL fragment itself, so a
+  // shared link keeps working with zero reads from this store; this write
+  // only exists so the founder can browse past scans without hoarding links.
+  try {
+    const store = getStore('aivis-scans');
+    await store.setJSON(payload.id, { ...payload, encoded });
+  } catch (err) {
+    console.error('Failed to save scan to Blobs store:', err);
+  }
 
   return new Response(null, {
     status: 302,

@@ -294,6 +294,53 @@ export function selectAdvice(agg) {
   return cards.slice(0, 3);
 }
 
+// ---------- Enrichment (auto-fill prospect fields from a URL) ----------
+// One Perplexity web_search call that researches a site and guesses the
+// rest of the scan form's fields, so the founder can start from a single
+// URL instead of typing seven fields by hand. Best-effort by design: every
+// field comes back empty rather than guessed wildly when the model isn't
+// confident, since a wrong guess the user doesn't notice is worse than an
+// empty box they have to fill in themselves (auto-fill must stay optional
+// and editable, never authoritative).
+export function buildEnrichPrompt(website) {
+  return `Research the company at ${website}. Based on their website and anything else you can find about them online, respond with ONLY a JSON object (no markdown fences, no commentary before or after) with these fields:
+{
+  "brand": "the company's brand/business name",
+  "category": "the general category a customer would search for, e.g. 'emergency plumber' or 'project management software'",
+  "use_case": "a concrete scenario someone in this category is trying to solve, e.g. 'a burst pipe at home'",
+  "region": "the city, country, or market they primarily serve",
+  "customer_segment": "who typically buys from them, e.g. 'homeowners' or 'small marketing teams'",
+  "competitors": ["2-3 real, named competing companies or brands in the same category"]
+}
+Leave a field as an empty string (or empty array for competitors) if you can't confidently determine it from the site. Do not invent facts.`;
+}
+
+// Lenient JSON extraction: models sometimes wrap JSON in markdown fences or
+// add a stray sentence before/after — strip both rather than failing the
+// whole enrichment over formatting. Always returns every field (defaulted
+// empty), so the caller can spread the result straight into form fields
+// without further null-checking.
+export function parseEnrichmentResponse(text) {
+  const empty = { brand: '', category: '', use_case: '', region: '', customer_segment: '', competitors: [] };
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return empty;
+  try {
+    const parsed = JSON.parse(match[0]);
+    return {
+      brand: typeof parsed.brand === 'string' ? parsed.brand.trim() : '',
+      category: typeof parsed.category === 'string' ? parsed.category.trim() : '',
+      use_case: typeof parsed.use_case === 'string' ? parsed.use_case.trim() : '',
+      region: typeof parsed.region === 'string' ? parsed.region.trim() : '',
+      customer_segment: typeof parsed.customer_segment === 'string' ? parsed.customer_segment.trim() : '',
+      competitors: Array.isArray(parsed.competitors)
+        ? parsed.competitors.filter((c) => typeof c === 'string' && c.trim()).map((c) => c.trim()).slice(0, 3)
+        : [],
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export function requiredProspectFields() {
   return ['brand', 'website', 'competitors', 'category', 'use_case', 'region', 'customer_segment'];
 }

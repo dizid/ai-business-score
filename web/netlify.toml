@@ -1,6 +1,11 @@
 [build]
-  publish = "."
+  command = "npm run build"
+  publish = "dist"
   functions = "netlify/functions"
 
 [functions]
   node_bundler = "esbuild"
+
+[dev]
+  command = "npm run dev"
+  targetPort = 5173

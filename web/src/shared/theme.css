@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/* AIVis shared palette — dataviz-skill reference values (chart chrome +
+   fixed status colors), used verbatim across all three pages. Centralized
+   here instead of hand-copied into index.html/result.html/history.html. */
+:root {
+  color-scheme: light;
+  --bg: #f9f9f7;
+  --card: #fcfcfb;
+  --fg: #0b0b0b;
+  --muted: #52514e;
+  --faint: #898781;
+  --border: rgba(11, 11, 11, 0.10);
+  --gridline: #e1e0d9;
+  --accent: #2a78d6;
+  --debar: #d8d6cd;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --success-text: #006300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg: #0d0d0d;
+    --card: #1a1a19;
+    --fg: #ffffff;
+    --muted: #c3c2b7;
+    --faint: #898781;
+    --border: rgba(255, 255, 255, 0.10);
+    --gridline: #2c2c2a;
+    --accent: #3987e5;
+    --debar: #3c3b37;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --success-text: #0ca30c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --card: #1a1a19;
+  --fg: #ffffff;
+  --muted: #c3c2b7;
+  --faint: #898781;
+  --border: rgba(255, 255, 255, 0.10);
+  --gridline: #2c2c2a;
+  --accent: #3987e5;
+  --debar: #3c3b37;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --success-text: #0ca30c;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+a { color: var(--accent); }
