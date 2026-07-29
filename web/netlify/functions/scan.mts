@@ -15,6 +15,8 @@ import {
   MODELS,
   callModel,
   aggregateProspect,
+  computeScore,
+  selectAdvice,
   missingProspectFields,
   normalizeUrl,
 } from '../../shared/aivis-core.mjs';
@@ -83,7 +85,15 @@ export default async (req: Request) => {
     })
   );
 
+  // Score/advice are pure, synchronous, in-memory computations on `agg` —
+  // no new API calls, no added latency. Do not add a live "advice" LLM call
+  // here: it would need these aggregated results as input, so it couldn't
+  // join the Promise.all batch above — it would add a full sequential
+  // 15-20s+ on top of the timeout budget that was already tuned down once
+  // (10 calls -> gateway timeout; 6 calls @ 20s/call -> works).
   const agg = aggregateProspect(prospect, callResults);
+  const score = computeScore(agg.perPromptRank, agg.completedCalls);
+  const advice = selectAdvice(agg);
 
   const payload = {
     brand: agg.prospect.brand,
@@ -94,6 +104,9 @@ export default async (req: Request) => {
     failedCalls: agg.failedCalls,
     ambiguousBrandFlag: agg.ambiguousBrandFlag,
     perPromptRank: agg.perPromptRank,
+    competitorTallies: agg.competitorTallies,
+    score,
+    advice,
     rawResponses: agg.rawResponses,
     generatedAt: new Date().toISOString(),
   };
