@@ -1,0 +1,20 @@
+[
+  {
+    "brand": "Acme Plumbing",
+    "website": "https://acmeplumbing.example.com",
+    "competitors": ["Bob's Pipes", "QuickFlow Plumbing"],
+    "category": "emergency plumber",
+    "use_case": "a burst pipe at home",
+    "region": "Rotterdam",
+    "customer_segment": "homeowners"
+  },
+  {
+    "brand": "Northwind Bakery",
+    "website": "https://northwindbakery.example.com",
+    "competitors": ["Sunrise Bread Co", "The Flour Mill"],
+    "category": "artisan bakery",
+    "use_case": "a custom wedding cake",
+    "region": "Amsterdam",
+    "customer_segment": "couples planning a wedding"
+  }
+]

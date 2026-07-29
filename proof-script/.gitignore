@@ -1,0 +1,4 @@
+.env
+results/
+tracking.csv
+node_modules/
