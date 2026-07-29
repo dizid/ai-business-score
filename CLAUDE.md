@@ -97,9 +97,34 @@ The single source of truth, imported by both entry points:
   skip auto-detection rather than false-matching everywhere.
 - **Aggregation** (`aggregateProspect`) — cited count, completed vs. failed
   call counts (tracked separately so a failed batch doesn't silently read as
-  "zero citations"), and a heuristic first-mention-order ranking
+  "zero citations"), a heuristic first-mention-order ranking
   (ranked-1 / beaten / not-mentioned) — explicitly labeled as unverified since
-  detection is presence-only.
+  detection is presence-only — and **`competitorTallies`** (per-named-competitor
+  `mentionCount`/`beatBrandCount`, computed unconditionally per completed
+  response, not gated on the brand itself being cited — a response that
+  mentions a competitor while the brand is absent is real scoreboard signal
+  and would otherwise be lost).
+- **Score** (`computeScore`, `scoreBand`) — 0-100 (or `null` if
+  `completedCalls === 0` — never a fake 0; a 0 must mean "genuinely
+  invisible," not "the API failed"). Formula: `round(100 * (ranked1Count +
+  0.4 * beatenCount) / completedCalls)` — the `0.4` (`SCORE_BEATEN_WEIGHT`)
+  is a named, tunable constant giving partial credit for "mentioned but
+  beaten." **This reverses an explicit `/office-hours` decision** against
+  precise/re-verifiable numeric claims — that reasoning was scoped to
+  cold-email copy sent to a skeptical prospect (LLM nondeterminism → a
+  re-run showing a different number was a credibility risk); a score shown
+  on a link the founder shares with a friend to gauge interest is a
+  different audience with no fact-checking motive, so the reversal is
+  deliberate, not silent. `proof-script`'s cold-email draft language is
+  untouched and stays directional.
+- **Advice** (`selectAdvice`) — rule-based/templated, not a live LLM call.
+  Returns structured scenario data (`id`, `tone`, small `params`), not
+  freeform text; the English copy lives in `result.html`'s `ADVICE_COPY`
+  lookup. Deliberately synchronous: an AI-generated-advice call would need
+  the aggregated results as input, so it couldn't join the `Promise.all`
+  batch — it would add a full sequential 15-20s+ on top of an already
+  tight function-timeout budget. Don't add one without new empirical
+  timeout testing, the same way the 6-call/20s config was arrived at.
 
 ### `proof-script/index.mjs` (Approach A)
 
@@ -123,11 +148,45 @@ A Netlify function (TypeScript, V2 format, routed to `/scan` via in-code
 auth — this is a public URL that costs real money per call). Runs the 6 checks
 fully in parallel (`Promise.all`, no retry — a single serverless invocation
 doesn't have the CLI's budget for retries), aggregates via the shared core,
-then **302-redirects to `/result.html#d=<base64url-encoded-JSON>`** — the
-result data lives in the URL fragment itself, so `web/result.html` (plain
-client-side JS, no framework) decodes and renders it without ever calling the
-API again. This is deliberate: two views of the same link always show the
-same result, sidestepping the LLM-nondeterminism/credibility risk that came up
-during `/plan-eng-review`. `web/index.html` is the founder-facing input form
-(plain HTML, native form POST — not `fetch`, since only a native browser
-navigation reliably carries a redirect's URL fragment through).
+computes `score` and `advice` (pure, synchronous, zero added API calls — see
+above), then **302-redirects to
+`/result.html#d=<base64url-encoded-JSON>`** — the payload includes `brand`,
+`website`, `category`, `citedCount`, `completedCalls`, `failedCalls`,
+`ambiguousBrandFlag`, `perPromptRank`, `competitorTallies`, `score`, `advice`,
+`rawResponses`, `generatedAt`. The result data lives in the URL fragment
+itself, so `web/result.html` (plain client-side JS, no framework) decodes and
+renders it without ever calling the API again. This is deliberate: two views
+of the same link always show the same result, sidestepping the
+LLM-nondeterminism/credibility risk that came up during `/plan-eng-review`.
+`web/index.html` is the founder-facing input form (plain HTML, native form
+POST — not `fetch`, since only a native browser navigation reliably carries a
+redirect's URL fragment through).
+
+### `web/result.html` — dashboard rendering
+
+`validatePayload()` extends the same fail-closed pattern for every new field:
+`score` bounds-checked 0-100 or `null`; `competitorTallies` capped at 12
+entries with cross-field sanity bounds (`mentionCount <= completedCalls`,
+`beatBrandCount <= mentionCount`); `advice` capped at 3 entries, `id`/`tone`
+checked against fixed enums, and each `params` field re-validated
+individually at render time (not trusted blindly) so a malformed-but-schema-
+valid advice item degrades gracefully instead of throwing. The payload is
+inherently unsigned/forgeable — anyone can craft a `#d=` link — so this
+validation is the only thing standing between a hostile link and whatever
+renders; extend it, don't bypass it, when adding fields.
+
+Visual design follows the `dataviz` skill's reference palette (chart chrome +
+fixed status colors: good/warning/serious/critical), used verbatim, not
+re-derived. Score ring: hand-rolled SVG circular meter (`stroke-dasharray`/
+`stroke-dashoffset`), track color-independent from fill, banded by
+`scoreBand()` (duplicated by hand from `aivis-core.mjs` — this file has no
+module import graph by design, see the "no build step" note above; keep the
+two in sync manually if the bands ever change). Scoreboard: an **emphasis**
+bar chart (brand in accent blue, competitors in a de-emphasis gray — "one
+series is the point, rest are context," per the skill's form-choice
+guidance), brand always pinned first, competitors sorted by `mentionCount`
+descending. Advice cards: status-colored left border + an explicit text tag
+(`Priority`/`Watch this`/`Working well`/`Also worth noting`) — never color
+alone, matching the skill's status-color rule. `web/index.html`'s palette
+mirrors this file's CSS custom properties so the form and result page read as
+one product.
