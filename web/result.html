@@ -109,6 +109,70 @@
     );
   }
 
+  // This page has no way to verify the #d= payload actually came from a real
+  // /scan call — it's a public static page reading data from a URL fragment,
+  // which anyone can forge and send as a link. String fields are safe once
+  // passed through esc() at render time, but numbers and enums need their
+  // own contract enforced here — a forged "citedCount" or "rank" string
+  // interpolated raw would be a DOM XSS. Fail closed: reject anything that
+  // doesn't match the exact shape scan.mts produces, rather than coercing
+  // and hoping for the best.
+  const RANKS = new Set(['ranked-1', 'beaten', 'not-mentioned']);
+
+  function asNonNegativeInt(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) return null;
+    return n;
+  }
+
+  function validatePayload(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    if (typeof raw.brand !== 'string' || typeof raw.website !== 'string' || typeof raw.category !== 'string') return null;
+
+    const citedCount = asNonNegativeInt(raw.citedCount);
+    const completedCalls = asNonNegativeInt(raw.completedCalls);
+    const failedCalls = asNonNegativeInt(raw.failedCalls);
+    if (citedCount === null || completedCalls === null || failedCalls === null) return null;
+
+    if (!Array.isArray(raw.perPromptRank)) return null;
+    const perPromptRank = [];
+    for (const r of raw.perPromptRank) {
+      const promptIndex = asNonNegativeInt(r && r.promptIndex);
+      if (promptIndex === null || !RANKS.has(r.rank)) return null;
+      perPromptRank.push({ promptIndex, rank: r.rank });
+    }
+
+    if (!Array.isArray(raw.rawResponses)) return null;
+    const rawResponses = [];
+    for (const r of raw.rawResponses) {
+      const promptIndex = asNonNegativeInt(r && r.promptIndex);
+      if (promptIndex === null || typeof r.model !== 'string' || typeof r.text !== 'string') return null;
+      rawResponses.push({ promptIndex, model: r.model, text: r.text });
+    }
+
+    const generatedAtDate = new Date(raw.generatedAt);
+    if (Number.isNaN(generatedAtDate.getTime())) return null;
+
+    // href-safety: only http(s) links get rendered as clickable — anything
+    // else (javascript:, data:, etc.) is dropped rather than escaped, since
+    // HTML-escaping a URL does not neutralize a javascript: scheme.
+    const safeWebsiteHref = /^https?:\/\//i.test(raw.website) ? raw.website : null;
+
+    return {
+      brand: raw.brand,
+      website: raw.website,
+      safeWebsiteHref,
+      category: raw.category,
+      citedCount,
+      completedCalls,
+      failedCalls,
+      ambiguousBrandFlag: raw.ambiguousBrandFlag === true,
+      perPromptRank,
+      rawResponses,
+      generatedAtDate,
+    };
+  }
+
   function render() {
     const app = document.getElementById('app');
     const hash = window.location.hash.replace(/^#/, '');
@@ -120,11 +184,17 @@
       return;
     }
 
-    let data;
+    let raw;
     try {
-      data = JSON.parse(b64urlDecode(encoded));
+      raw = JSON.parse(b64urlDecode(encoded));
     } catch (err) {
       app.innerHTML = '<h1>Could not read result</h1><p id="error">This link\'s data could not be decoded. Ask for a fresh link.</p>';
+      return;
+    }
+
+    const data = validatePayload(raw);
+    if (!data) {
+      app.innerHTML = '<h1>Invalid result data</h1><p id="error">This link\'s data doesn\'t match the expected format — it may be corrupted or not a genuine AIVis link. Ask for a fresh link.</p>';
       return;
     }
 
@@ -143,7 +213,11 @@
 
     let html = '';
     html += `<h1>${esc(data.brand)}</h1>`;
-    html += `<div class="meta"><a href="${esc(data.website)}" target="_blank" rel="noopener">${esc(data.website)}</a> &middot; checked ${esc(new Date(data.generatedAt).toLocaleString())}</div>`;
+    html += '<div class="meta">';
+    html += data.safeWebsiteHref
+      ? `<a href="${esc(data.safeWebsiteHref)}" target="_blank" rel="noopener">${esc(data.website)}</a>`
+      : esc(data.website);
+    html += ` &middot; checked ${esc(data.generatedAtDate.toLocaleString())}</div>`;
     html += `<div class="headline">${headline}</div>`;
 
     if (data.ambiguousBrandFlag) {
