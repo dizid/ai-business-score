@@ -1,6 +1,49 @@
 # TODOs
 
-## STATUS 2026-07-29: Vite + TypeScript + Vue migration for `web/` — DONE locally, not yet deployed
+## STATUS 2026-08-02: Vite + TypeScript + Vue migration for `web/` — SHIPPED, verified in production
+
+Merged `vite-vue-migration` into `master` (fast-forward, `7005ae2`) and
+confirmed the site is live on the new build.
+
+The Netlify site (`aivis-scan`) turned out to already be Git-linked to
+`dizid/ai-business-score`, but its build settings had base directory `/`
+with no build command/publish directory set — it had no way to find
+`web/netlify.toml`, since the repo root never had one (the site was always
+deployed via manual `dist` upload before). Fixed by adding a one-line root
+`netlify.toml` (`[build]\n  base = "web"`) — Netlify's documented monorepo
+pattern: it cd's into `web/` and picks up the existing config there, so
+nothing needed to change inside `web/netlify.toml` itself.
+
+**Caveat:** two pushes to `master` since the repo was linked (the migration
+merge, then the `netlify.toml` fix) have **not** triggered an automatic
+Netlify build — `currentDeploy` never moved off whatever was last
+published. To get the fix live without waiting on an unexplained CI gap, a
+manual deploy (`netlify-deploy-services-updater` → `deploy-site`, pointed at
+`web/`) was pushed directly — deploy `6a6da6858672bf1d00b9c0a4`, `state:
+ready`, correctly built with Vite/vue-tsc, 3 functions (`enrich`, `history`,
+`scan`) deployed, 3 pages published. **Follow-up still open:** figure out
+why push-triggered auto-deploy isn't firing (check the GitHub webhook under
+Site configuration → Build & deploy → Continuous deployment, or try a
+manual "Trigger deploy" once to see if that re-establishes it) — until then,
+future pushes to `master` will need a manual `deploy-site` call too.
+
+Verified for real in production (not just deployed):
+- `https://aivis-scan.netlify.app/` serves the new Vite-built `index.html`
+  (hashed `/assets/*` bundle, not the old inline-`<style>` vanilla page).
+- Ran one real `/scan` (brand "Acme Plumbing", the same example already used
+  as UI placeholder text) — 3 of 6 Perplexity calls completed within the 20s
+  timeout (3 timed out, consistent with documented real-world variance), got
+  a valid 302 redirect with a correctly-shaped payload (score 0, `advice:
+  zero-citations`).
+- Loaded the resulting `/result.html#d=...` in a real headless browser: score
+  ring, "3 of 6 checks failed" warning banner, scoreboard bars, and the
+  red-bordered "Priority" advice card all rendered correctly, zero console
+  errors.
+- Confirmed the scan appears in `/history` (`POST /history` with the
+  passphrase) with the correct brand/score, sorted newest-first alongside
+  two earlier scans.
+
+## STATUS 2026-07-29 (superseded above): Vite + TypeScript + Vue migration for `web/` — DONE locally, not yet deployed
 
 Rewrote `web/` on branch `vite-vue-migration` per the (corrected)
 `MIGRATION.md` plan: added a real build pipeline (Vite, TypeScript,
