@@ -96,6 +96,16 @@ export default async (req: Request) => {
   const score = computeScore(agg.perPromptRank, agg.completedCalls);
   const advice = selectAdvice(agg);
 
+  // Surface failed-call reasons in the function log so a systematic failure
+  // (e.g. a deprecated model ID returning HTTP 400, vs. a one-off timeout) is
+  // diagnosable from the Netlify logs, not just visible as an opaque count.
+  if (agg.failures.length > 0) {
+    console.error(
+      `scan ${agg.prospect.brand}: ${agg.failures.length}/${callResults.length} calls failed — ` +
+        agg.failures.map((f) => `${f.model} (prompt ${f.promptIndex}): ${f.error}`).join(' | ')
+    );
+  }
+
   const payload = {
     id: crypto.randomUUID(),
     brand: agg.prospect.brand,
@@ -110,6 +120,7 @@ export default async (req: Request) => {
     score,
     advice,
     rawResponses: agg.rawResponses,
+    failures: agg.failures,
     generatedAt: new Date().toISOString(),
   };
 

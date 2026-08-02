@@ -208,6 +208,7 @@ export function aggregateProspect(prospect, callResults) {
     perPromptRank,
     competitorTallies,
     rawResponses: completed.map((r) => ({ model: r.model, promptIndex: r.promptIndex, text: r.text })),
+    failures: failed.map((r) => ({ model: r.model, promptIndex: r.promptIndex, error: String(r.error ?? '').slice(0, 300) })),
     totalTokens: completed.reduce((sum, r) => sum + (r.usage?.total_tokens ?? 0), 0),
   };
 }

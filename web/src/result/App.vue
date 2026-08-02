@@ -10,6 +10,7 @@ interface PerPromptRank { promptIndex: number; rank: Rank; }
 interface CompetitorTally { name: string; mentionCount: number; beatBrandCount: number; }
 interface AdviceCard { id: AdviceId; tone: AdviceTone; params: Record<string, unknown>; }
 interface RawResponse { promptIndex: number; model: string; text: string; }
+interface FailureItem { model: string; promptIndex: number; error: string; }
 
 interface ValidatedPayload {
   brand: string;
@@ -25,6 +26,7 @@ interface ValidatedPayload {
   score: number | null;
   advice: AdviceCard[];
   rawResponses: RawResponse[];
+  failures: FailureItem[];
   generatedAtDate: Date;
 }
 
@@ -41,6 +43,8 @@ const ADVICE_TONES = new Set(['critical', 'warning', 'positive', 'neutral']);
 const MAX_COMPETITORS = 12;
 const MAX_ADVICE_CARDS = 3;
 const MAX_NAME_LEN = 120;
+const MAX_FAILURES = 12;
+const MAX_ERROR_LEN = 300;
 
 function asNonNegativeInt(v: unknown): number | null {
   const n = Number(v);
@@ -123,6 +127,21 @@ function validatePayload(raw: any): ValidatedPayload | null {
     rawResponses.push({ promptIndex, model: r.model, text: r.text });
   }
 
+  // failures: optional diagnostic list (why calls failed). Fail-closed on
+  // structural problems, but the error text is free-form model/gateway output
+  // so it's coerced+truncated rather than rejected. Same forgeable-payload
+  // discipline as every other field here.
+  const failures: FailureItem[] = [];
+  if (raw.failures !== undefined) {
+    if (!Array.isArray(raw.failures) || raw.failures.length > MAX_FAILURES) return null;
+    for (const f of raw.failures) {
+      const promptIndex = asNonNegativeInt(f && f.promptIndex);
+      if (promptIndex === null || typeof f.model !== 'string' || f.model.length > MAX_NAME_LEN) return null;
+      const error = typeof f.error === 'string' ? f.error.slice(0, MAX_ERROR_LEN) : '';
+      failures.push({ model: f.model, promptIndex, error });
+    }
+  }
+
   const generatedAtDate = new Date(raw.generatedAt);
   if (Number.isNaN(generatedAtDate.getTime())) return null;
 
@@ -145,6 +164,7 @@ function validatePayload(raw: any): ValidatedPayload | null {
     score,
     advice,
     rawResponses,
+    failures,
     generatedAtDate,
   };
 }
@@ -298,6 +318,9 @@ const visibleAdvice = computed(() =>
       </div>
       <div class="warn" v-if="data.failedCalls > 0">
         {{ data.failedCalls }} of {{ data.completedCalls + data.failedCalls }} checks failed to complete and are not counted above.
+        <ul class="fail-reasons" v-if="data.failures.length">
+          <li v-for="(f, i) in data.failures" :key="i"><code>{{ f.model }}</code> — {{ f.error || 'no error message' }}</li>
+        </ul>
       </div>
 
       <!-- scoreboard: emphasis bar chart (brand = accent, rivals = de-emphasis gray) -->
@@ -404,6 +427,8 @@ h1 { font-size: 1.5rem; margin: 0 0 2px; }
   font-size: 0.88rem;
   margin-bottom: 12px;
 }
+.fail-reasons { margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+.fail-reasons code { font-size: 12px; word-break: break-all; }
 
 /* ---- scoreboard (emphasis bar chart: brand = accent, rivals = de-emphasis gray) ---- */
 .board-row { margin-bottom: 12px; }

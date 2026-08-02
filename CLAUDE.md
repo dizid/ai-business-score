@@ -224,7 +224,7 @@ above), then **302-redirects to
 `/result.html#d=<base64url-encoded-JSON>`** — the payload includes `id`,
 `brand`, `website`, `category`, `citedCount`, `completedCalls`, `failedCalls`,
 `ambiguousBrandFlag`, `perPromptRank`, `competitorTallies`, `score`, `advice`,
-`rawResponses`, `generatedAt`. The result data lives in the URL fragment
+`rawResponses`, `failures`, `generatedAt`. The result data lives in the URL fragment
 itself, so `web/result.html` (plain client-side JS, no framework) decodes and
 renders it without ever calling the API again. This is deliberate: two views
 of the same link always show the same result, sidestepping the
