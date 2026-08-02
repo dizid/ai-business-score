@@ -14,18 +14,24 @@ deployed via manual `dist` upload before). Fixed by adding a one-line root
 pattern: it cd's into `web/` and picks up the existing config there, so
 nothing needed to change inside `web/netlify.toml` itself.
 
-**Caveat:** two pushes to `master` since the repo was linked (the migration
-merge, then the `netlify.toml` fix) have **not** triggered an automatic
-Netlify build — `currentDeploy` never moved off whatever was last
-published. To get the fix live without waiting on an unexplained CI gap, a
-manual deploy (`netlify-deploy-services-updater` → `deploy-site`, pointed at
-`web/`) was pushed directly — deploy `6a6da6858672bf1d00b9c0a4`, `state:
-ready`, correctly built with Vite/vue-tsc, 3 functions (`enrich`, `history`,
-`scan`) deployed, 3 pages published. **Follow-up still open:** figure out
-why push-triggered auto-deploy isn't firing (check the GitHub webhook under
-Site configuration → Build & deploy → Continuous deployment, or try a
-manual "Trigger deploy" once to see if that re-establishes it) — until then,
-future pushes to `master` will need a manual `deploy-site` call too.
+**Auto-deploy root cause, found and fixed:** two pushes to `master` right
+after linking didn't trigger a build — `currentDeploy` never moved. Root
+cause was a **duplicate Netlify project**: `ai-score11` (same team, zero env
+vars set) was the one actually receiving the GitHub webhook for this repo,
+not `aivis-scan` (which has the real `PERPLEXITY_API_KEY`/`SCAN_PASSPHRASE`).
+Confirmed by checking `ai-score11`'s deploy history directly — it had
+silently auto-built the `netlify.toml` fix commit while `aivis-scan` sat
+idle. Any `/scan` on `ai-score11` would have 500'd on the missing API key
+before ever touching Blobs, so deleting it was safe (no data at risk).
+Fixed by: deleting `ai-score11` in the dashboard, then unlinking and
+re-linking the GitHub repo on `aivis-scan`'s own Build & deploy settings
+(deleting the duplicate alone did *not* auto-transfer the webhook — a fresh
+link was still required). Verified with two trivial commits: the first
+(pre-relink) still didn't trigger a build; the second, after re-linking,
+deployed automatically in 14s (`deploy 6a6f1c7ace942b0008a3061a`, correct
+commit ref, `master--aivis-scan.netlify.app` branch subdomain). Auto-deploy
+on push is now confirmed working end-to-end — no more manual `deploy-site`
+calls needed for `web/` changes.
 
 Verified for real in production (not just deployed):
 - `https://aivis-scan.netlify.app/` serves the new Vite-built `index.html`
