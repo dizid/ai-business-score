@@ -5,7 +5,10 @@ import { neon } from '@neondatabase/serverless';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
-let cachedSql: ReturnType<typeof neon> | null = null;
+// Pin the generics to the default (object rows, not full results) so every
+// call site gets a plain `Record<string, any>[]` back instead of the full
+// arrayMode/fullResults overload union.
+let cachedSql: ReturnType<typeof neon<false, false>> | null = null;
 
 export function sql() {
   if (cachedSql) return cachedSql;
@@ -13,6 +16,6 @@ export function sql() {
   if (!databaseUrl) {
     throw new Error('Server misconfigured: DATABASE_URL not set');
   }
-  cachedSql = neon(databaseUrl);
+  cachedSql = neon<false, false>(databaseUrl);
   return cachedSql;
 }

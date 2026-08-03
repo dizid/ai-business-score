@@ -7,9 +7,7 @@ import { sql } from './_shared/db.mts';
 
 export default async (req: Request) => {
   const db = sql();
-  const rows = (await db`SELECT count(*)::int AS count FROM public.companies`) as {
-    count: number;
-  }[];
+  const rows = await db`SELECT count(*)::int AS count FROM public.companies`;
   return new Response(JSON.stringify({ companies: rows[0].count }), {
     headers: { 'Content-Type': 'application/json' },
   });
