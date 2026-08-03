@@ -7,7 +7,7 @@
 //   node index.mjs --prospects prospects.json          (the real run)
 //
 // Shared detection/API logic lives in ../shared/aivis-core.mjs — also used by
-// web/netlify/functions/scan.mjs (Approach B, the hosted version).
+// netlify/functions/scan.mts (Approach B, the hosted version).
 
 import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -20,7 +20,7 @@ import {
   callModel,
   aggregateProspect,
   missingProspectFields,
-} from '../web/shared/aivis-core.mjs';
+} from '../shared/aivis-core.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

@@ -5,4 +5,7 @@ DEV.md
 node_modules/
 .DS_Store
 .gstack/
-web/dist/
+dist/
+
+# Local Netlify folder
+.netlify

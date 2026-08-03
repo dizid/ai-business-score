@@ -2,7 +2,7 @@
   "name": "aivis-web",
   "private": true,
   "type": "module",
-  "description": "AIVis hosted site — Vite + TypeScript + Vue 3 frontend, plus Netlify Functions runtime deps. `npm run build` produces web/dist (published by Netlify CI); Netlify's esbuild bundler resolves netlify/functions/* independently from node_modules at deploy time.",
+  "description": "AIVis hosted site — Vite + TypeScript + Vue 3 frontend, plus Netlify Functions runtime deps. `npm run build` produces dist (published by Netlify CI); Netlify's esbuild bundler resolves netlify/functions/* independently from node_modules at deploy time.",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
