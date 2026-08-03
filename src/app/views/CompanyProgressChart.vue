@@ -61,6 +61,15 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+// Anchor the first/last labels to the inside edge so they never clip past
+// the SVG viewport — only interior labels center on their point.
+function labelAnchor(index: number): 'start' | 'middle' | 'end' {
+  if (points.value.length <= 1) return 'middle';
+  if (index === 0) return 'start';
+  if (index === points.value.length - 1) return 'end';
+  return 'middle';
+}
+
 // Show every date label when few points, else just first/last to avoid
 // overlap — consistent with the skill's "selective direct labels, never a
 // number on every point" guidance.
@@ -91,7 +100,7 @@ const hovered = computed(() => (hoveredIndex.value === null ? null : points.valu
             v-if="showAllLabels || i === 0 || i === points.length - 1"
             class="axis-label"
             :x="xFor(i)" :y="HEIGHT - 8"
-            text-anchor="middle"
+            :text-anchor="labelAnchor(i)"
           >{{ formatDate(p.generatedAt) }}</text>
         </template>
 
