@@ -7,11 +7,13 @@
 // always edit the pre-filled form or skip straight to filling it by hand
 // (see index.html) — this removes typing, it never removes control.
 //
-// Gated by the same SCAN_PASSPHRASE as /scan since it also costs real money
-// per call (one web_search-grounded Perplexity call).
+// Gated by Neon Auth (Milestone 2 of the SaaS-pivot plan) since it also
+// costs real money per call (one web_search-grounded Perplexity call) —
+// previously a shared SCAN_PASSPHRASE, now any authenticated user.
 
 import type { Config } from '@netlify/functions';
 import { callModel, buildEnrichPrompt, parseEnrichmentResponse, normalizeUrl } from '../../shared/aivis-core.mjs';
+import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
@@ -20,21 +22,19 @@ export default async (req: Request) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  let body: { website?: string; passphrase?: string };
+  try {
+    await requireAuth(req);
+  } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
+    throw err;
+  }
+
+  let body: { website?: string };
   try {
     body = await req.json();
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  const passphrase = body.passphrase || '';
-  const expectedPassphrase = Netlify.env.get('SCAN_PASSPHRASE');
-  if (!expectedPassphrase || passphrase !== expectedPassphrase) {
-    return new Response(JSON.stringify({ error: 'Forbidden — wrong or missing passphrase' }), {
-      status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }
