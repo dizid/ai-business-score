@@ -10,6 +10,13 @@
   command = "npm run dev"
   targetPort = 5173
 
+# index.html/history.html were retired in Milestone 5 with no replacement
+# for the bare domain, leaving "/" a dead 404 — send it to the real app.
+[[redirects]]
+  from = "/"
+  to = "/app"
+  status = 302
+
 # The authenticated app shell (Milestone 4 of the SaaS-pivot plan) is a real
 # vue-router SPA — direct navigation/refresh on a nested route like
 # /app/companies/123 must still resolve to app.html so the router can take
