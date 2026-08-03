@@ -1,139 +1,89 @@
-// AIVis hosted scan — Approach B from the office-hours design doc.
-// Founder-facing form (not public self-serve): runs a live check and
-// redirects to a shareable result page with the data encoded in the URL
-// itself. No DB — the result page never re-computes or re-calls the API, so
-// repeated views of the same link always show the same (already-computed)
-// result. This also sidesteps the LLM-nondeterminism/credibility risk raised
-// during /plan-eng-review: two visits to the same URL can't disagree.
-//
-// Gated by SCAN_PASSPHRASE (a Netlify env var, not a real auth system) so a
-// public POST endpoint that costs real money per call can't be hit by bots.
-
+// AIVis scan trigger — Milestone 5 of the SaaS-pivot plan (see
+// /home/marc/.claude/plans/cheerful-leaping-dragon.md). Creates a pending
+// scan row and fires a Background Function to do the actual 20-30s of
+// work, returning almost immediately — confirmed via the Milestone 0
+// spike that a background-function trigger returns in well under 1s on
+// this site's plan. Auth + company-ownership scoped; replaces the old
+// passphrase-gated, synchronous, Blobs-backed /scan entirely.
 import type { Config } from '@netlify/functions';
-import { getStore } from '@netlify/blobs';
-import {
-  PROMPT_TEMPLATES,
-  MODELS,
-  callModel,
-  aggregateProspect,
-  computeScore,
-  selectAdvice,
-  missingProspectFields,
-  normalizeUrl,
-} from '../../shared/aivis-core.mjs';
-
-declare const Netlify: { env: { get(key: string): string | undefined } };
+import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { sql } from './_shared/db.mts';
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
-  const form = await req.formData();
-  const passphrase = (form.get('passphrase') as string) || '';
-  const expectedPassphrase = Netlify.env.get('SCAN_PASSPHRASE');
-  if (!expectedPassphrase || passphrase !== expectedPassphrase) {
-    return new Response('Forbidden — wrong or missing passphrase', { status: 403 });
-  }
-
-  const prospect = {
-    brand: ((form.get('brand') as string) || '').trim(),
-    website: ((form.get('website') as string) || '').trim(),
-    competitors: ((form.get('competitors') as string) || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean),
-    category: ((form.get('category') as string) || '').trim(),
-    use_case: ((form.get('use_case') as string) || '').trim(),
-    region: ((form.get('region') as string) || '').trim(),
-    customer_segment: ((form.get('customer_segment') as string) || '').trim(),
-  };
-
-  const missing = missingProspectFields(prospect);
-  if (missing.length) {
-    return new Response(`Missing fields: ${missing.join(', ')}`, { status: 400 });
-  }
-
-  const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');
-  if (!apiKey) {
-    return new Response('Server misconfigured: PERPLEXITY_API_KEY not set', { status: 500 });
-  }
-
-  // Free-scan tier: 3 prompts x 2 models = 6 checks — smaller than the local
-  // proof-script's 8x2=16. Real grounded Perplexity calls with web_search
-  // took 15-20s each in live testing (not the near-instant "reply OK" smoke
-  // test) — 5x2=10 calls hit a gateway "Inactivity Timeout"; 1x2=2 calls at
-  // ~20s succeeded. Each call gets a hard per-call timeout so one especially
-  // slow call can't blow the whole request past whatever the real ceiling is.
-  const scanPrompts = PROMPT_TEMPLATES.slice(0, 3);
-  const CALL_TIMEOUT_MS = 20000;
-  const tasks: { prompt: string; model: string; promptIndex: number }[] = [];
-  for (const [promptIndex, template] of scanPrompts.entries()) {
-    const prompt = template(prospect);
-    for (const model of MODELS) {
-      tasks.push({ prompt, model, promptIndex });
-    }
-  }
-
-  const callResults = await Promise.all(
-    tasks.map(async (task) => {
-      try {
-        const result = await callModel(apiKey, task.model, task.prompt, CALL_TIMEOUT_MS);
-        return { ok: true, ...result, model: task.model, promptIndex: task.promptIndex };
-      } catch (err) {
-        const message = (err as Error).message;
-        // Previously silent: failedCalls was a bare count with no way to tell
-        // timeout vs. rate-limit vs. malformed response apart from Netlify
-        // function logs. Log per-call so a real failure spike is diagnosable.
-        console.error(`Scan call failed [prompt ${task.promptIndex}, ${task.model}]: ${message}`);
-        return { ok: false, error: message, model: task.model, promptIndex: task.promptIndex };
-      }
-    })
-  );
-
-  // Score/advice are pure, synchronous, in-memory computations on `agg` —
-  // no new API calls, no added latency. Do not add a live "advice" LLM call
-  // here: it would need these aggregated results as input, so it couldn't
-  // join the Promise.all batch above — it would add a full sequential
-  // 15-20s+ on top of the timeout budget that was already tuned down once
-  // (10 calls -> gateway timeout; 6 calls @ 20s/call -> works).
-  const agg = aggregateProspect(prospect, callResults);
-  const score = computeScore(agg.perPromptRank, agg.completedCalls);
-  const advice = selectAdvice(agg);
-
-  const payload = {
-    id: crypto.randomUUID(),
-    brand: agg.prospect.brand,
-    website: normalizeUrl(agg.prospect.website),
-    category: agg.prospect.category,
-    citedCount: agg.citedCount,
-    completedCalls: agg.completedCalls,
-    failedCalls: agg.failedCalls,
-    ambiguousBrandFlag: agg.ambiguousBrandFlag,
-    perPromptRank: agg.perPromptRank,
-    competitorTallies: agg.competitorTallies,
-    score,
-    advice,
-    rawResponses: agg.rawResponses,
-    generatedAt: new Date().toISOString(),
-  };
-
-  const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
-
-  // Persist a copy for the /history view. Purely additive — the redirect
-  // below still carries the full result in the URL fragment itself, so a
-  // shared link keeps working with zero reads from this store; this write
-  // only exists so the founder can browse past scans without hoarding links.
+  let userId: string;
   try {
-    const store = getStore('aivis-scans');
-    await store.setJSON(payload.id, { ...payload, encoded });
+    userId = await requireAuth(req);
   } catch (err) {
-    console.error('Failed to save scan to Blobs store:', err);
+    if (err instanceof AuthError) return authErrorResponse(err);
+    throw err;
   }
 
-  return new Response(null, {
-    status: 302,
-    headers: { Location: `/result.html#d=${encoded}` },
+  let body: { company_id?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const companyId = body.company_id;
+  if (!companyId) {
+    return new Response(JSON.stringify({ error: 'company_id is required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const db = sql();
+  const companies = await db`
+    SELECT * FROM public.companies WHERE id = ${companyId} AND owner_user_id = ${userId}
+  `;
+  if (companies.length === 0) {
+    return new Response(JSON.stringify({ error: 'Company not found' }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const company = companies[0];
+
+  const inserted = await db`
+    INSERT INTO public.scans (id, company_id, status, brand, website, category)
+    VALUES (gen_random_uuid(), ${companyId}, 'pending', ${company.brand}, ${company.website}, ${company.category})
+    RETURNING id
+  `;
+  const scanId = inserted[0].id as string;
+
+  const origin = new URL(req.url).origin;
+  try {
+    await fetch(`${origin}/run-scan-background`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scanId }),
+    });
+  } catch (err) {
+    console.error(`Failed to trigger background scan for ${scanId}:`, err);
+    await db`
+      UPDATE public.scans SET status = 'failed', error_message = 'Failed to start scan'
+      WHERE id = ${scanId}
+    `;
+    return new Response(JSON.stringify({ error: 'Failed to start scan' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  return new Response(JSON.stringify({ ok: true, scanId }), {
+    status: 202,
+    headers: { 'Content-Type': 'application/json' },
   });
 };
 

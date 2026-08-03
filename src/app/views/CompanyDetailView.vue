@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { validatePayload } from '../../shared/scanPayload';
 import ScanDetail from '../../shared/ScanDetail.vue';
@@ -24,6 +24,11 @@ const scans = ref<Record<string, unknown>[]>([]);
 const loading = ref(true);
 const loadError = ref('');
 const selectedIndex = ref<number | null>(null);
+
+const scanning = ref(false);
+const scanStatus = ref('');
+const scanError = ref('');
+let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
 function keyOf(scan: Record<string, unknown>, index: number): string {
   return (scan.id as string) || String(index);
@@ -55,6 +60,65 @@ async function load() {
   }
 }
 
+function stopPolling() {
+  if (pollHandle) {
+    clearTimeout(pollHandle);
+    pollHandle = null;
+  }
+}
+
+async function pollScan(scanId: string) {
+  try {
+    const res = await fetch(`/scans/${scanId}`, { headers: { ...authHeaders() } });
+    const data = await res.json();
+    if (!data.ok) {
+      scanError.value = data.error || 'Failed to check scan status.';
+      scanning.value = false;
+      return;
+    }
+    if (data.status === 'completed') {
+      scanning.value = false;
+      scanStatus.value = '';
+      await load();
+      return;
+    }
+    if (data.status === 'failed') {
+      scanning.value = false;
+      scanError.value = data.errorMessage || 'Scan failed.';
+      return;
+    }
+    scanStatus.value = data.status === 'running' ? 'Running checks (~20-30s)…' : 'Queued…';
+    pollHandle = setTimeout(() => pollScan(scanId), 2000);
+  } catch (err) {
+    scanError.value = (err as Error).message;
+    scanning.value = false;
+  }
+}
+
+async function runNewScan() {
+  if (!company.value) return;
+  scanning.value = true;
+  scanError.value = '';
+  scanStatus.value = 'Starting scan…';
+  try {
+    const res = await fetch('/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ company_id: company.value.id }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      scanError.value = data.error || 'Failed to start scan.';
+      scanning.value = false;
+      return;
+    }
+    pollScan(data.scanId);
+  } catch (err) {
+    scanError.value = (err as Error).message;
+    scanning.value = false;
+  }
+}
+
 const selectedScan = computed(() =>
   selectedIndex.value === null ? null : scans.value[selectedIndex.value] ?? null
 );
@@ -68,6 +132,7 @@ function backToList() {
 }
 
 onMounted(load);
+onUnmounted(stopPolling);
 watch(() => route.params.id, load);
 </script>
 
@@ -78,15 +143,25 @@ watch(() => route.params.id, load);
 
     <template v-else-if="company">
       <router-link class="back-link" to="/app">&larr; All companies</router-link>
-      <h1>
-        {{ company.brand }}
-        <span class="legacy-tag" v-if="company.is_legacy_import">legacy import</span>
-      </h1>
-      <p class="sub">{{ company.category }} · {{ company.website }}</p>
+      <div class="head-row">
+        <div>
+          <h1>
+            {{ company.brand }}
+            <span class="legacy-tag" v-if="company.is_legacy_import">legacy import</span>
+          </h1>
+          <p class="sub">{{ company.category }} · {{ company.website }}</p>
+        </div>
+        <div class="scan-trigger">
+          <button type="button" :disabled="scanning" @click="runNewScan">
+            {{ scanning ? 'Scanning…' : 'Run new scan' }}
+          </button>
+          <div class="scan-status" v-if="scanStatus">{{ scanStatus }}</div>
+          <div class="scan-status error" v-if="scanError">{{ scanError }}</div>
+        </div>
+      </div>
 
       <p class="empty" v-if="scans.length === 0">
-        No scans yet for this company. Scan creation from the dashboard ships in a follow-up milestone —
-        for now, historical scans only appear here after a backfill.
+        No scans yet for this company — click "Run new scan" to check its AI search visibility.
       </p>
 
       <div class="dashboard" v-else :class="{ 'has-selection': selectedIndex !== null }">
@@ -125,12 +200,21 @@ watch(() => route.params.id, load);
 <style scoped>
 main { max-width: 1100px; margin: 0 auto; padding: 48px 20px 80px; }
 .back-link { font-size: 0.85rem; color: var(--muted); text-decoration: underline; }
-h1 { font-size: 1.5rem; margin: 12px 0 4px; }
+.head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-top: 12px; margin-bottom: 24px; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; }
 .legacy-tag {
   font-size: 0.7rem; font-weight: 600; color: var(--muted);
   border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: middle;
 }
-p.sub { color: var(--muted); margin-top: 0; margin-bottom: 24px; }
+p.sub { color: var(--muted); margin: 0; }
+.scan-trigger { flex: none; text-align: right; }
+.scan-trigger button {
+  padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
+  border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+}
+.scan-trigger button:disabled { opacity: 0.6; cursor: wait; }
+.scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 220px; }
+.scan-status.error { color: var(--critical); }
 
 .status.error { font-size: 0.9rem; color: var(--critical); }
 .empty { color: var(--muted); font-size: 0.9rem; }
