@@ -82,7 +82,13 @@ showing a real score on this page. The cold-email version (the local
 `proof-script/` tool, if you use it later) still deliberately avoids exact
 numbers in the email copy itself — that decision wasn't touched.
 
-## What this does NOT include (on purpose)
+## What this does NOT include (on purpose) — STALE as of 2026-08-03
+
+**Update 2026-08-03:** everything in this section was reversed by the SaaS
+pivot — see `CLAUDE.md` and `TODOS.md`'s 2026-08-03 status entry for the
+current architecture (Neon Postgres, Neon Auth accounts, a companies/scans
+data model, a score-over-time chart). Kept below as historical record of the
+2026-07-29 scope, not current fact.
 
 - No database, no accounts, no login.
 - No history — nothing is tracked over time, no "your score last week."

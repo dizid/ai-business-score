@@ -5,70 +5,72 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 AIVis: checks whether a business shows up when AI search engines (ChatGPT,
-Gemini, via Perplexity's Agent API) are asked about their category, and formats
-the result as a cold-email hook. Two implementations share one core:
+Gemini, via Perplexity's Agent API) are asked about their category. Two
+implementations share one core:
 
 - **`proof-script/`** (Approach A) — a local CLI, run manually by one person
-  against a hand-curated prospect list. No server, no DB, no accounts.
-- **The repo root** (Approach B) — a hosted version, deployed to Netlify as
-  site `aivis-scan`: a founder-facing form (gated by a passphrase, not a real
-  auth system) that optionally auto-fills itself from a single URL, then runs
-  a live check and redirects to a shareable result page. The result data is
-  encoded directly in the result URL's fragment, so viewing a link never
-  re-computes or re-calls the API — and every scan is *also* persisted to a
-  Netlify Blobs store (see "Persistence" below) so the founder can browse
-  past scans without hoarding links. (Lived under a `web/` subdirectory
-  until 2026-08-03, when it was flattened to the repo root — `web/` had
-  never been a deliberate monorepo layout, just an artifact of `proof-script/`
-  existing first; `proof-script/` is the only thing that still needs to stay
-  a separate subdirectory.)
+  against a hand-curated prospect list. No server, no DB, no accounts. Still
+  the tool for hand-curated outbound (see `TODOS.md`'s GTM notes) — untouched
+  by the SaaS pivot below.
+- **The repo root** (Approach B) — a hosted, self-serve, multi-tenant SaaS
+  deployed to Netlify as site `aivis-scan`: users sign up, add companies they
+  want to track, run scans against them, and watch a score-over-time trend.
+  This **was** a single-operator, passphrase-gated stateless-link tool until
+  2026-08-03, when the CEO confirmed a deliberate pivot to self-serve
+  multi-tenant SaaS (see memory `aivis-saas-pivot-2026-08-03` and the
+  executed plan at `~/.claude/plans/cheerful-leaping-dragon.md` for the full
+  milestone-by-milestone history). `result.html` — the old stateless
+  shareable-link page — is kept alive indefinitely alongside the new
+  authenticated app so links shared before the pivot never break; it is
+  otherwise frozen and receives no new traffic.
 - **`shared/aivis-core.mjs`** — the single source of truth for prompt
-  templates, models, brand-detection, and the Perplexity API call. Imported
-  by `proof-script/index.mjs`, `netlify/functions/scan.mts`/`enrich.mts`,
-  and (since the Vite/Vue migration, 2026-07-29) the Vue app under `src/`.
-  Deliberately kept as plain untyped `.mjs` at this exact path —
-  `proof-script` runs via plain `node index.mjs` with zero deps and zero
-  transpilation, so it cannot load a `.ts` file. Converting or moving this
-  file would break proof-script outright; if it ever needs real types, give
-  proof-script its own build step first.
+  templates, models, brand-detection, scoring, and the Perplexity API call.
+  Imported by `proof-script/index.mjs`, every `netlify/functions/*.mts` that
+  needs it, and the Vue app under `src/`. Deliberately kept as plain untyped
+  `.mjs` at this exact path — `proof-script` runs via plain `node index.mjs`
+  with zero deps and zero transpilation, so it cannot load a `.ts` file.
+  Converting or moving this file would break proof-script outright. Every
+  export added since the SaaS pivot (`buildDeepAdvicePrompt`,
+  `parseDeepAdviceResponse`) follows this same constraint and is additive
+  only — nothing existing has been removed or renamed.
 
-The full rationale (why Approach A first, what was rejected, what's deferred)
-lives in the design doc at
+The full rationale for the *original* stateless-link design (why Approach A
+first, what was rejected, what's deferred) lives in the design doc at
 `~/.gstack/projects/ai-business-score/marc-none-no-git-repo-design-20260728-153615.md`
-and its eng-review addendum. Read it before proposing further scope changes —
-a test suite and vertical prompt templating are still deliberately deferred
-based on evidence gathered there. **The "real database" deferral has since
-been reversed** (2026-07-29): the hosted site writes every scan to a Netlify
-Blobs store now (see "Persistence" below) — the original reasoning was scoped to
-"don't build a DB just to make the stateless-link design work," which still
-holds, but it didn't anticipate a second, separate need: a history view the
-founder can browse without a database at all wasn't possible, and Blobs was
-the lowest-ceremony way to add one (zero external accounts, no connection
-string, bundles into the existing Netlify site). Neon Postgres (this
-project's usual default per the company CLAUDE.md) was intentionally *not*
-used here — provisioning it requires authorizing the Neon MCP connection
-interactively, which wasn't available when this was built; revisit if the
-data model outgrows a flat key-value store.
+and its eng-review addendum — still useful history, but read it knowing the
+"no database, no accounts" scoping it documents was reversed on 2026-08-03,
+not just the earlier "add a Blobs store" reversal it already describes.
+Vertical prompt templating is still deliberately deferred per that doc's
+original reasoning (see `TODOS.md`).
 
-**Known limitation (hosted site only):** real Perplexity calls with `web_search`
-grounding routinely take 15-20s, sometimes longer. The scan function runs 3
-prompts x 2 models = 6 calls in parallel with a 20s per-call timeout and a
-~20-30s total budget; individual calls that exceed the timeout are counted as
-failed (shown honestly on the result page as "N calls failed") rather than
-silently dropped or retried. This is real-world variance, not a bug — don't
-"fix" it by adding blind retries without checking current failure rates first.
-Each failure's reason (timeout vs. HTTP error vs. malformed response) is
-`console.error`'d per-call in `scan.mts` (model + promptIndex + message) —
-previously the per-call `error` was captured but discarded, so a real spike
-above the expected ~50% rate was undiagnosable from Netlify function logs.
-Netlify's synchronous function execution ceiling is not reliably
-knowable/configurable from this codebase (docs and support-forum threads
-disagree on 10s-default/26s-max vs. a flat 60s — unverified as of
-2026-08-02) and there is no `netlify.toml`/in-code config key for it either
-way, so `CALL_TIMEOUT_MS` (20000, in `scan.mts`) was deliberately left
-as-is rather than bumped speculatively — raising it risks turning a
-partial-but-usable result (some calls succeed) into a total function
-timeout (zero calls returned), which is a worse failure mode.
+**Known limitation, unchanged by the pivot:** real Perplexity calls with
+`web_search` grounding routinely take 15-20s, sometimes longer. A scan runs 3
+prompts x 2 models = 6 calls in parallel with a 20s per-call timeout;
+individual calls that exceed the timeout are counted as failed rather than
+silently dropped or retried. This used to force the whole `/scan` request to
+stay synchronous and tightly timeout-budgeted — that constraint is gone
+since Milestone 5 made scans asynchronous (see "Async scan execution"
+below), but the per-call 20s timeout and the real-world ~50% failure rate
+are unrelated to that and still apply.
+
+## Deployment
+
+- **Netlify site:** `aivis-scan`, site ID `70e29675-6562-4245-831a-7a3392e51980`,
+  team `dizid`. Git-connected CI — pushing to `master` triggers a build.
+- **Neon project:** `aivis`, project ID `square-snow-36406551`, org
+  `org-raspy-sound-58493566` ("Marc de"), database `neondb`, branch `main`
+  (`br-little-queen-axuj51in`). Created 2026-08-03 specifically for this
+  app — do not confuse with the org's ~16 other unrelated Neon projects.
+- **Neon Auth (Better Auth 1.4.18):** base URL
+  `https://ep-polished-flower-axm1d600.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth`,
+  JWKS at `.../auth/.well-known/jwks.json`. `https://aivis-scan.netlify.app`
+  is in Neon Auth's `trusted_origins` (was empty at provisioning time —
+  required for browser sign-up/sign-in to work from the deployed site, not
+  just `localhost`).
+- Env vars on the Netlify site (all non-secret, per standing rule):
+  `PERPLEXITY_API_KEY`, `DATABASE_URL` (Neon pooled connection string),
+  `NEON_AUTH_JWKS_URL`. `SCAN_PASSPHRASE` was removed 2026-08-03 (Milestone 8
+  cleanup) once nothing in code referenced it anymore.
 
 ## Commands
 
@@ -86,263 +88,266 @@ Setup: copy `proof-script/.env.example` to `proof-script/.env` and set
 `prospects.json` and fill in real prospects (schema: brand, website,
 competitors, category, use_case, region, customer_segment).
 
-**Hosted site** (from the repo root): as of the 2026-07-29 Vite/Vue migration,
-the hosted site has a real build step:
+**Hosted site** (from the repo root):
 
 ```bash
 npm install       # from the repo root, after any dependency change
 npm run dev       # Vite dev server on :5173, @netlify/vite-plugin emulates
                    # functions/blobs/env vars locally (no netlify dev needed)
-npm run type-check  # vue-tsc --noEmit
+npm run type-check  # vue-tsc --noEmit (covers netlify/functions/**/*.mts too, not just src/)
 npm run build     # vue-tsc --noEmit && vite build -> dist/
 ```
 
-Deploys now go through **git-connected Netlify CI** (site `aivis-scan`, team
-`dizid`), not the old manual `deploy-site` MCP upload — pushing to the linked
-branch triggers Netlify to run `npm run build` itself and publish `dist`.
-`netlify.toml` sets `command = "npm run build"`, `publish = "dist"`,
-`functions = "netlify/functions"`, `node_bundler = "esbuild"`. Env vars
-(`PERPLEXITY_API_KEY`, `SCAN_PASSPHRASE`) are still set on the Netlify site
-itself, not read from any local `.env` at the repo root — unaffected by the
-build-mechanism change.
+Deploys go through **git-connected Netlify CI** (site `aivis-scan`, team
+`dizid`) — pushing to `master` triggers Netlify to run `npm run build` and
+publish `dist`. `netlify.toml` sets `command = "npm run build"`,
+`publish = "dist"`, `functions = "netlify/functions"`,
+`node_bundler = "esbuild"`, plus a `[[redirects]]` rule rewriting `/app/*` to
+`/app.html` for the SPA (see below).
 
 No lint config, no test framework anywhere in this repo — `proof-script/`
-stays zero-dep, plain `node index.mjs`, no build step (see the aivis-core.mjs
-note above for why that constraint is load-bearing). The hosted site's
-Netlify Functions (`scan.mts`/`enrich.mts`/`history.mts`) are still bundled
-independently by Netlify's own esbuild function bundler at deploy time — they
-import `../../shared/aivis-core.mjs` directly and are unaffected by the
-frontend's Vite build. Formal automated tests were explicitly deferred (see
-eng-review in the design doc) in favor of `--dry-run` as the pre-flight check
-for `proof-script/` and `vue-tsc`/manual browser verification for the hosted
-site — this started as a same-day, likely-single-use script, not shipped
-product code (Approach B has since made it a lot more durable, but the same
-low-ceremony bar still applies to test *automation*, not to skipping
-verification — see each page's section below for what was actually checked).
+stays zero-dep, plain `node index.mjs`, no build step. The hosted site's
+Netlify Functions are bundled independently by Netlify's own esbuild
+function bundler at deploy time — they import `../../shared/aivis-core.mjs`
+directly and are unaffected by the frontend's Vite build (both are now
+type-checked by the same `npm run type-check`, though — `tsconfig.json`'s
+`include` covers `netlify/functions/**/*.mts` since Milestone 0 of the
+pivot, fixing a real gap where those files were never type-checked before).
+Formal automated tests were explicitly deferred in favor of `--dry-run` as
+the pre-flight check for `proof-script/` and `vue-tsc`/manual browser
+verification for the hosted site — this constraint predates the pivot and
+wasn't revisited by it.
 
 ## Architecture
 
-### Shared core — `shared/aivis-core.mjs`
+### Database schema (Neon Postgres, `public` schema)
 
-The single source of truth, imported by both entry points:
+- **`user_profiles`** — one row per signed-up user, `user_id` FK to
+  `neon_auth."user".id` (a `uuid`, not `text` — confirmed by inspecting the
+  live schema before writing this, don't assume). Holds `plan_tier` (default
+  `'free'`) as a metering/plan-gating hook for later — nothing reads it yet.
+- **`companies`** — a tracked business, `owner_user_id` FK to
+  `user_profiles`. Single owner per company (CEO decision, 2026-08-03) —
+  extending to team/agency shared access later is a pure additive migration
+  (a `company_members` join table), not a breaking one. `is_legacy_import`
+  flags companies created by the one-off Blobs backfill (Milestone 3) —
+  those are the founder's own prospect-research history (scans of *other*
+  businesses for outbound), not "the user's own company," labeled honestly
+  rather than force-fit into the new model.
+- **`scans`** — one row per scan, `company_id` FK, `status` (`pending` →
+  `running` → `completed`/`failed`), denormalized `brand`/`website`/
+  `category` snapshot at scan time, `jsonb` columns for
+  `per_prompt_rank`/`competitor_tallies`/`raw_responses`/`advice`/
+  `deep_advice`, plus `legacy_blob_key` (traceability back to the original
+  Blobs entry, for legacy-imported scans only).
+
+Schema and Neon Auth were provisioned via the Neon MCP tools
+(`create_project`, `provision_neon_auth`, `prepare_database_migration` →
+verify on temp branch → `complete_database_migration`) — see the plan file
+for the exact migration SQL if it needs revisiting.
+
+### Auth (Neon Auth / Better Auth), `netlify/functions/_shared/`
+
+- **`auth.mts`** — `requireAuth(req)` verifies an `Authorization: Bearer
+  <jwt>` header against Neon Auth's JWKS (via `jose`'s `createRemoteJWKSet`
+  + `jwtVerify`), returns the JWT's `sub` claim (the Neon Auth user id) or
+  throws. Every function that needs a caller identity uses this — there is
+  no shared middleware wrapper, each function calls it explicitly, same
+  pattern the old `SCAN_PASSPHRASE` check used before it (copy-pasted, not
+  abstracted, deliberately — see each function).
+- **`db.mts`** — `sql()` returns a cached `@neondatabase/serverless` client
+  (`neon<false, false>(...)`, generics pinned so every call site gets a
+  plain `Record<string, any>[]` back instead of the driver's full
+  arrayMode/fullResults overload union). HTTP-fetch-based, not a pooled TCP
+  client like `pg` — fits Netlify Functions' isolated/cold-start runtime.
+- **`scanRow.mts`** — `toScanPayload(row)` converts a `scans` row's
+  snake_case DB columns into the camelCase shape `scanPayload.ts`'s
+  `validatePayload()` expects (the same shape the old stateless-link
+  `/scan` used to write into the URL fragment) — this is what lets
+  `ScanDetail.vue` render DB-backed data completely unchanged.
+- **Frontend** (`src/app/lib/auth.ts`): wraps `better-auth`'s
+  framework-agnostic client (`createAuthClient` from `'better-auth/client'`,
+  cross-origin against Neon Auth's own domain — the client handles that
+  session-cookie flow). A short-lived JWT for calling *this site's own*
+  backend is minted separately via a plain `fetch(`${AUTH_BASE}/token`,
+  { credentials: 'include' })` (GET, not POST — confirmed by testing
+  directly rather than trusting the Better Auth JWT-plugin docs' generic
+  description) rather than through the client's own token-plugin surface,
+  since that exact contract was already verified by hand.
+
+### `shared/aivis-core.mjs`
+
+The single source of truth, imported by every consumer:
 
 - **Prompt templates** (8, generic brand/competitor substitution only —
-  vertical-specific templating was explicitly deferred, see `TODOS.md`) x
-  **2 models** (`openai/gpt-5-mini`, `google/gemini-3-flash-preview`).
-  `proof-script` uses all 8; the hosted site uses only the first 3 (see the
-  timeout note above).
-- **Perplexity Agent API client** (`callModel`) — calls
-  `POST https://api.perplexity.ai/v1/responses` (the OpenAI-SDK-compatible
-  alias for `/v1/agent`), routing both OpenAI- and Google-branded models
-  through one Perplexity key via `provider/model-name` addressing. Response
-  shape is the OpenAI Responses API shape (`output[].content[].text`) —
-  confirmed via live smoke test during `/plan-eng-review`. Takes an optional
-  `timeoutMs` (via `AbortController`) — unused by `proof-script`, set to 20s
-  by the hosted site since it runs inside a wall-clock-limited serverless
-  function.
+  vertical-specific templating still deferred, see `TODOS.md`) x **2 models**
+  (`openai/gpt-5-mini`, `google/gemini-3-flash-preview`). `proof-script`
+  uses all 8; the hosted site uses only the first 3.
+- **Perplexity Agent API client** (`callModel`) — `POST
+  https://api.perplexity.ai/v1/responses`, routing both OpenAI- and
+  Google-branded models through one Perplexity key via `provider/model-name`
+  addressing. Optional `timeoutMs` (via `AbortController`).
 - **Detection** (`findBrandMention`, `findMentions`) — whole-word,
   case-insensitive regex match on the brand name and a domain-derived alias.
-  Presence-only, not sentiment-aware (a negative mention still counts as
-  "cited" — both outputs tell the human to skim raw responses before trusting
-  the count). Common-word brand names (e.g. "Best") are flagged ambiguous and
-  skip auto-detection rather than false-matching everywhere.
+  Presence-only, not sentiment-aware. Common-word brand names are flagged
+  ambiguous and skip auto-detection.
 - **Aggregation** (`aggregateProspect`) — cited count, completed vs. failed
-  call counts (tracked separately so a failed batch doesn't silently read as
-  "zero citations"), a heuristic first-mention-order ranking
-  (ranked-1 / beaten / not-mentioned) — explicitly labeled as unverified since
-  detection is presence-only — and **`competitorTallies`** (per-named-competitor
-  `mentionCount`/`beatBrandCount`, computed unconditionally per completed
-  response, not gated on the brand itself being cited — a response that
-  mentions a competitor while the brand is absent is real scoreboard signal
-  and would otherwise be lost).
+  call counts, heuristic first-mention-order ranking, and
+  `competitorTallies` (computed unconditionally per completed response, not
+  gated on the brand itself being cited).
 - **Score** (`computeScore`, `scoreBand`) — 0-100 (or `null` if
-  `completedCalls === 0` — never a fake 0; a 0 must mean "genuinely
-  invisible," not "the API failed"). Formula: `round(100 * (ranked1Count +
-  0.4 * beatenCount) / completedCalls)` — the `0.4` (`SCORE_BEATEN_WEIGHT`)
-  is a named, tunable constant giving partial credit for "mentioned but
-  beaten." **This reverses an explicit `/office-hours` decision** against
-  precise/re-verifiable numeric claims — that reasoning was scoped to
-  cold-email copy sent to a skeptical prospect (LLM nondeterminism → a
-  re-run showing a different number was a credibility risk); a score shown
-  on a link the founder shares with a friend to gauge interest is a
-  different audience with no fact-checking motive, so the reversal is
-  deliberate, not silent. `proof-script`'s cold-email draft language is
-  untouched and stays directional.
-- **Advice** (`selectAdvice`) — rule-based/templated, not a live LLM call.
-  Returns structured scenario data (`id`, `tone`, small `params`), not
-  freeform text; the English copy lives in `src/shared/ScanDetail.vue`'s
-  template branches (see below). Deliberately synchronous: an AI-generated-advice call would need
-  the aggregated results as input, so it couldn't join the `Promise.all`
-  batch — it would add a full sequential 15-20s+ on top of an already
-  tight function-timeout budget. Don't add one without new empirical
-  timeout testing, the same way the 6-call/20s config was arrived at.
-- **Enrichment** (`buildEnrichPrompt`, `parseEnrichmentResponse`) — used only
-  by `netlify/functions/enrich.mts` (below), not by `proof-script`.
-  `buildEnrichPrompt` asks a model to research a bare URL and return the rest
-  of the prospect fields as JSON; `parseEnrichmentResponse` extracts the
-  first `{...}` block from the reply (models sometimes wrap it in markdown
-  fences) and always returns every field, defaulted to `''`/`[]` rather than
-  throwing — a field the model couldn't infer should come back blank for the
-  human to fill in, never a parse error that blocks the form.
+  `completedCalls === 0` — never a fake 0). Formula: `round(100 *
+  (ranked1Count + 0.4 * beatenCount) / completedCalls)`.
+- **Advice** (`selectAdvice`) — rule-based/templated, not a live LLM call,
+  always computed synchronously right after a scan completes. Copy lives in
+  `src/shared/ScanDetail.vue`'s template branches.
+- **Deep advice** (`buildDeepAdvicePrompt`, `parseDeepAdviceResponse`) —
+  added in the SaaS pivot's Milestone 6, additive only. Unlike
+  `selectAdvice`, this **is** a live grounded Perplexity call — safe to add
+  specifically because scans are async now, so there's no synchronous
+  function-timeout budget left to blow (the exact constraint that used to
+  block this is described on `selectAdvice` above, and no longer applies to
+  this one). Deliberately on-demand (a "Generate deeper advice" button on a
+  completed scan, not automatic) — it roughly doubles Perplexity spend per
+  scan, and pricing/plan limits for the new self-serve product aren't
+  decided yet. `buildDeepAdvicePrompt` grounds the prompt in the actual scan
+  data (citation rate, competitor tallies) rather than generic SEO advice;
+  `parseDeepAdviceResponse` follows the same lenient-JSON-extraction,
+  always-safe-shape pattern as `parseEnrichmentResponse` below.
+- **Enrichment** (`buildEnrichPrompt`, `parseEnrichmentResponse`) — used by
+  `netlify/functions/enrich.mts`. Asks a model to research a bare URL and
+  return the rest of the prospect fields as JSON; always returns every
+  field, defaulted to `''`/`[]` rather than throwing. Not currently wired
+  into the new app shell's "create company" form (a plain manual form,
+  Milestone 4) — the endpoint still works and is auth-gated, just unused by
+  any UI right now; wiring it in is a small future enhancement, not a bug.
 
-### `vite.config.ts` — multi-page app, not a Vue-Router SPA
+### `vite.config.ts` — two entries
 
-Three independent Vue app instances/entry points (`index.html`, `result.html`,
-`history.html`, each with its own `src/<page>/main.ts` + `App.vue`) via
-`build.rollupOptions.input` — deliberately not a single-page app with
-client-side routing. This preserves the pre-migration URL structure and,
-more importantly, keeps `index.html`'s step-2 `<form method="POST"
-action="/scan">` a genuine native browser navigation: only that (not a
-client-side route change, not `fetch`) reliably carries the `/scan`
-redirect's URL fragment through to `result.html`. `src/shared/theme.css`
-centralizes the dataviz-skill palette (`--bg`/`--accent`/`--good`/etc.) that
-used to be hand-copied into all three pages' `<style>` blocks — page-specific
-styles still live in each page's own `App.vue` `<style scoped>`.
+- **`result.html`** — the pre-pivot shareable result page, kept alive
+  indefinitely so old links never break. Thin Vite shell; `src/result/App.vue`
+  decodes a `#d=` URL fragment client-side (`b64urlDecode` +
+  `validatePayload` from `scanPayload.ts`) and renders via
+  `<ScanDetail :payload="data" />`. Never calls the API. `allowDeepAdvice`
+  is not set here, so the deep-advice button never shows on old links (no
+  auth system on this page at all).
+- **`app.html`** — the real product: a full **vue-router SPA**
+  (`src/app/router.ts`, `history` mode). Safe as a client-side-routed SPA
+  specifically because its data comes from authenticated API calls fetched
+  by ID, not a URL fragment a route change would drop — the opposite of why
+  the pre-pivot pages were deliberately *not* a SPA (see below).
+  `netlify.toml`'s `[[redirects]]` rule (`/app/* → /app.html`, 200) makes
+  direct navigation/refresh on nested routes like `/app/companies/123`
+  resolve correctly.
 
-### `proof-script/index.mjs` (Approach A)
+`index.html` and `history.html` (the old passphrase-gated scan form and
+history list) were **retired** in Milestone 5 once the authenticated app
+shell covered the same ground — deleted along with their
+`src/index`/`src/history` Vue apps and the then-fully-redundant
+`netlify/functions/history.mts` (superseded by `GET /companies` +
+`GET /companies/:id`). If you're looking for the "why not a SPA" reasoning
+that used to live here, it only ever applied to those retired pages and
+`result.html` — read `src/app/router.ts`'s own comment for why `app.html`
+doesn't have that constraint.
 
-Adds CLI-specific orchestration on top of the shared core: hand-rolled arg
-parser and `.env` loader (no deps), **fail-fast + retry**
-(`FailFastTracker`, `callWithRetry` — one retry per call, aborts the whole run
-if 3 consecutive calls fail rather than burning through the budget against a
-dead key/endpoint), a **concurrency-limited runner** (`runWithConcurrency`,
-no `p-limit` dependency), and **output formatting**
-(`formatInternalSummary`, `csvRow`) — one Markdown file per prospect in
-`results/` (raw responses, a *directional* email draft — deliberately not a
-precise re-verifiable number, since LLM responses vary between runs) plus one
-row per prospect appended to `tracking.csv` (sent-date/replied/note columns
-left blank for manual fill-in). `results/` and `tracking.csv` are gitignored —
-run output, not source.
+### `src/app/` — the authenticated app shell
 
-### `netlify/functions/enrich.mts` — auto-fill from a single URL
-
-POST `/enrich`, gated by the same `SCAN_PASSPHRASE` (it also spends real
-Perplexity budget: one `web_search`-grounded call). Takes `{ website,
-passphrase }` as JSON, asks `openai/gpt-5-mini` to research the site via
-`buildEnrichPrompt`, and returns the guessed `brand`/`category`/`use_case`/
-`region`/`customer_segment`/`competitors` via `parseEnrichmentResponse`. Two
-deliberate choices: (1) it **always returns 200** even when the underlying
-call fails (`{ ok: false, error }`) — enrichment failing is never fatal to the
-flow, `index.html` just falls through to a blank form, so there's no reason to
-make the caller branch on HTTP status *and* a body flag; (2) every returned
-field is best-effort and meant to be reviewed, never trusted blindly — this
-is a typing-reduction feature, not an auto-submit feature. Nothing here is
-persisted; only a completed `/scan` gets saved.
-
-### `netlify/functions/scan.mts` (Approach B)
-
-A Netlify function (TypeScript, V2 format, routed to `/scan` via in-code
-`config`). POST-only, gated by `SCAN_PASSPHRASE` (an anti-abuse gate, not real
-auth — this is a public URL that costs real money per call). Runs the 6 checks
-fully in parallel (`Promise.all`, no retry — a single serverless invocation
-doesn't have the CLI's budget for retries), aggregates via the shared core,
-computes `score` and `advice` (pure, synchronous, zero added API calls — see
-above), then **302-redirects to
-`/result.html#d=<base64url-encoded-JSON>`** — the payload includes `id`,
-`brand`, `website`, `category`, `citedCount`, `completedCalls`, `failedCalls`,
-`ambiguousBrandFlag`, `perPromptRank`, `competitorTallies`, `score`, `advice`,
-`rawResponses`, `generatedAt`. The result data lives in the URL fragment
-itself, so `result.html` (plain client-side JS, no framework) decodes and
-renders it without ever calling the API again. This is deliberate: two views
-of the same link always show the same result, sidestepping the
-LLM-nondeterminism/credibility risk that came up during `/plan-eng-review`.
-
-**Persistence:** right before redirecting, the same `payload` (plus the
-`encoded` string used in the redirect URL) is written to a Netlify Blobs store
-named `aivis-scans`, keyed by `payload.id` (a `crypto.randomUUID()`). This
-write is wrapped in try/catch and only `console.error`s on failure — it must
-never block or fail the redirect the founder is actively waiting on, since the
-stateless shareable link already worked without it and shouldn't regress if
-Blobs has a bad day. `netlify/functions/history.mts` is the only reader.
-
-`index.html` (thin Vite entry shell, real UI in `src/index/App.vue`)
-is the founder-facing input form — a two-step flow: step 1 is just a website
-URL (+ passphrase), submitted via `fetch` to `/enrich`; step 2 shows the same
-seven fields as before, pre-filled from step 1's response but every field
-stays a plain editable `<input>` bound with `v-model`, plus a "skip, fill in
-manually" escape hatch that jumps straight to step 2 blank. Step 2's submit
-is still a native `<form method="POST" action="/scan">` — the `@submit`
-handler updates UI state only and must never call `preventDefault()`, since
-only a native browser navigation reliably carries the `/scan` redirect's URL
-fragment through (see the `vite.config.ts` note above).
+- **`router.ts`** — routes: `/app` (companies list), `/app/login`,
+  `/app/signup`, `/app/companies/:id`. A global `beforeEach` guard calls
+  `restoreSession()` once, then redirects unauthenticated visitors to
+  `/app/login?redirect=<intended path>` (and authenticated visitors away
+  from `/app/login`/`/app/signup`) — verified end-to-end including the
+  redirect-preservation round trip.
+- **`views/LoginView.vue` / `SignupView.vue`** — plain email/password forms
+  against `lib/auth.ts`'s `signIn`/`signUp`.
+- **`views/CompaniesListView.vue`** — lists the caller's companies
+  (`GET /companies`), each with `scan_count`/`latest_score` computed
+  server-side via correlated subqueries; a manual "+ New company" form
+  (`POST /companies`) — not yet wired to `enrich.mts`'s auto-fill, see
+  above.
+- **`views/CompanyDetailView.vue`** — one company's master-detail dashboard:
+  `CompanyProgressChart.vue` (score-over-time, shown once a company has 2+
+  scans — a single point isn't a trend) above a scan list, selecting a scan
+  renders it via the shared `ScanDetail.vue`. Also owns the "Run new scan"
+  button (POSTs `/scan`, then polls `/scans/:id` every ~2s) and the
+  "Generate deeper advice" flow (POSTs `/scans/:id/deep-advice`, replaces
+  the scan in local state with the response on success).
+- **`views/CompanyProgressChart.vue`** — hand-rolled SVG line chart (no
+  chart library, matching `ScanDetail.vue`'s score ring/scoreboard
+  approach), single series so no legend needed per the `dataviz` skill's
+  rule for one series. Breaks the line across any scan with `score: null`
+  rather than drawing through a fake 0. First/last x-axis labels anchor
+  start/end instead of center so they don't clip past the SVG viewport (a
+  real bug caught by screenshotting the rendered chart, not just reading
+  the code — the skill's own "render it and look at it" step).
 
 ### `src/shared/scanPayload.ts` + `src/shared/ScanDetail.vue`
 
-The result-rendering core, extracted (2026-08-02) out of `result/App.vue` so
-`history/App.vue`'s detail pane (below) could reuse it verbatim instead of
-hand-copying the score ring/scoreboard/advice-card markup a second time —
-the earlier single-copy version was already flagged as a duplication risk
-before a second consumer existed.
+Reused across every scan-rendering surface: `result/App.vue`,
+`CompanyDetailView.vue`'s detail pane. `scanPayload.ts` holds the types and
+`validatePayload()` — fail-closed validation of a scan-result object, since
+`result.html`'s payload is inherently unsigned/forgeable (anyone can craft a
+`#d=` link) and `CompanyDetailView.vue`'s DB-backed data gets the same
+treatment for consistency and bounds-safety. `id` is now a required field
+(added for Milestone 6's deep-advice button, which needs to know which scan
+to POST to) — confirmed backward compatible since `scan.mts` has always
+included `id` in every payload it ever produced, including pre-pivot links
+still live in the wild. `deepAdvice`/`deepAdviceGeneratedAt` are optional —
+missing, `null`, or malformed all degrade to `null` rather than rejecting
+the whole payload, since deep advice is a bonus on top of the always-present
+rule-based advice.
 
-`scanPayload.ts` holds the types and `validatePayload()`: fail-closed
-validation of a scan-result object, extending the same pattern to every
-field — `score` bounds-checked 0-100 or `null`; `competitorTallies` capped
-at 12 entries with cross-field sanity bounds (`mentionCount <=
-completedCalls`, `beatBrandCount <= mentionCount`); `advice` capped at 3
-entries, `id`/`tone` checked against fixed enums. `result/App.vue`'s payload
-is inherently unsigned/forgeable — anyone can craft a `#d=` link — so this
-validation is the only thing standing between a hostile link and whatever
-renders; extend it, don't bypass it, when adding fields. `history/App.vue`
-runs the same validator over its own (server-authored, not forgeable)
-records too, purely for consistency and bounds-safety, not because Blobs
-data is untrusted.
+`ScanDetail.vue` renders everything from the brand/website header through
+the score ring, scoreboard, advice cards, deep-advice section, raw-response
+`<details>`, and footer. Its one deliberate exception to "purely
+presentational, no other props, no emits" is `allowDeepAdvice`/
+`deepAdviceLoading` props plus a `generate-deep-advice` emit — `result/App.vue`
+never sets `allowDeepAdvice` (no auth system there), so the button only ever
+appears in the authenticated app; the component itself stays auth-agnostic,
+`CompanyDetailView.vue` owns the actual fetch call.
 
-`ScanDetail.vue` takes a validated payload as a prop and renders everything
-from the brand/website header through the score ring, scoreboard, advice
-cards, raw-response `<details>`, and footer. Headline and advice copy render
-via Vue template branches (auto-escaping), not raw HTML string
-concatenation + `v-html` — removes a whole class of escaping mistakes the
-old hand-rolled `esc()` approach depended on getting right every time. Each
-`params` field is re-validated individually at render time (not trusted
-blindly) so a malformed-but-schema-valid advice item degrades gracefully
-instead of throwing. The website link gets an explicit underline (not just
-the global `a { color: var(--accent) }` rule) — accent-blue-on-dark alone
-wasn't a strong enough tap-target cue on mobile.
+### `proof-script/index.mjs` (Approach A)
 
-### `result.html` — single shareable result page
+Unchanged by the SaaS pivot — hand-rolled arg parser and `.env` loader, fail-fast
++ retry (`FailFastTracker`, `callWithRetry`), a concurrency-limited runner
+(`runWithConcurrency`), and output formatting (`formatInternalSummary`,
+`csvRow`) into `results/`/`tracking.csv` (gitignored). `node
+proof-script/index.mjs --dry-run` is the standing regression check, re-run
+after every change to `shared/aivis-core.mjs` regardless of which consumer
+motivated the change.
 
-Thin Vite entry shell; `src/result/App.vue` now only handles decoding
-the `#d=` fragment (`b64urlDecode` + `validatePayload` from
-`scanPayload.ts`) and the three error states (missing/undecodable/invalid
-data) — the actual rendering is `<ScanDetail :payload="data" />`.
+### `netlify/functions/` — one function per file, all auth-scoped except `enrich`
 
-### `netlify/functions/history.mts` + `history.html` — master-detail dashboard
-
-POST `/history` (passphrase in the JSON body, not a query string — avoids
-leaking it into access logs/browser history) lists every record in the
-`aivis-scans` Blobs store, sorted by `generatedAt` descending (plain string
-comparison — the field is always an ISO timestamp), and returns each stored
-object verbatim (not a projection) — every field `ScanDetail.vue` needs is
-already present, no second fetch required.
-
-`history.html` (thin shell; UI in `src/history/App.vue`) is a
-passphrase-gated **master-detail dashboard** (rebuilt 2026-08-02 from a flat
-link-list): a list pane (search by brand/category, sort by
-newest/highest/lowest score — all client-side over the already-fetched
-records) and a detail pane rendering the selected scan via the shared
-`ScanDetail.vue`. Selecting a row no longer navigates to `/result.html` —
-clicking is now in-page state (a `<button>`, not an `<a>`), with a
-"Open as shareable link ↗" anchor inside the detail pane for the actual
-`/result.html#d=<encoded>` navigation, still replaying the exact `encoded`
-string `/scan` persisted rather than re-deriving it. Layout is a CSS grid
-two-pane split ≥900px; below that, `.has-selection` toggles which single
-pane is visible (list *or* detail, with a "← Back to list" button) — there
-is no JS viewport branching, purely a CSS class driven by whether a scan is
-selected. The list-row score badge still imports `scoreBand` from
-`aivis-core.mjs` rather than re-deriving the 80/50/1 thresholds locally.
-
-Visual design follows the `dataviz` skill's reference palette (chart chrome +
-fixed status colors: good/warning/serious/critical), used verbatim, not
-re-derived — centralized once in `src/shared/theme.css` (see the
-`vite.config.ts` note above). Score ring: hand-rolled SVG circular meter
-(`stroke-dasharray`/`stroke-dashoffset`), track color-independent from fill,
-banded by `scoreBand()` **imported directly from `aivis-core.mjs`** (no
-longer hand-duplicated — the old "this file has no module import graph by
-design, keep the two in sync manually" caveat no longer applies now that the
-page is a real ES module). Scoreboard: an **emphasis** bar chart (brand in
-accent blue, competitors in a de-emphasis gray — "one series is the point,
-rest are context," per the skill's form-choice guidance), brand always
-pinned first, competitors sorted by `mentionCount` descending. Advice cards:
-status-colored left border + an explicit text tag (`Priority`/`Watch
-this`/`Working well`/`Also worth noting`) — never color alone, matching the
-skill's status-color rule.
+- **`scan.mts`** — POST `/scan`, `{ company_id }`. Auth + company-ownership
+  checked, inserts a `pending` scans row, fires a **Background Function**
+  trigger (`run-scan-background.mts`) and returns `{ scanId }` in well under
+  a second — confirmed viable on this site's plan (`nf_team_dev`) via a
+  throwaway spike before committing to this design (Milestone 0): a
+  Background Function POST returns 202 immediately, the actual work
+  continues afterward. No more 302 redirect, no more Blobs write, no more
+  synchronous-request timeout budget.
+- **`run-scan-background.mts`** — the actual 6-call scan (`-background`
+  filename suffix required by Netlify's convention). Atomically claims the
+  scan (`UPDATE ... WHERE status='pending'`) so a duplicate trigger is a
+  cheap no-op instead of double-spending Perplexity calls, then updates the
+  row to `completed`/`failed`.
+- **`scan-status.mts`** — GET `/scans/:id`, auth + ownership-scoped (join
+  through `companies`), polled by the frontend.
+- **`generate-deep-advice.mts`** — POST `/scans/:id/deep-advice`, see
+  "Deep advice" above.
+- **`companies.mts`** — GET (list, with per-company `scan_count`/
+  `latest_score`) and POST (create) `/companies`, auth-scoped.
+- **`company.mts`** — GET `/companies/:id` (via Netlify's URLPattern path
+  syntax, `context.params.id`), returns the company plus its full scan
+  history via `toScanPayload`.
+- **`enrich.mts`** — POST `/enrich`, auth-gated (not company-scoped — it's a
+  stateless research helper with no DB/company concept). Always returns 200
+  even on internal failure (`{ ok: false, error }`); nothing here is
+  persisted.
+- **`backfill-legacy-scans.mts`** — one-off Milestone 3 import of the
+  pre-pivot `aivis-scans` Blobs store into Postgres (any authenticated
+  caller becomes the owner of everything imported; idempotent, skips
+  already-imported blobs via `legacy_blob_key`). Was run once against a
+  throwaway test account to prove the mechanism works — **still needs to be
+  re-run against whichever account the CEO actually uses going forward**;
+  left deployed rather than deleted since that hasn't happened yet.

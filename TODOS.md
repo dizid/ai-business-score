@@ -1,5 +1,69 @@
 # TODOs
 
+## STATUS 2026-08-03: SaaS pivot (auth, Neon Postgres, async scans, deep advice, progress chart) — SHIPPED, verified in production
+
+The CEO reviewed an external draft plan proposing user accounts, a real
+database, async scans, and progress-over-time dashboards, and confirmed this
+was a deliberate pivot from "single-operator internal tool" to a self-serve
+multi-tenant SaaS — not scope creep (see memory `aivis-saas-pivot-2026-08-03`).
+Executed as 8 checkpointed milestones (plan file:
+`~/.claude/plans/cheerful-leaping-dragon.md`), each built, deployed, and
+verified live (curl + a real headless browser via the `browse` skill) before
+starting the next. `CLAUDE.md`'s Architecture section now describes the
+result in full; this entry is the shipping log.
+
+**What shipped, in order:**
+1. Confirmed Netlify Background Functions actually work on this site's plan
+   (`nf_team_dev`) via a throwaway spike before committing the async-scan
+   design to it — 202 in 0.47s, background work observably completed ~5s
+   later. Also fixed a real gap: `netlify/functions/*.mts` was never covered
+   by `npm run type-check` (`tsconfig.json`'s `include` was `src/**` only).
+2. Provisioned a new Neon project (`square-snow-36406551`) + Neon Auth
+   (Better Auth) + initial schema (`user_profiles`/`companies`/`scans`) —
+   Neon MCP wasn't authorized when Blobs was chosen back on 2026-07-29; it
+   is now.
+3. Replaced `SCAN_PASSPHRASE` with Neon Auth JWT verification on
+   `history.mts`/`enrich.mts` first (backend-only, curl-verified before any
+   frontend existed).
+4. One-off backfill of the pre-pivot `aivis-scans` Blobs store into
+   Postgres (4/4 records imported, idempotent, `is_legacy_import=true`) —
+   run against a throwaway test account; **still needs re-running against
+   whichever account the CEO actually uses**, see `backfill-legacy-scans.mts`.
+5. Built the authenticated app shell: `app.html` + `vue-router` SPA
+   (`src/app/`), login/signup, companies list/detail, `companies.mts`/
+   `company.mts` endpoints. Verified end-to-end in a real browser: signup,
+   session persistence across reload, company creation, deep-link auth-guard
+   redirect preservation, sign-out.
+6. Rewrote `/scan` for async execution (Background Function + status
+   polling), retired `index.html`/`history.html` and the now-redundant
+   `history.mts` — the native-form-POST mechanism those pages depended on
+   is gone along with them. `result.html` is untouched, stays up
+   indefinitely. Verified live: 202 in 0.9s, `pending → running →
+   completed` over ~21s with real Perplexity calls.
+7. Added on-demand deep advice (`buildDeepAdvicePrompt`/
+   `parseDeepAdviceResponse` in `aivis-core.mjs`, additive-only —
+   `proof-script --dry-run` re-verified clean) — a "Generate deeper advice"
+   button, not automatic, since it doubles Perplexity spend per scan and
+   pricing isn't decided yet.
+8. Added `CompanyProgressChart.vue` (hand-rolled SVG, dataviz-skill
+   guidance) — caught and fixed a real edge-clipping bug on the date labels
+   by screenshotting the live rendered chart, not just reading the code.
+   Cleaned up: removed `SCAN_PASSPHRASE` from Netlify env vars (confirmed
+   zero remaining code references first) and the temporary `db-health.mts`
+   verification function; docs updated.
+
+**Open follow-ups, not yet done:**
+- Re-run `backfill-legacy-scans.mts` against the CEO's real production
+  login once they have one (it currently only has the throwaway test
+  account's 4 imported scans).
+- `enrich.mts`'s URL auto-fill isn't wired into the new app shell's
+  "create company" form yet (plain manual form for now) — small UX
+  enhancement, not a bug.
+- Pricing/plan-tier gating for deep advice is unresolved — `plan_tier`
+  column exists on `user_profiles` for this, unused so far.
+- No pagination anywhere yet (`/history`-equivalent queries cap at
+  `LIMIT 50`) — fine at current volume, revisit if it changes.
+
 ## STATUS 2026-08-02: Vite + TypeScript + Vue migration for `web/` — SHIPPED, verified in production
 
 Merged `vite-vue-migration` into `master` (fast-forward, `7005ae2`) and
