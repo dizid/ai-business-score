@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { validatePayload } from '../../shared/scanPayload';
 import ScanDetail from '../../shared/ScanDetail.vue';
+import CompanyProgressChart from './CompanyProgressChart.vue';
 import { authHeaders } from '../lib/auth';
 
 const route = useRoute();
@@ -121,6 +122,13 @@ async function runNewScan() {
   }
 }
 
+const scanTrend = computed(() =>
+  scans.value.map((s) => ({
+    generatedAt: typeof s.generatedAt === 'string' ? s.generatedAt : '',
+    score: typeof s.score === 'number' ? s.score : null,
+  }))
+);
+
 const selectedScan = computed(() =>
   selectedIndex.value === null ? null : scans.value[selectedIndex.value] ?? null
 );
@@ -187,7 +195,9 @@ watch(() => route.params.id, load);
         No scans yet for this company — click "Run new scan" to check its AI search visibility.
       </p>
 
-      <div class="dashboard" v-else :class="{ 'has-selection': selectedIndex !== null }">
+      <CompanyProgressChart v-if="scans.length >= 2" :scans="scanTrend" />
+
+      <div class="dashboard" v-if="scans.length" :class="{ 'has-selection': selectedIndex !== null }">
         <div class="list-pane">
           <button
             v-for="(scan, index) in scans"
