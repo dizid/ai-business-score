@@ -53,6 +53,18 @@ prompts x 2 models = 6 calls in parallel with a 20s per-call timeout and a
 failed (shown honestly on the result page as "N calls failed") rather than
 silently dropped or retried. This is real-world variance, not a bug — don't
 "fix" it by adding blind retries without checking current failure rates first.
+Each failure's reason (timeout vs. HTTP error vs. malformed response) is
+`console.error`'d per-call in `scan.mts` (model + promptIndex + message) —
+previously the per-call `error` was captured but discarded, so a real spike
+above the expected ~50% rate was undiagnosable from Netlify function logs.
+Netlify's synchronous function execution ceiling is not reliably
+knowable/configurable from this codebase (docs and support-forum threads
+disagree on 10s-default/26s-max vs. a flat 60s — unverified as of
+2026-08-02) and there is no `netlify.toml`/in-code config key for it either
+way, so `CALL_TIMEOUT_MS` (20000, in `scan.mts`) was deliberately left
+as-is rather than bumped speculatively — raising it risks turning a
+partial-but-usable result (some calls succeed) into a total function
+timeout (zero calls returned), which is a worse failure mode.
 
 ## Commands
 
@@ -153,8 +165,8 @@ The single source of truth, imported by both entry points:
   untouched and stays directional.
 - **Advice** (`selectAdvice`) — rule-based/templated, not a live LLM call.
   Returns structured scenario data (`id`, `tone`, small `params`), not
-  freeform text; the English copy lives in `result.html`'s `ADVICE_COPY`
-  lookup. Deliberately synchronous: an AI-generated-advice call would need
+  freeform text; the English copy lives in `web/src/shared/ScanDetail.vue`'s
+  template branches (see below). Deliberately synchronous: an AI-generated-advice call would need
   the aggregated results as input, so it couldn't join the `Promise.all`
   batch — it would add a full sequential 15-20s+ on top of an already
   tight function-timeout budget. Don't add one without new empirical
@@ -249,36 +261,70 @@ handler updates UI state only and must never call `preventDefault()`, since
 only a native browser navigation reliably carries the `/scan` redirect's URL
 fragment through (see the `vite.config.ts` note above).
 
-### `web/netlify/functions/history.mts` + `web/history.html`
+### `web/src/shared/scanPayload.ts` + `web/src/shared/ScanDetail.vue`
+
+The result-rendering core, extracted (2026-08-02) out of `result/App.vue` so
+`history/App.vue`'s detail pane (below) could reuse it verbatim instead of
+hand-copying the score ring/scoreboard/advice-card markup a second time —
+the earlier single-copy version was already flagged as a duplication risk
+before a second consumer existed.
+
+`scanPayload.ts` holds the types and `validatePayload()`: fail-closed
+validation of a scan-result object, extending the same pattern to every
+field — `score` bounds-checked 0-100 or `null`; `competitorTallies` capped
+at 12 entries with cross-field sanity bounds (`mentionCount <=
+completedCalls`, `beatBrandCount <= mentionCount`); `advice` capped at 3
+entries, `id`/`tone` checked against fixed enums. `result/App.vue`'s payload
+is inherently unsigned/forgeable — anyone can craft a `#d=` link — so this
+validation is the only thing standing between a hostile link and whatever
+renders; extend it, don't bypass it, when adding fields. `history/App.vue`
+runs the same validator over its own (server-authored, not forgeable)
+records too, purely for consistency and bounds-safety, not because Blobs
+data is untrusted.
+
+`ScanDetail.vue` takes a validated payload as a prop and renders everything
+from the brand/website header through the score ring, scoreboard, advice
+cards, raw-response `<details>`, and footer. Headline and advice copy render
+via Vue template branches (auto-escaping), not raw HTML string
+concatenation + `v-html` — removes a whole class of escaping mistakes the
+old hand-rolled `esc()` approach depended on getting right every time. Each
+`params` field is re-validated individually at render time (not trusted
+blindly) so a malformed-but-schema-valid advice item degrades gracefully
+instead of throwing. The website link gets an explicit underline (not just
+the global `a { color: var(--accent) }` rule) — accent-blue-on-dark alone
+wasn't a strong enough tap-target cue on mobile.
+
+### `web/result.html` — single shareable result page
+
+Thin Vite entry shell; `web/src/result/App.vue` now only handles decoding
+the `#d=` fragment (`b64urlDecode` + `validatePayload` from
+`scanPayload.ts`) and the three error states (missing/undecodable/invalid
+data) — the actual rendering is `<ScanDetail :payload="data" />`.
+
+### `web/netlify/functions/history.mts` + `web/history.html` — master-detail dashboard
 
 POST `/history` (passphrase in the JSON body, not a query string — avoids
 leaking it into access logs/browser history) lists every record in the
 `aivis-scans` Blobs store, sorted by `generatedAt` descending (plain string
-comparison — the field is always an ISO timestamp). `web/history.html` (thin
-shell; UI in `web/src/history/App.vue`) is a passphrase-gated page that calls
-it and renders each scan as a card (brand, category, date, score) linking to
-`/result.html#d=<encoded>` using the `encoded` string that was persisted
-alongside — the history page never re-derives or re-encodes the payload
-itself, it just replays the exact fragment `/scan` already built. The
-score-to-color mapping imports `scoreBand` from `aivis-core.mjs` rather than
-re-deriving the 80/50/1 thresholds locally.
+comparison — the field is always an ISO timestamp), and returns each stored
+object verbatim (not a projection) — every field `ScanDetail.vue` needs is
+already present, no second fetch required.
 
-### `web/result.html` — dashboard rendering
-
-Thin Vite entry shell; the actual page is `web/src/result/App.vue`.
-`validatePayload()` extends the same fail-closed pattern for every field:
-`score` bounds-checked 0-100 or `null`; `competitorTallies` capped at 12
-entries with cross-field sanity bounds (`mentionCount <= completedCalls`,
-`beatBrandCount <= mentionCount`); `advice` capped at 3 entries, `id`/`tone`
-checked against fixed enums, and each `params` field re-validated
-individually at render time (not trusted blindly) so a malformed-but-schema-
-valid advice item degrades gracefully instead of throwing. The payload is
-inherently unsigned/forgeable — anyone can craft a `#d=` link — so this
-validation is the only thing standing between a hostile link and whatever
-renders; extend it, don't bypass it, when adding fields. Headline and advice
-copy are rendered via Vue template branches (auto-escaping), not raw HTML
-string concatenation + `v-html` — removes a whole class of escaping mistakes
-the old hand-rolled `esc()` approach depended on getting right every time.
+`web/history.html` (thin shell; UI in `web/src/history/App.vue`) is a
+passphrase-gated **master-detail dashboard** (rebuilt 2026-08-02 from a flat
+link-list): a list pane (search by brand/category, sort by
+newest/highest/lowest score — all client-side over the already-fetched
+records) and a detail pane rendering the selected scan via the shared
+`ScanDetail.vue`. Selecting a row no longer navigates to `/result.html` —
+clicking is now in-page state (a `<button>`, not an `<a>`), with a
+"Open as shareable link ↗" anchor inside the detail pane for the actual
+`/result.html#d=<encoded>` navigation, still replaying the exact `encoded`
+string `/scan` persisted rather than re-deriving it. Layout is a CSS grid
+two-pane split ≥900px; below that, `.has-selection` toggles which single
+pane is visible (list *or* detail, with a "← Back to list" button) — there
+is no JS viewport branching, purely a CSS class driven by whether a scan is
+selected. The list-row score badge still imports `scoreBand` from
+`aivis-core.mjs` rather than re-deriving the 80/50/1 thresholds locally.
 
 Visual design follows the `dataviz` skill's reference palette (chart chrome +
 fixed status colors: good/warning/serious/critical), used verbatim, not

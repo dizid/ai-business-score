@@ -81,7 +81,12 @@ export default async (req: Request) => {
         const result = await callModel(apiKey, task.model, task.prompt, CALL_TIMEOUT_MS);
         return { ok: true, ...result, model: task.model, promptIndex: task.promptIndex };
       } catch (err) {
-        return { ok: false, error: (err as Error).message, model: task.model, promptIndex: task.promptIndex };
+        const message = (err as Error).message;
+        // Previously silent: failedCalls was a bare count with no way to tell
+        // timeout vs. rate-limit vs. malformed response apart from Netlify
+        // function logs. Log per-call so a real failure spike is diagnosable.
+        console.error(`Scan call failed [prompt ${task.promptIndex}, ${task.model}]: ${message}`);
+        return { ok: false, error: message, model: task.model, promptIndex: task.promptIndex };
       }
     })
   );
