@@ -1,0 +1,85 @@
+// Neon Auth (Better Auth) client for the authenticated app shell. Neon
+// Auth's server lives on a different origin than this site, so sign-up/
+// sign-in/session all go cross-origin — Neon Auth is designed for exactly
+// this (see the trusted_origins config on the Neon project). The client
+// handles cookie-based session state; we separately mint a short-lived JWT
+// (POST-free GET .../token with the session cookie, confirmed via curl
+// during Milestone 2) to send as a Bearer token to *our own* backend
+// functions, since those don't share Neon Auth's cookie.
+import { createAuthClient } from 'better-auth/client';
+import { computed, ref } from 'vue';
+
+const AUTH_BASE =
+  'https://ep-polished-flower-axm1d600.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth';
+
+const authClient = createAuthClient({ baseURL: AUTH_BASE });
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+}
+
+const user = ref<AuthUser | null>(null);
+const jwt = ref<string | null>(null);
+const initializing = ref(true);
+
+const isAuthenticated = computed(() => !!user.value && !!jwt.value);
+
+async function mintJwt(): Promise<string | null> {
+  try {
+    const res = await fetch(`${AUTH_BASE}/token`, { credentials: 'include' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.token === 'string' ? data.token : null;
+  } catch {
+    return null;
+  }
+}
+
+let restored = false;
+
+async function restoreSession() {
+  if (restored) return;
+  restored = true;
+  initializing.value = true;
+  try {
+    const { data } = await authClient.getSession();
+    if (data?.user) {
+      user.value = { id: data.user.id, email: data.user.email, name: data.user.name };
+      jwt.value = await mintJwt();
+    }
+  } finally {
+    initializing.value = false;
+  }
+}
+
+async function signUp(email: string, password: string, name: string) {
+  const { data, error } = await authClient.signUp.email({ email, password, name });
+  if (error) throw new Error(error.message || 'Sign up failed');
+  user.value = data?.user
+    ? { id: data.user.id, email: data.user.email, name: data.user.name }
+    : null;
+  jwt.value = await mintJwt();
+}
+
+async function signIn(email: string, password: string) {
+  const { data, error } = await authClient.signIn.email({ email, password });
+  if (error) throw new Error(error.message || 'Sign in failed');
+  user.value = data?.user
+    ? { id: data.user.id, email: data.user.email, name: data.user.name }
+    : null;
+  jwt.value = await mintJwt();
+}
+
+async function signOut() {
+  await authClient.signOut();
+  user.value = null;
+  jwt.value = null;
+}
+
+function authHeaders(): Record<string, string> {
+  return jwt.value ? { Authorization: `Bearer ${jwt.value}` } : {};
+}
+
+export { user, jwt, initializing, isAuthenticated, restoreSession, signUp, signIn, signOut, authHeaders };

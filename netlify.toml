@@ -9,3 +9,12 @@
 [dev]
   command = "npm run dev"
   targetPort = 5173
+
+# The authenticated app shell (Milestone 4 of the SaaS-pivot plan) is a real
+# vue-router SPA — direct navigation/refresh on a nested route like
+# /app/companies/123 must still resolve to app.html so the router can take
+# over client-side.
+[[redirects]]
+  from = "/app/*"
+  to = "/app.html"
+  status = 200
