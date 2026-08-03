@@ -4,10 +4,22 @@ import { scoreBand } from '../../shared/aivis-core.mjs';
 import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceTone } from './scanPayload';
 
 // Shared between result/App.vue (a shareable, standalone page) and
-// history/App.vue's detail pane (master-detail dashboard) — same rendering
-// for the same validated payload shape, so the two views can never drift
-// out of sync the way two hand-copied templates eventually would.
-const props = defineProps<{ payload: ValidatedPayload }>();
+// CompanyDetailView.vue's detail pane (master-detail dashboard) — same
+// rendering for the same validated payload shape, so the two views can
+// never drift out of sync the way two hand-copied templates eventually
+// would.
+//
+// allowDeepAdvice/deepAdviceLoading + the generate-deep-advice emit are the
+// one deliberate exception to "purely presentational, no other props, no
+// emits" (Milestone 6): result/App.vue has no auth system at all (old
+// shareable links are static, decode-only), so it never sets
+// allowDeepAdvice — only CompanyDetailView.vue does, and it owns the actual
+// authenticated fetch call, keeping this component itself auth-agnostic.
+const props = withDefaults(
+  defineProps<{ payload: ValidatedPayload; allowDeepAdvice?: boolean; deepAdviceLoading?: boolean }>(),
+  { allowDeepAdvice: false, deepAdviceLoading: false }
+);
+defineEmits<{ 'generate-deep-advice': [] }>();
 
 const BAND_LABEL: Record<string, string> = {
   leading: 'Leading', visible: 'Visible, often beaten',
@@ -148,6 +160,34 @@ const visibleAdvice = computed(() =>
       </div>
     </template>
 
+    <!-- deep advice: on-demand LLM-generated steps, Milestone 6 -->
+    <template v-if="allowDeepAdvice || payload.deepAdvice">
+      <h2>Deeper advice</h2>
+      <div class="card deep-advice-card" v-if="payload.deepAdvice">
+        <ol class="deep-advice-steps">
+          <li v-for="(step, i) in payload.deepAdvice.steps" :key="i">
+            <div class="step-head">
+              <strong>{{ step.title }}</strong>
+              <span class="difficulty" :class="`difficulty-${step.difficulty.toLowerCase()}`">{{ step.difficulty }}</span>
+            </div>
+            <p v-if="step.reasoning">{{ step.reasoning }}</p>
+          </li>
+        </ol>
+        <div class="deep-advice-meta" v-if="payload.deepAdviceGeneratedAtDate">
+          Generated {{ payload.deepAdviceGeneratedAtDate.toLocaleString() }}
+        </div>
+      </div>
+      <button
+        v-else-if="allowDeepAdvice"
+        type="button"
+        class="deep-advice-button"
+        :disabled="deepAdviceLoading"
+        @click="$emit('generate-deep-advice')"
+      >
+        {{ deepAdviceLoading ? 'Generating…' : 'Generate deeper advice' }}
+      </button>
+    </template>
+
     <h2>Raw data</h2>
     <details>
       <summary>Raw AI responses (for manual review)</summary>
@@ -256,6 +296,26 @@ h1 { font-size: 1.5rem; margin: 0 0 2px; }
 .advice-card.tone-neutral { border-left-color: var(--faint); }
 .advice-card.tone-neutral .advice-tag { color: var(--muted); }
 .advice-body { font-size: 0.92rem; }
+
+/* ---- deep advice ---- */
+.deep-advice-steps { margin: 0; padding-left: 20px; }
+.deep-advice-steps li { margin-bottom: 14px; }
+.deep-advice-steps li:last-child { margin-bottom: 0; }
+.step-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.step-head strong { font-size: 0.95rem; }
+.deep-advice-steps p { margin: 4px 0 0; font-size: 0.88rem; color: var(--muted); }
+.difficulty {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted);
+}
+.difficulty-easy { border-color: color-mix(in srgb, var(--good) 45%, var(--border)); color: var(--success-text); }
+.difficulty-hard { border-color: color-mix(in srgb, var(--critical) 45%, var(--border)); color: var(--critical); }
+.deep-advice-meta { margin-top: 14px; font-size: 0.78rem; color: var(--faint); }
+.deep-advice-button {
+  padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
+  border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+}
+.deep-advice-button:disabled { opacity: 0.6; cursor: wait; }
 
 h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 28px 0 10px; }
 h2:first-of-type { margin-top: 0; }

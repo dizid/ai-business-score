@@ -341,6 +341,61 @@ export function parseEnrichmentResponse(text) {
   }
 }
 
+// ---------- Deep advice (on-demand, live LLM call) ----------
+// Milestone 6 of the SaaS-pivot plan: unlike selectAdvice() above, this DOES
+// make a live grounded Perplexity call — safe to add now specifically
+// because scans are async (Milestone 5), so there's no synchronous
+// function-timeout budget left to blow. Deliberately on-demand (a button on
+// the completed-scan view, not automatic) rather than run for every scan:
+// it roughly doubles Perplexity spend per scan, and pricing/plan limits
+// aren't finalized yet — the CEO's call, not a default to bake in silently.
+export function buildDeepAdvicePrompt(scan) {
+  const competitorLines = (scan.competitorTallies || [])
+    .map((c) => `- ${c.name}: mentioned in ${c.mentionCount}/${scan.completedCalls} checks, beat ${scan.brand} in ${c.beatBrandCount}`)
+    .join('\n');
+
+  return `You are a world-class SEO and AI-search-visibility strategist. A brand called "${scan.brand}" (${scan.website}, category: "${scan.category}") was just checked for how often it comes up when AI assistants (ChatGPT, Gemini) are asked about their category.
+
+Results: cited in ${scan.citedCount ?? 0} of ${scan.completedCalls ?? 0} completed checks, visibility score ${scan.score ?? 'unavailable'}/100.
+Competitor tallies:
+${competitorLines || '(no named competitors)'}
+
+Based on this, respond with ONLY a JSON object (no markdown fences, no commentary before or after) with this shape:
+{
+  "steps": [
+    { "title": "short actionable step", "reasoning": "1-2 sentences on why this helps AI search visibility specifically", "difficulty": "Easy" | "Medium" | "Hard" }
+  ]
+}
+Provide up to 5 steps, ordered by highest-leverage first. Ground each step in the actual data above (e.g. reference specific competitors or the citation rate) rather than generic SEO advice.`;
+}
+
+// Same lenient-extraction, always-safe-shape pattern as
+// parseEnrichmentResponse() — a malformed or unparseable response degrades
+// to an empty steps list rather than throwing, since deep advice is a
+// bonus on top of the rule-based advice that's already showing.
+export function parseDeepAdviceResponse(text) {
+  const empty = { steps: [] };
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return empty;
+  try {
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed.steps)) return empty;
+    const validDifficulties = new Set(['Easy', 'Medium', 'Hard']);
+    return {
+      steps: parsed.steps
+        .filter((s) => s && typeof s.title === 'string' && s.title.trim())
+        .slice(0, 5)
+        .map((s) => ({
+          title: s.title.trim().slice(0, 200),
+          reasoning: typeof s.reasoning === 'string' ? s.reasoning.trim().slice(0, 500) : '',
+          difficulty: validDifficulties.has(s.difficulty) ? s.difficulty : 'Medium',
+        })),
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export function requiredProspectFields() {
   return ['brand', 'website', 'competitors', 'category', 'use_case', 'region', 'customer_segment'];
 }

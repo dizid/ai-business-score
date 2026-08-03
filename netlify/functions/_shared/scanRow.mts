@@ -18,5 +18,7 @@ export function toScanPayload(row: Record<string, any>) {
     advice: row.advice,
     rawResponses: row.raw_responses,
     generatedAt: row.generated_at,
+    deepAdvice: row.deep_advice ?? null,
+    deepAdviceGeneratedAt: row.deep_advice_generated_at ?? null,
   };
 }

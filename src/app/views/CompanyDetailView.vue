@@ -30,6 +30,8 @@ const scanStatus = ref('');
 const scanError = ref('');
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
+const deepAdviceLoading = ref(false);
+
 function keyOf(scan: Record<string, unknown>, index: number): string {
   return (scan.id as string) || String(index);
 }
@@ -124,6 +126,27 @@ const selectedScan = computed(() =>
 );
 const selectedPayload = computed(() => (selectedScan.value ? validatePayload(selectedScan.value) : null));
 
+async function runDeepAdvice() {
+  if (selectedIndex.value === null || !selectedPayload.value) return;
+  deepAdviceLoading.value = true;
+  try {
+    const res = await fetch(`/scans/${selectedPayload.value.id}/deep-advice`, {
+      method: 'POST',
+      headers: { ...authHeaders() },
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      scanError.value = data.error || 'Failed to generate deeper advice.';
+      return;
+    }
+    scans.value[selectedIndex.value] = data.scan;
+  } catch (err) {
+    scanError.value = (err as Error).message;
+  } finally {
+    deepAdviceLoading.value = false;
+  }
+}
+
 function selectScan(index: number) {
   selectedIndex.value = index;
 }
@@ -188,7 +211,13 @@ watch(() => route.params.id, load);
           </template>
           <template v-else>
             <button type="button" class="back" @click="backToList">&larr; Back to list</button>
-            <ScanDetail v-if="selectedPayload" :payload="selectedPayload" />
+            <ScanDetail
+              v-if="selectedPayload"
+              :payload="selectedPayload"
+              :allow-deep-advice="true"
+              :deep-advice-loading="deepAdviceLoading"
+              @generate-deep-advice="runDeepAdvice"
+            />
             <p class="empty" v-else>This record couldn't be rendered — its stored data doesn't match the expected format.</p>
           </template>
         </div>

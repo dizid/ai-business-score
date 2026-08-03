@@ -10,12 +10,17 @@ export type Rank = 'ranked-1' | 'beaten' | 'not-mentioned';
 export type AdviceId = 'no-data' | 'zero-citations' | 'consistently-beaten' | 'leading' | 'mixed' | 'top-rival';
 export type AdviceTone = 'critical' | 'warning' | 'positive' | 'neutral';
 
+export type Difficulty = 'Easy' | 'Medium' | 'Hard';
+
 export interface PerPromptRank { promptIndex: number; rank: Rank; }
 export interface CompetitorTally { name: string; mentionCount: number; beatBrandCount: number; }
 export interface AdviceCard { id: AdviceId; tone: AdviceTone; params: Record<string, unknown>; }
 export interface RawResponse { promptIndex: number; model: string; text: string; }
+export interface DeepAdviceStep { title: string; reasoning: string; difficulty: Difficulty; }
+export interface DeepAdvice { steps: DeepAdviceStep[]; }
 
 export interface ValidatedPayload {
+  id: string;
   brand: string;
   website: string;
   safeWebsiteHref: string | null;
@@ -30,14 +35,19 @@ export interface ValidatedPayload {
   advice: AdviceCard[];
   rawResponses: RawResponse[];
   generatedAtDate: Date;
+  deepAdvice: DeepAdvice | null;
+  deepAdviceGeneratedAtDate: Date | null;
 }
 
 const RANKS = new Set(['ranked-1', 'beaten', 'not-mentioned']);
 const ADVICE_IDS = new Set(['no-data', 'zero-citations', 'consistently-beaten', 'leading', 'mixed', 'top-rival']);
 const ADVICE_TONES = new Set(['critical', 'warning', 'positive', 'neutral']);
+const DIFFICULTIES = new Set(['Easy', 'Medium', 'Hard']);
 const MAX_COMPETITORS = 12;
 const MAX_ADVICE_CARDS = 3;
+const MAX_DEEP_ADVICE_STEPS = 5;
 const MAX_NAME_LEN = 120;
+const MAX_TEXT_LEN = 600;
 
 export function asNonNegativeInt(v: unknown): number | null {
   const n = Number(v);
@@ -65,6 +75,7 @@ export function b64urlDecode(str: string): string {
 // doesn't match the exact shape scan.mts produces, rather than coercing.
 export function validatePayload(raw: any): ValidatedPayload | null {
   if (!raw || typeof raw !== 'object') return null;
+  if (typeof raw.id !== 'string' || !raw.id) return null;
   if (typeof raw.brand !== 'string' || typeof raw.website !== 'string' || typeof raw.category !== 'string') return null;
 
   const citedCount = asNonNegativeInt(raw.citedCount);
@@ -126,12 +137,36 @@ export function validatePayload(raw: any): ValidatedPayload | null {
   const generatedAtDate = new Date(raw.generatedAt);
   if (Number.isNaN(generatedAtDate.getTime())) return null;
 
+  // deepAdvice is genuinely optional (may not have been generated yet) —
+  // missing/null/malformed all degrade to null rather than rejecting the
+  // whole payload, since it's a bonus on top of the always-present
+  // rule-based advice above.
+  let deepAdvice: DeepAdvice | null = null;
+  if (raw.deepAdvice && typeof raw.deepAdvice === 'object' && Array.isArray(raw.deepAdvice.steps)) {
+    const steps: DeepAdviceStep[] = [];
+    for (const s of raw.deepAdvice.steps.slice(0, MAX_DEEP_ADVICE_STEPS)) {
+      if (!s || typeof s.title !== 'string' || !s.title) continue;
+      steps.push({
+        title: s.title.slice(0, MAX_NAME_LEN * 2),
+        reasoning: typeof s.reasoning === 'string' ? s.reasoning.slice(0, MAX_TEXT_LEN) : '',
+        difficulty: DIFFICULTIES.has(s.difficulty) ? s.difficulty : 'Medium',
+      });
+    }
+    if (steps.length) deepAdvice = { steps };
+  }
+  let deepAdviceGeneratedAtDate: Date | null = null;
+  if (typeof raw.deepAdviceGeneratedAt === 'string') {
+    const d = new Date(raw.deepAdviceGeneratedAt);
+    if (!Number.isNaN(d.getTime())) deepAdviceGeneratedAtDate = d;
+  }
+
   // href-safety: only http(s) links get rendered as clickable — anything
   // else (javascript:, data:, etc.) is dropped rather than escaped, since
   // HTML-escaping a URL does not neutralize a javascript: scheme.
   const safeWebsiteHref = /^https?:\/\//i.test(raw.website) ? raw.website : null;
 
   return {
+    id: raw.id,
     brand: raw.brand,
     website: raw.website,
     safeWebsiteHref,
@@ -146,5 +181,7 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     advice,
     rawResponses,
     generatedAtDate,
+    deepAdvice,
+    deepAdviceGeneratedAtDate,
   };
 }
