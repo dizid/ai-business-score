@@ -82,4 +82,34 @@ function authHeaders(): Record<string, string> {
   return jwt.value ? { Authorization: `Bearer ${jwt.value}` } : {};
 }
 
-export { user, jwt, initializing, isAuthenticated, restoreSession, signUp, signIn, signOut, authHeaders };
+// The minted JWT is short-lived (15 min) and otherwise only ever set once,
+// at login/session-restore — nothing re-mints it as the session goes on. A
+// user who leaves a tab open past that window gets a 401 on their next
+// action with no recovery. Wrap fetch to re-mint and retry once on 401
+// instead of pushing that logic into every call site.
+async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const withAuth = (): RequestInit => ({
+    ...options,
+    headers: { ...(options.headers as Record<string, string> | undefined), ...authHeaders() },
+  });
+
+  const res = await fetch(url, withAuth());
+  if (res.status !== 401) return res;
+
+  jwt.value = await mintJwt();
+  if (!jwt.value) return res;
+  return fetch(url, withAuth());
+}
+
+export {
+  user,
+  jwt,
+  initializing,
+  isAuthenticated,
+  restoreSession,
+  signUp,
+  signIn,
+  signOut,
+  authHeaders,
+  authFetch,
+};

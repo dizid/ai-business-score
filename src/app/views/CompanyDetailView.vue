@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router';
 import { validatePayload } from '../../shared/scanPayload';
 import ScanDetail from '../../shared/ScanDetail.vue';
 import CompanyProgressChart from './CompanyProgressChart.vue';
-import { authHeaders } from '../lib/auth';
+import { authFetch } from '../lib/auth';
 
 const route = useRoute();
 
@@ -48,7 +48,7 @@ async function load() {
   loadError.value = '';
   selectedIndex.value = null;
   try {
-    const res = await fetch(`/companies/${route.params.id}`, { headers: { ...authHeaders() } });
+    const res = await authFetch(`/companies/${route.params.id}`);
     const data = await res.json();
     if (!data.ok) {
       loadError.value = data.error || 'Failed to load company.';
@@ -72,7 +72,7 @@ function stopPolling() {
 
 async function pollScan(scanId: string) {
   try {
-    const res = await fetch(`/scans/${scanId}`, { headers: { ...authHeaders() } });
+    const res = await authFetch(`/scans/${scanId}`);
     const data = await res.json();
     if (!data.ok) {
       scanError.value = data.error || 'Failed to check scan status.';
@@ -104,9 +104,9 @@ async function runNewScan() {
   scanError.value = '';
   scanStatus.value = 'Starting scan…';
   try {
-    const res = await fetch('/scan', {
+    const res = await authFetch('/scan', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ company_id: company.value.id }),
     });
     const data = await res.json();
@@ -138,9 +138,8 @@ async function runDeepAdvice() {
   if (selectedIndex.value === null || !selectedPayload.value) return;
   deepAdviceLoading.value = true;
   try {
-    const res = await fetch(`/scans/${selectedPayload.value.id}/deep-advice`, {
+    const res = await authFetch(`/scans/${selectedPayload.value.id}/deep-advice`, {
       method: 'POST',
-      headers: { ...authHeaders() },
     });
     const data = await res.json();
     if (!data.ok) {

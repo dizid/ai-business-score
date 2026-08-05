@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { scoreBand } from '../../../shared/aivis-core.mjs';
-import { authHeaders } from '../lib/auth';
+import { authFetch } from '../lib/auth';
 
 interface CompanyRow {
   id: string;
@@ -47,7 +47,7 @@ async function loadCompanies() {
   loading.value = true;
   loadError.value = '';
   try {
-    const res = await fetch('/companies', { headers: { ...authHeaders() } });
+    const res = await authFetch('/companies');
     const data = await res.json();
     if (!data.ok) {
       loadError.value = data.error || 'Failed to load companies.';
@@ -65,9 +65,9 @@ async function onCreate() {
   creating.value = true;
   createError.value = '';
   try {
-    const res = await fetch('/companies', {
+    const res = await authFetch('/companies', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form.value),
     });
     const data = await res.json();

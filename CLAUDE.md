@@ -173,7 +173,18 @@ for the exact migration SQL if it needs revisiting.
   { credentials: 'include' })` (GET, not POST — confirmed by testing
   directly rather than trusting the Better Auth JWT-plugin docs' generic
   description) rather than through the client's own token-plugin surface,
-  since that exact contract was already verified by hand.
+  since that exact contract was already verified by hand. That JWT is short-
+  lived (15 min, confirmed by decoding a live token's `iat`/`exp`) and used
+  to be minted exactly once, at login/`restoreSession()`, then cached in a
+  module-level ref for the rest of the tab's life — a user who left a tab
+  open past 15 min got a hard-to-diagnose 401 (`Missing or malformed
+  Authorization header`) on their next click, since the cached ref goes
+  stale but nothing ever re-mints it. Fixed 2026-08-04 by adding
+  `authFetch()` alongside `authHeaders()`: a fetch wrapper that retries once
+  with a freshly-minted token on any 401. Every authenticated call site
+  (`CompaniesListView.vue`, `CompanyDetailView.vue`) goes through it now;
+  `authHeaders()` itself is kept (still used internally by `authFetch()`)
+  rather than removed.
 
 ### `shared/aivis-core.mjs`
 
