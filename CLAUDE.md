@@ -249,10 +249,11 @@ The single source of truth, imported by every consumer:
 - **Enrichment** (`buildEnrichPrompt`, `parseEnrichmentResponse`) — used by
   `netlify/functions/enrich.mts`. Asks a model to research a bare URL and
   return the rest of the prospect fields as JSON; always returns every
-  field, defaulted to `''`/`[]` rather than throwing. Not currently wired
-  into the new app shell's "create company" form (a plain manual form,
-  Milestone 4) — the endpoint still works and is auth-gated, just unused by
-  any UI right now; wiring it in is a small future enhancement, not a bug.
+  field, defaulted to `''`/`[]` rather than throwing. Wired into the app
+  shell's "create company" form since the "URL-first onboarding" work
+  (`CompaniesListView.vue`'s two-step flow: URL → `/enrich` pre-fills the
+  rest → editable review before `POST /companies`) — this doc previously
+  said it was still unwired; it wasn't, that was stale.
 
 ### `vite.config.ts` — two entries
 
@@ -294,9 +295,11 @@ doesn't have that constraint.
   against `lib/auth.ts`'s `signIn`/`signUp`.
 - **`views/CompaniesListView.vue`** — lists the caller's companies
   (`GET /companies`), each with `scan_count`/`latest_score` computed
-  server-side via correlated subqueries; a manual "+ New company" form
-  (`POST /companies`) — not yet wired to `enrich.mts`'s auto-fill, see
-  above.
+  server-side via correlated subqueries; a two-step "+ New company" form —
+  URL first, `POST /enrich` pre-fills brand/category/use_case/region/
+  customer_segment/competitors, then an editable review step before
+  `POST /companies` — falling back to a blank editable form on enrichment
+  failure (`enrich.mts` always returns 200 even on internal failure).
 - **`views/CompanyDetailView.vue`** — one company's master-detail dashboard:
   `CompanyProgressChart.vue` (score-over-time, shown once a company has 2+
   scans — a single point isn't a trend) above a scan list, selecting a scan
