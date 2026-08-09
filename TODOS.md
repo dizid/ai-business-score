@@ -56,9 +56,13 @@ result in full; this entry is the shipping log.
 - Re-run `backfill-legacy-scans.mts` against the CEO's real production
   login once they have one (it currently only has the throwaway test
   account's 4 imported scans).
-- `enrich.mts`'s URL auto-fill isn't wired into the new app shell's
-  "create company" form yet (plain manual form for now) — small UX
-  enhancement, not a bug.
+- ~~`enrich.mts`'s URL auto-fill isn't wired into the new app shell's
+  "create company" form yet~~ — done as part of the "URL-first onboarding"
+  work (see `dd95291`, already on `master`): `CompaniesListView.vue`'s
+  create form is now URL-first with an editable enrichment pre-fill. This
+  bullet sat stale in both `TODOS.md` and `CLAUDE.md` after that shipped —
+  caught 2026-08-09 when about to re-do it from the stale description
+  instead of checking the actual code first.
 - Pricing/plan-tier gating for deep advice is unresolved — `plan_tier`
   column exists on `user_profiles` for this, unused so far.
 - No pagination anywhere yet (`/history`-equivalent queries cap at
