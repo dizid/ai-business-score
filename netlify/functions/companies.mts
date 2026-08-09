@@ -79,7 +79,19 @@ export default async (req: Request) => {
       )
       RETURNING *
     `;
-    return new Response(JSON.stringify({ ok: true, company: inserted[0] }), {
+    const company = inserted[0];
+
+    // Multi-URL support: every company always has a primary company_urls
+    // row equal to its website — CompanyDetailView's URL selector and
+    // scan.mts's url_id resolution both rely on at least one row existing.
+    // Existing companies got this via the 2026-08-09 backfill migration;
+    // new ones get it here.
+    await db`
+      INSERT INTO public.company_urls (company_id, url, is_primary)
+      VALUES (${company.id}, ${company.website}, true)
+    `;
+
+    return new Response(JSON.stringify({ ok: true, company }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     });
