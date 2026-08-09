@@ -374,9 +374,10 @@ export function parseEnrichmentResponse(text) {
 }
 
 // Human labels for the 3 prompt templates the hosted site runs (PROMPT_TEMPLATES
-// indices 0-2 above) — used only to make deep-advice grounding readable, not
-// exported/used for detection logic.
-const DEEP_ADVICE_PROMPT_LABELS = [
+// indices 0-2 above). Originally deep-advice-only; now also imported by
+// ScanDetail.vue for the check-by-check breakdown, so the same wording
+// appears in both places rather than drifting out of sync.
+export const PROMPT_LABELS = [
   'category-recommendation query ("what\'s the best [category] for [use case]?")',
   'brand-vs-competitor comparison query',
   'general recommendation query ("I need a good [category], what do you recommend?")',
@@ -398,7 +399,7 @@ function summarizePerPromptRank(perPromptRank) {
     .sort((a, b) => a[0] - b[0])
     .map(([promptIndex, counts]) => {
       const total = counts['ranked-1'] + counts.beaten + counts['not-mentioned'];
-      const label = DEEP_ADVICE_PROMPT_LABELS[promptIndex] || `prompt ${promptIndex}`;
+      const label = PROMPT_LABELS[promptIndex] || `prompt ${promptIndex}`;
       return `- ${label}: ranked first in ${counts['ranked-1']}, beaten by a competitor in ${counts.beaten}, not mentioned in ${counts['not-mentioned']} (of ${total} checks)`;
     })
     .join('\n');

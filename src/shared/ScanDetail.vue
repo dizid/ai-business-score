@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { scoreBand } from '../../shared/aivis-core.mjs';
-import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceTone } from './scanPayload';
+import { scoreBand, PROMPT_LABELS } from '../../shared/aivis-core.mjs';
+import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceTone, type Rank } from './scanPayload';
 
 // Shared between result/App.vue (a shareable, standalone page) and
 // CompanyDetailView.vue's detail pane (master-detail dashboard) — same
@@ -34,6 +34,11 @@ const BAND_EXPLAIN: Record<string, string> = {
 };
 const ADVICE_TAG: Record<AdviceTone, string> = {
   critical: 'Priority', warning: 'Watch this', positive: 'Working well', neutral: 'Also worth noting',
+};
+const CHECK_BADGE_LABEL: Record<Rank, string> = {
+  'ranked-1': 'Mentioned first',
+  beaten: 'Mentioned, but beaten',
+  'not-mentioned': 'Not mentioned',
 };
 
 const band = computed(() => scoreBand(props.payload.score));
@@ -69,6 +74,31 @@ function rowPct(row: ScoreboardRow) {
   if (props.payload.completedCalls === 0) return 0;
   return Math.min(100, Math.round((row.mentionCount / props.payload.completedCalls) * 100));
 }
+
+// rawResponses[i] and perPromptRank[i] describe the same completed call —
+// both are built by mapping over aggregateProspect()'s `completed` array in
+// the same order, with no filtering/reordering in between — so zipping by
+// index is safe. Grouped by promptIndex so each of the 3 prompt templates
+// shows its 2 model outcomes together, answering "which prompt, which
+// model, did it show up" directly instead of leaving it to a flat raw-text
+// dump the reader has to cross-reference by hand.
+interface CheckRow { model: string; rank: Rank; text: string; }
+interface CheckGroup { promptIndex: number; label: string; checks: CheckRow[]; }
+const checkBreakdown = computed<CheckGroup[]>(() => {
+  const byPrompt = new Map<number, CheckRow[]>();
+  props.payload.rawResponses.forEach((r, i) => {
+    const rank = props.payload.perPromptRank[i]?.rank ?? 'not-mentioned';
+    if (!byPrompt.has(r.promptIndex)) byPrompt.set(r.promptIndex, []);
+    byPrompt.get(r.promptIndex)!.push({ model: r.model, rank, text: r.text });
+  });
+  return [...byPrompt.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([promptIndex, checks]) => ({
+      promptIndex,
+      label: PROMPT_LABELS[promptIndex] || `Prompt ${promptIndex + 1}`,
+      checks,
+    }));
+});
 
 // Only 'top-rival' can produce an empty body (when no valid competitor
 // name survives re-validation) — the other advice ids always render
@@ -188,14 +218,30 @@ const visibleAdvice = computed(() =>
       </button>
     </template>
 
-    <h2>Raw data</h2>
-    <details>
-      <summary>Raw AI responses (for manual review)</summary>
-      <div class="response" v-for="(r, i) in payload.rawResponses" :key="i">
-        <div class="label">Prompt {{ r.promptIndex + 1 }} &middot; {{ r.model }}</div>
-        {{ r.text }}
+    <!-- check-by-check breakdown: every completed call, grouped by which of
+         the 3 prompts produced it, with each model's outcome shown next to
+         its own raw response text (expand per-check rather than one long
+         undifferentiated dump). -->
+    <template v-if="checkBreakdown.length">
+      <h2>Check-by-check</h2>
+      <div class="card checks-card">
+        <div class="check-group" v-for="group in checkBreakdown" :key="group.promptIndex">
+          <div class="check-prompt-label">{{ group.label }}</div>
+          <details class="check-row" v-for="(c, i) in group.checks" :key="i">
+            <summary>
+              <span class="check-model">{{ c.model }}</span>
+              <span class="check-badge" :class="`badge-${c.rank}`">{{ CHECK_BADGE_LABEL[c.rank] }}</span>
+            </summary>
+            <div class="check-text">{{ c.text }}</div>
+          </details>
+        </div>
+        <div class="check-failed-note" v-if="payload.failedCalls > 0">
+          {{ payload.failedCalls }} additional {{ payload.failedCalls === 1 ? 'check' : 'checks' }} failed to
+          complete (API error or timeout) and aren't shown here — which specific prompt/model failed isn't
+          currently recorded.
+        </div>
       </div>
-    </details>
+    </template>
 
     <footer>Detection is presence-only, not sentiment-aware — a negative or comparative mention still counts as "cited." The score above is a heuristic weighting of that same presence-only detection, not an independently verified rank. This is a single point-in-time check, not a monitored score. Results are fixed at generation time; this link will always show the same result.</footer>
   </div>
@@ -320,20 +366,43 @@ h1 { font-size: 1.5rem; margin: 0 0 2px; }
 h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 28px 0 10px; }
 h2:first-of-type { margin-top: 0; }
 
-details {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 16px;
-  background: var(--card);
+/* ---- check-by-check breakdown ---- */
+.checks-card { padding: 8px 20px; }
+.check-group { padding: 12px 0; border-top: 1px solid var(--border); }
+.check-group:first-child { border-top: none; }
+.check-prompt-label { font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
+.check-row { margin-bottom: 6px; }
+.check-row:last-child { margin-bottom: 0; }
+.check-row summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
-summary { cursor: pointer; font-weight: 600; }
-.response {
-  margin-top: 14px;
-  padding-top: 14px;
+.check-row summary::-webkit-details-marker { display: none; }
+.check-row[open] summary { border-radius: 8px 8px 0 0; }
+.check-model { font-size: 0.85rem; color: var(--muted); font-family: ui-monospace, monospace; }
+.check-badge {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 2px 9px; border-radius: 999px; flex: none; white-space: nowrap;
+}
+.badge-ranked-1 { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--success-text); }
+.badge-beaten { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
+.badge-not-mentioned { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+.check-text {
+  font-size: 0.85rem; color: var(--muted);
+  padding: 10px 10px 4px;
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 8px 8px;
+  white-space: pre-wrap;
+}
+.check-failed-note {
+  margin-top: 4px; padding: 10px 0;
+  font-size: 0.82rem; color: var(--muted);
   border-top: 1px solid var(--border);
-  font-size: 0.9rem;
 }
-.response:first-of-type { border-top: none; margin-top: 8px; padding-top: 8px; }
-.response .label { color: var(--muted); font-size: 0.8rem; margin-bottom: 4px; }
+
 footer { margin-top: 28px; color: var(--faint); font-size: 0.78rem; }
 </style>
