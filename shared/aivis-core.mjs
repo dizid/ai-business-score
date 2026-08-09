@@ -37,31 +37,20 @@ export const PROMPT_TEMPLATES = [
   (p) => `I'm looking to switch away from ${p.competitors[0]} — what's a good ${normalizeCategory(p.category)} alternative?`,
 ];
 
-// ---------- Models ----------
-// Grew from 2 to 6 on 2026-08-09 at a live user's request for broader model
-// coverage. IMPORTANT: only the first two entries have ever been confirmed
-// against a real Perplexity call (see PPLX_URL's comment above — live
-// smoke-tested 2026-07-28). The other four are best-effort from a web search
-// of Perplexity's Agent API changelog, NOT a live-verified smoke test —
-// docs.perplexity.ai was unreachable (network egress policy) to confirm
-// exact identifiers or pricing tier directly. They may be misspelled,
-// already retired, or a far more expensive tier than gpt-5-mini/
-// gemini-3-flash-preview's "cheap tier" — Perplexity's own preview models do
-// get retired underneath callers (e.g. google/gemini-3.1-flash-lite-preview
-// was retired when Google pulled the underlying model). A wrong/dead model
-// string here degrades gracefully — callModelWithRetry just burns 3 failed
-// attempts and that model's calls count toward failedCalls, nothing breaks
-// — but failed-call detail (which model/prompt) isn't persisted anywhere
-// currently (see run-scan-background.mts), so confirming which of these
-// actually work requires reading Netlify function logs after a real scan,
-// not just looking at the app UI. Trim this list once that's known.
+// ---------- Models (2, cheap tier, live-verified) ----------
+// Briefly grew to 6 on 2026-08-09 (4 unverified additions sourced from a web
+// search of Perplexity's changelog, since docs.perplexity.ai itself was
+// unreachable through this network's egress policy to smoke-test directly)
+// — reverted same day after that combined with the 10-prompt expansion to
+// push per-scan calls to 60, which is what run-scan-background.mts's scan
+// deadline + reduced retry count below are actually defending against. Only
+// these two have ever been confirmed against a real Perplexity call (see
+// PPLX_URL's comment above — live smoke-tested 2026-07-28). Re-add more
+// once each candidate has been smoke-tested the same way, one at a time —
+// not as a batch of guesses.
 export const MODELS = [
   'openai/gpt-5-mini',
   'google/gemini-3-flash-preview',
-  'anthropic/claude-opus-5',
-  'openai/gpt-5.6-luna',
-  'google/gemini-3.6-flash',
-  'xai/grok-4.5',
 ];
 
 // ---------- Common-word stoplist for brand-name ambiguity flag ----------
@@ -140,9 +129,20 @@ const PPLX_URL = 'https://api.perplexity.ai/v1/responses';
 // a bound so one slow web_search call can't blow the whole request. On
 // timeout this throws (same shape as any other failure) rather than hanging
 // — callers already treat failures as "skip and count separately."
-export async function callModel(apiKey, model, prompt, timeoutMs) {
+//
+// externalSignal (optional, 5th arg) is separate from the internal
+// timeoutMs-derived controller: it lets a caller running MANY of these in
+// parallel (the hosted scan) impose one shared scan-wide deadline across all
+// of them, so a straggler can't drag the whole batch out past a predictable
+// bound the way per-call timeouts alone allow (each call gets its own full
+// timeoutMs budget regardless of how long the batch has already been
+// running). AbortSignal.any (Node 20+) combines both — either one aborting
+// aborts the fetch.
+export async function callModel(apiKey, model, prompt, timeoutMs, externalSignal) {
   const controller = timeoutMs ? new AbortController() : undefined;
   const timer = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+  const signals = [controller?.signal, externalSignal].filter(Boolean);
+  const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
   try {
     const res = await fetch(PPLX_URL, {
       method: 'POST',
@@ -155,7 +155,7 @@ export async function callModel(apiKey, model, prompt, timeoutMs) {
         input: prompt,
         tools: [{ type: 'web_search' }],
       }),
-      signal: controller?.signal,
+      signal,
     });
 
     if (!res.ok) {
@@ -167,7 +167,11 @@ export async function callModel(apiKey, model, prompt, timeoutMs) {
     return { text: extractText(json), usage: json.usage ?? null };
   } catch (err) {
     if (err.name === 'AbortError') {
-      throw new Error(`Timed out after ${timeoutMs}ms waiting for ${model}`);
+      throw new Error(
+        externalSignal?.aborted
+          ? `Scan deadline exceeded waiting for ${model}`
+          : `Timed out after ${timeoutMs}ms waiting for ${model}`
+      );
     }
     throw err;
   } finally {
@@ -175,24 +179,62 @@ export async function callModel(apiKey, model, prompt, timeoutMs) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // Bounded retry wrapper around callModel — additive, does not change
 // callModel itself. proof-script has its own local callWithRetry (1 retry,
 // paired with a FailFastTracker circuit-breaker for its long sequential
 // prospect list); this is a simpler standalone version for callers that just
 // need "try again on failure" without a batch-level circuit-breaker, e.g.
-// the hosted site's single 6-call scan. No backoff between attempts — calls
-// run in parallel under a background-function budget generous enough
-// (minutes) that waiting between attempts buys nothing.
-export async function callModelWithRetry(apiKey, model, prompt, timeoutMs, maxAttempts = 3) {
+// the hosted site's scan. maxAttempts dropped from 3 to 2 on 2026-08-09 —
+// with only 6 calls, losing one to a bad retry chain was a meaningful chunk
+// of the data; now that a scan runs many more prompts, each individual call
+// matters less to the aggregate score, so it's worth capping the worst-case
+// per-call latency (was up to 3 x timeoutMs with zero backoff) instead of
+// retrying as aggressively. A short backoff (unlike before) is worth it now
+// specifically because firing many calls at once raises the odds that a
+// failure is a shared rate-limit response, not isolated flakiness —
+// retrying instantly into a live rate limit just compounds it. Skips the
+// backoff (and any further attempt) once externalSignal has already fired —
+// no point waiting to retry into a deadline that's already passed.
+const RETRY_BACKOFF_MS = 1000;
+
+export async function callModelWithRetry(apiKey, model, prompt, timeoutMs, maxAttempts = 2, externalSignal) {
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await callModel(apiKey, model, prompt, timeoutMs);
+      return await callModel(apiKey, model, prompt, timeoutMs, externalSignal);
     } catch (err) {
       lastErr = err;
+      if (externalSignal?.aborted) break;
+      if (attempt < maxAttempts) await sleep(RETRY_BACKOFF_MS);
     }
   }
   throw lastErr;
+}
+
+// Concurrency-limited task runner: a small worker pool (size `limit`) pulls
+// from a shared queue instead of firing every task at once via Promise.all.
+// Ported from proof-script's local runWithConcurrency (used there to bound
+// concurrent calls across its whole prospect list) so the hosted scan can
+// use the same pattern to bound concurrent calls WITHIN one scan — added
+// 2026-08-09 specifically because firing all of a scan's calls at once (6,
+// then briefly 60) is untested against Perplexity's per-key concurrency
+// limits and a live user flagged it as a real risk before it was ever
+// exercised at the larger count.
+export async function runWithConcurrency(tasks, limit, worker) {
+  const results = new Array(tasks.length);
+  let next = 0;
+  async function runner() {
+    while (next < tasks.length) {
+      const i = next++;
+      results[i] = await worker(tasks[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, runner));
+  return results;
 }
 
 // Defensive extraction: try the confirmed-live OpenAI-Responses-API shape
