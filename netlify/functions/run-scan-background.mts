@@ -1,13 +1,19 @@
-// Does the actual 6-call scan (unchanged logic from the old synchronous
-// /scan) after being triggered by scan.mts. Background Functions get up to
-// 15 minutes of wall-clock time and Netlify returns 202 to the trigger
-// immediately, so this can safely take the full 20-60s real Perplexity
-// calls (with retries) need — the constraint that forced the old /scan to
-// stay synchronous-and-tight-timeout no longer applies. Per-call timeout was
-// 20s and had no retry until 2026-08-09 — real calls routinely take
-// 15-20s+, so a 20s timeout with zero margin caused ~50% of calls to fail;
-// raised to 60s with 2 retries (callModelWithRetry) since the 15-minute
-// budget leaves enormous headroom.
+// Does the actual scan (10 prompts x 6 models = 60 calls as of 2026-08-09,
+// up from the original 3x2=6 — see aivis-core.mjs's PROMPT_TEMPLATES/MODELS
+// comments for why) after being triggered by scan.mts. Background Functions
+// get up to 15 minutes of wall-clock time and Netlify returns 202 to the
+// trigger immediately, so this can safely take the full 20-60s real
+// Perplexity calls (with retries) need — the constraint that forced the old
+// /scan to stay synchronous-and-tight-timeout no longer applies. Per-call
+// timeout was 20s and had no retry until 2026-08-09 — real calls routinely
+// take 15-20s+, so a 20s timeout with zero margin caused ~50% of calls to
+// fail; raised to 60s with 2 retries (callModelWithRetry) since the
+// 15-minute budget leaves enormous headroom. NOTE: going from 6 to 60
+// concurrent calls (all fired via Promise.all at once, no batching) is
+// untested against Perplexity's actual per-key rate/concurrency limits —
+// if a live scan shows a cluster of failures across otherwise-valid models,
+// that's the likely cause, not a broken model string; batching the calls
+// instead of firing all 60 at once would be the fix.
 import type { Config } from '@netlify/functions';
 import {
   PROMPT_TEMPLATES,
@@ -84,7 +90,9 @@ export default async (req: Request) => {
     customer_segment: company.customer_segment,
   };
 
-  const scanPrompts = PROMPT_TEMPLATES.slice(0, 3);
+  // Was PROMPT_TEMPLATES.slice(0, 3) — the hosted site now runs the full
+  // set, same as proof-script always has (see aivis-core.mjs comment).
+  const scanPrompts = PROMPT_TEMPLATES;
   const CALL_TIMEOUT_MS = 60000;
   const tasks: { prompt: string; model: string; promptIndex: number }[] = [];
   for (const [promptIndex, template] of scanPrompts.entries()) {

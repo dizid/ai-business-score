@@ -78,7 +78,7 @@ function rowPct(row: ScoreboardRow) {
 // rawResponses[i] and perPromptRank[i] describe the same completed call —
 // both are built by mapping over aggregateProspect()'s `completed` array in
 // the same order, with no filtering/reordering in between — so zipping by
-// index is safe. Grouped by promptIndex so each of the 3 prompt templates
+// index is safe. Grouped by promptIndex so each prompt template
 // shows its 2 model outcomes together, answering "which prompt, which
 // model, did it show up" directly instead of leaving it to a flat raw-text
 // dump the reader has to cross-reference by hand.
@@ -218,8 +218,8 @@ const visibleAdvice = computed(() =>
       </button>
     </template>
 
-    <!-- check-by-check breakdown: every completed call, grouped by which of
-         the 3 prompts produced it, with each model's outcome shown next to
+    <!-- check-by-check breakdown: every completed call, grouped by which
+         prompt produced it, with each model's outcome shown next to
          its own raw response text (expand per-check rather than one long
          undifferentiated dump). -->
     <template v-if="checkBreakdown.length">

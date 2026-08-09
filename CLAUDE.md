@@ -44,14 +44,22 @@ Vertical prompt templating is still deliberately deferred per that doc's
 original reasoning (see `TODOS.md`).
 
 **Known limitation, unchanged by the pivot:** real Perplexity calls with
-`web_search` grounding routinely take 15-20s, sometimes longer. A scan runs 3
-prompts x 2 models = 6 calls in parallel with a 20s per-call timeout;
-individual calls that exceed the timeout are counted as failed rather than
-silently dropped or retried. This used to force the whole `/scan` request to
-stay synchronous and tightly timeout-budgeted — that constraint is gone
-since Milestone 5 made scans asynchronous (see "Async scan execution"
-below), but the per-call 20s timeout and the real-world ~50% failure rate
-are unrelated to that and still apply.
+`web_search` grounding routinely take 15-20s, sometimes longer. A scan runs
+10 prompts x 6 models = 60 calls in parallel (grown from the original 3x2=6
+on 2026-08-09 at a live user's request — see `shared/aivis-core.mjs`'s
+`PROMPT_TEMPLATES`/`MODELS` comments) with a 60s per-call timeout and 2
+retries (`callModelWithRetry`, also raised 2026-08-09 from a 20s/no-retry
+setup that failed ~50% of calls); individual calls that still fail after
+retries are counted as failed rather than silently dropped. This used to
+force the whole `/scan` request to stay synchronous and tightly
+timeout-budgeted — that constraint is gone since Milestone 5 made scans
+asynchronous (see "Async scan execution" below). Of the 6 models, only the
+first two (`openai/gpt-5-mini`, `google/gemini-3-flash-preview`) have ever
+been confirmed against a live call; the other four came from a web search of
+Perplexity's changelog (docs.perplexity.ai was unreachable directly) and are
+unverified — see the `MODELS` comment for what to check if a live scan shows
+a cluster of failures. Firing all 60 calls at once via `Promise.all` (no
+batching) is also untested against Perplexity's per-key rate limits.
 
 ## Deployment
 
