@@ -1,5 +1,83 @@
 # TODOs
 
+## STATUS 2026-08-09: Scan coverage + reliability + check-by-check UI — PR open, not yet merged
+
+**Where things stand:** all work is on branch `claude/url-brand-checks-analysis-e7hwc4`,
+already pushed, with **open PR https://github.com/dizid/ai-business-score/pull/2**
+(base `master`). CI (Netlify's redirect/header/pages checks) is green, deploy
+preview is live at `https://deploy-preview-2--aivis-scan.netlify.app`, no
+unresolved review comments, `mergeable_state: clean`. **Not merged yet —
+that's a deliberate pause, not a blocker**: the PR is fully working, just
+waiting on the user to review/test before merging. To resume from a fresh
+session (this one resumed, or a new one on another machine): `git fetch
+origin claude/url-brand-checks-analysis-e7hwc4 && git checkout
+claude/url-brand-checks-analysis-e7hwc4`, then read this entry, `WISH_LIST.md`,
+and PR #2's description/comments for full context — a fresh session has none
+of this conversation's memory otherwise.
+
+**What shipped on this branch, in order (5 commits):**
+1. Check-by-check breakdown in `ScanDetail.vue` — every completed call now
+   shown grouped by prompt template with a per-model outcome badge
+   (mentioned-first/beaten/not-mentioned) and expandable raw text, replacing
+   the old flat "Raw AI responses" dump. `PROMPT_LABELS` exported from
+   `aivis-core.mjs` for this (shared with deep-advice grounding).
+2. `PROMPT_TEMPLATES` grew from 8 to 10 (added a criteria-based and a
+   switcher-intent prompt) and the hosted site switched from running just
+   the first 3 to the full set — a live user's feedback that the original
+   3-prompt subset read as too generic.
+3. `MODELS` briefly grew from 2 to 6, then was **reverted back to 2**
+   same day: the 4 additions were sourced from a web search of Perplexity's
+   changelog (never live-verified — `docs.perplexity.ai` is unreachable
+   through this network's egress policy), and combined with the 10-prompt
+   expansion pushed one scan to 60 concurrent calls, which the same user
+   flagged as a real risk before it ever ran for real.
+4. Added real safeguards for the resulting call volume: a concurrency-
+   limited worker pool (`runWithConcurrency`, limit 10, replacing a bare
+   `Promise.all`), a hard scan-wide deadline (`SCAN_DEADLINE_MS`, 100s, one
+   shared `AbortController`) so a straggler can't drag the whole scan out
+   the way it could before, and `callModelWithRetry` dropped from 3 attempts
+   to 2 with a 1s backoff between them.
+5. Corrected two stale doc claims in `CLAUDE.md`/`TODOS.md` — both said
+   `enrich.mts`'s URL auto-fill wasn't wired into the "create company" form;
+   it already was (shipped earlier in `dd95291`, already on `master`). Caught
+   by checking the actual code before re-doing already-done work.
+
+**Verified each step:** `npm run type-check`, `proof-script --dry-run`
+(confirms the real call count — 20 now, was 6), full `npm run build`, a
+standalone script exercising `runWithConcurrency`'s concurrency cap plus
+`callModelWithRetry`'s backoff timing and pre-aborted-signal short-circuit
+against a mocked `fetch`, and a Playwright screenshot of the rendered
+check-by-check UI in dark mode. Never ran a real scan against production
+Perplexity — that still needs doing before fully trusting the 20-call
+volume and the 2 live-verified models in practice.
+
+**Two things found while testing PR #2's deploy preview that are NOT
+regressions from this branch** (pre-existing gaps, now in `WISH_LIST.md`
+items #6-7): sign-up/login fails with "Invalid origin" on any PR preview
+URL because Neon Auth's `trusted_origins` only lists production — expected
+behavior given the config, not new breakage, and the "Chrome forgot my
+password" symptom was the same root cause (different origin, no saved
+credentials for it). No password-reset flow exists anywhere in the app
+(confirmed by reading the code, not just missing UI). **Both need Neon
+console access to fix — no Neon MCP connector is available to attach in
+this session; try from an interactive session (`claude mcp`) or the Neon
+console directly.** Production login (`https://aivis-scan.netlify.app`)
+was never confirmed broken — only the preview URL was tested.
+
+**Immediate next steps, in likely order:**
+1. Test this PR's actual changes (the scan itself, check-by-check UI) via
+   production login, since preview-URL auth is a known dead end.
+2. Merge PR #2 once satisfied.
+3. Run one real scan in production to confirm the 20-call volume behaves
+   as designed (verifies `WISH_LIST.md` item #5's open question).
+4. Pick up whichever `WISH_LIST.md` item matters most — #1 (persisting
+   failed-call detail) is flagged there as the one that makes several of
+   the others faster to iterate on.
+
+**Full backlog of deferred ideas:** see `WISH_LIST.md` — not duplicated
+here since it's the dedicated place for this, per the user's request this
+session to stop losing ideas to chat scrollback.
+
 ## STATUS 2026-08-03: SaaS pivot (auth, Neon Postgres, async scans, deep advice, progress chart) — SHIPPED, verified in production
 
 The CEO reviewed an external draft plan proposing user accounts, a real
