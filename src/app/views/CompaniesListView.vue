@@ -21,6 +21,9 @@ const loadError = ref('');
 const showCreate = ref(false);
 const creating = ref(false);
 const createError = ref('');
+const detailsRevealed = ref(false);
+const enriching = ref(false);
+const enrichError = ref('');
 const form = ref({
   brand: '',
   website: '',
@@ -61,6 +64,70 @@ async function loadCompanies() {
   }
 }
 
+function resetForm() {
+  form.value = { brand: '', website: '', category: '', use_case: '', region: '', customer_segment: '', competitors: '' };
+  detailsRevealed.value = false;
+  enrichError.value = '';
+  createError.value = '';
+}
+
+function toggleCreate() {
+  if (showCreate.value) {
+    showCreate.value = false;
+  } else {
+    resetForm();
+    showCreate.value = true;
+  }
+}
+
+// Step 1 -> 2: research the URL via /enrich to pre-fill the rest of the
+// fields. Best-effort — enrich.mts always returns 200 (even on internal
+// failure, {ok:false}), so a failure just means "start from blank, editable
+// fields" rather than blocking the flow.
+async function onEnrich() {
+  enriching.value = true;
+  enrichError.value = '';
+  try {
+    const res = await authFetch('/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ website: form.value.website }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      form.value = {
+        brand: data.brand,
+        website: data.website || form.value.website,
+        category: data.category,
+        use_case: data.use_case,
+        region: data.region,
+        customer_segment: data.customer_segment,
+        competitors: (data.competitors || []).join(', '),
+      };
+    } else {
+      enrichError.value = data.error || "Couldn't auto-fill from that URL — fill in the details below.";
+    }
+  } catch (err) {
+    enrichError.value = "Couldn't auto-fill from that URL — fill in the details below.";
+  } finally {
+    enriching.value = false;
+    detailsRevealed.value = true;
+  }
+}
+
+function backToUrl() {
+  detailsRevealed.value = false;
+  enrichError.value = '';
+}
+
+function onSubmit() {
+  if (!detailsRevealed.value) {
+    onEnrich();
+  } else {
+    onCreate();
+  }
+}
+
 async function onCreate() {
   creating.value = true;
   createError.value = '';
@@ -76,7 +143,7 @@ async function onCreate() {
       return;
     }
     showCreate.value = false;
-    form.value = { brand: '', website: '', category: '', use_case: '', region: '', customer_segment: '', competitors: '' };
+    resetForm();
     await loadCompanies();
   } catch (err) {
     createError.value = (err as Error).message;
@@ -95,32 +162,46 @@ onMounted(loadCompanies);
         <h1>Companies</h1>
         <p class="sub">Track AI search visibility over time for each business you're watching.</p>
       </div>
-      <button type="button" @click="showCreate = !showCreate">{{ showCreate ? 'Cancel' : '+ New company' }}</button>
+      <button type="button" @click="toggleCreate">{{ showCreate ? 'Cancel' : '+ New company' }}</button>
     </div>
 
-    <form class="card create-card" v-if="showCreate" @submit.prevent="onCreate">
-      <label>Brand name</label>
-      <input type="text" v-model="form.brand" required />
+    <form class="card create-card" v-if="showCreate" @submit.prevent="onSubmit">
+      <template v-if="!detailsRevealed">
+        <label>Website</label>
+        <input type="text" v-model="form.website" required placeholder="acmeplumbing.com" autofocus />
+        <p class="hint-text">We'll look up the site and pre-fill the rest — you can edit anything before creating.</p>
 
-      <label>Website</label>
-      <input type="text" v-model="form.website" required placeholder="acmeplumbing.com" />
+        <button type="submit" :disabled="enriching || !form.website.trim()">{{ enriching ? 'Looking it up…' : 'Continue' }}</button>
+      </template>
 
-      <label>Category</label>
-      <input type="text" v-model="form.category" required placeholder="emergency plumber" />
+      <template v-else>
+        <button type="button" class="back-link" @click="backToUrl">&larr; Change URL</button>
+        <div class="status error" v-if="enrichError">{{ enrichError }}</div>
 
-      <label>Use case</label>
-      <input type="text" v-model="form.use_case" required placeholder="a burst pipe at home" />
+        <label>Brand name</label>
+        <input type="text" v-model="form.brand" required />
 
-      <label>Region</label>
-      <input type="text" v-model="form.region" required placeholder="Rotterdam" />
+        <label>Website</label>
+        <input type="text" v-model="form.website" required placeholder="acmeplumbing.com" />
 
-      <label>Customer segment</label>
-      <input type="text" v-model="form.customer_segment" required placeholder="homeowners" />
+        <label>Category</label>
+        <input type="text" v-model="form.category" required placeholder="emergency plumber" />
 
-      <label>Competitors <span class="hint">(comma-separated, 2-3)</span></label>
-      <input type="text" v-model="form.competitors" required placeholder="Bob's Pipes, QuickFlow Plumbing" />
+        <label>Use case</label>
+        <input type="text" v-model="form.use_case" required placeholder="a burst pipe at home" />
 
-      <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'Create company' }}</button>
+        <label>Region</label>
+        <input type="text" v-model="form.region" required placeholder="Rotterdam" />
+
+        <label>Customer segment</label>
+        <input type="text" v-model="form.customer_segment" required placeholder="homeowners" />
+
+        <label>Competitors <span class="hint">(comma-separated, 2-3)</span></label>
+        <input type="text" v-model="form.competitors" required placeholder="Bob's Pipes, QuickFlow Plumbing" />
+
+        <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'GO' }}</button>
+      </template>
+
       <div class="status error" v-if="createError">{{ createError }}</div>
     </form>
 
@@ -151,7 +232,7 @@ onMounted(loadCompanies);
 
 <style scoped>
 main { max-width: 800px; margin: 0 auto; padding: 48px 20px 80px; }
-.head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+.head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
 h1 { font-size: 1.5rem; margin: 0 0 4px; }
 p.sub { color: var(--muted); margin: 0; }
 .head-row button {
@@ -162,6 +243,11 @@ p.sub { color: var(--muted); margin: 0; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 8px 20px 20px; margin-bottom: 24px; }
 .card label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 18px; margin-bottom: 6px; }
 .card label .hint { font-weight: 400; color: var(--muted); }
+.hint-text { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
+.back-link {
+  display: block; margin: 18px 0 4px; padding: 0; border: none; background: none;
+  color: var(--muted); font-size: 0.85rem; text-decoration: underline; cursor: pointer;
+}
 .card input {
   width: 100%; padding: 10px 12px; font-size: 1rem;
   border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg);

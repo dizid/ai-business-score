@@ -4,12 +4,24 @@
 // prompt templates, models, brand-detection, and the API call — the two
 // callers differ only in orchestration (batch CLI vs. single web request).
 
+// A `category` string is free-typed by the founder (or auto-inferred) and
+// isn't guaranteed to read as a clean noun phrase — e.g. "Sport, boxing".
+// Splicing that straight into "What's the best {category} for..." produces
+// a grammatically broken prompt that confuses the model into asking a
+// clarifying question instead of answering (observed live 2026-08-09 with
+// category "Sport, boxing" → gpt-5-mini got stuck on "do you mean 'is
+// boxing the best sport'?"). Normalizing comma/slash-joined categories into
+// a single " / "-joined phrase keeps templates 0 and 2 grammatical either way.
+function normalizeCategory(category) {
+  return category.split(/[,/]+/).map((s) => s.trim()).filter(Boolean).join(' / ');
+}
+
 // ---------- Prompts (8, generic — brand/competitor substitution only) ----------
 // Vertical-adjusted templating explicitly deferred, see TODOS.md.
 export const PROMPT_TEMPLATES = [
-  (p) => `What's the best ${p.category} for ${p.use_case}?`,
+  (p) => `What's the best ${normalizeCategory(p.category)} option for ${p.use_case}?`,
   (p) => `Compare ${p.brand} vs ${p.competitors[0]} vs ${p.competitors[1] ?? p.competitors[0]}.`,
-  (p) => `I need a ${p.category} — what do you recommend and why?`,
+  (p) => `I need a good ${normalizeCategory(p.category)} option — what do you recommend and why?`,
   (p) => `Top ${p.category} companies in ${p.region}?`,
   (p) => `Is ${p.brand} a good choice for ${p.use_case}? What are the alternatives?`,
   (p) => `What are people saying about ${p.brand} vs ${p.competitors[0]}?`,
@@ -129,6 +141,26 @@ export async function callModel(apiKey, model, prompt, timeoutMs) {
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+// Bounded retry wrapper around callModel — additive, does not change
+// callModel itself. proof-script has its own local callWithRetry (1 retry,
+// paired with a FailFastTracker circuit-breaker for its long sequential
+// prospect list); this is a simpler standalone version for callers that just
+// need "try again on failure" without a batch-level circuit-breaker, e.g.
+// the hosted site's single 6-call scan. No backoff between attempts — calls
+// run in parallel under a background-function budget generous enough
+// (minutes) that waiting between attempts buys nothing.
+export async function callModelWithRetry(apiKey, model, prompt, timeoutMs, maxAttempts = 3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await callModel(apiKey, model, prompt, timeoutMs);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
 }
 
 // Defensive extraction: try the confirmed-live OpenAI-Responses-API shape
@@ -341,6 +373,37 @@ export function parseEnrichmentResponse(text) {
   }
 }
 
+// Human labels for the 3 prompt templates the hosted site runs (PROMPT_TEMPLATES
+// indices 0-2 above) — used only to make deep-advice grounding readable, not
+// exported/used for detection logic.
+const DEEP_ADVICE_PROMPT_LABELS = [
+  'category-recommendation query ("what\'s the best [category] for [use case]?")',
+  'brand-vs-competitor comparison query',
+  'general recommendation query ("I need a good [category], what do you recommend?")',
+];
+
+// Groups perPromptRank (one entry per completed model call, keyed by which
+// of the 3 templates produced it) into a per-template breakdown, so
+// buildDeepAdvicePrompt can ground steps in specifics like "you're missing
+// from the comparison-style query" instead of only aggregate counts.
+function summarizePerPromptRank(perPromptRank) {
+  const byPrompt = new Map();
+  for (const r of perPromptRank || []) {
+    if (!byPrompt.has(r.promptIndex)) {
+      byPrompt.set(r.promptIndex, { 'ranked-1': 0, beaten: 0, 'not-mentioned': 0 });
+    }
+    byPrompt.get(r.promptIndex)[r.rank]++;
+  }
+  return [...byPrompt.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([promptIndex, counts]) => {
+      const total = counts['ranked-1'] + counts.beaten + counts['not-mentioned'];
+      const label = DEEP_ADVICE_PROMPT_LABELS[promptIndex] || `prompt ${promptIndex}`;
+      return `- ${label}: ranked first in ${counts['ranked-1']}, beaten by a competitor in ${counts.beaten}, not mentioned in ${counts['not-mentioned']} (of ${total} checks)`;
+    })
+    .join('\n');
+}
+
 // ---------- Deep advice (on-demand, live LLM call) ----------
 // Milestone 6 of the SaaS-pivot plan: unlike selectAdvice() above, this DOES
 // make a live grounded Perplexity call — safe to add now specifically
@@ -353,6 +416,7 @@ export function buildDeepAdvicePrompt(scan) {
   const competitorLines = (scan.competitorTallies || [])
     .map((c) => `- ${c.name}: mentioned in ${c.mentionCount}/${scan.completedCalls} checks, beat ${scan.brand} in ${c.beatBrandCount}`)
     .join('\n');
+  const perPromptLines = summarizePerPromptRank(scan.perPromptRank);
 
   return `You are a world-class SEO and AI-search-visibility strategist. A brand called "${scan.brand}" (${scan.website}, category: "${scan.category}") was just checked for how often it comes up when AI assistants (ChatGPT, Gemini) are asked about their category.
 
@@ -360,13 +424,16 @@ Results: cited in ${scan.citedCount ?? 0} of ${scan.completedCalls ?? 0} complet
 Competitor tallies:
 ${competitorLines || '(no named competitors)'}
 
+Breakdown by query type:
+${perPromptLines || '(no per-query data)'}
+
 Based on this, respond with ONLY a JSON object (no markdown fences, no commentary before or after) with this shape:
 {
   "steps": [
     { "title": "short actionable step", "reasoning": "1-2 sentences on why this helps AI search visibility specifically", "difficulty": "Easy" | "Medium" | "Hard" }
   ]
 }
-Provide up to 5 steps, ordered by highest-leverage first. Ground each step in the actual data above (e.g. reference specific competitors or the citation rate) rather than generic SEO advice.`;
+Provide up to 5 steps, ordered by highest-leverage first. Ground each step in the actual data above — reference specific competitors, the citation rate, and which query type(s) from the breakdown the brand is weak in — rather than generic SEO advice.`;
 }
 
 // Same lenient-extraction, always-safe-shape pattern as

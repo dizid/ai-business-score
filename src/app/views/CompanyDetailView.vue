@@ -20,11 +20,32 @@ interface CompanyRow {
   is_legacy_import: boolean;
 }
 
+interface CompanyUrlRow {
+  id: string;
+  company_id: string;
+  url: string;
+  label: string | null;
+  is_primary: boolean;
+  created_at: string;
+}
+
 const company = ref<CompanyRow | null>(null);
 const scans = ref<Record<string, unknown>[]>([]);
 const loading = ref(true);
 const loadError = ref('');
 const selectedIndex = ref<number | null>(null);
+
+// Multi-URL support: each tracked URL has its own independent scan
+// history/chart (no cross-URL aggregation). selectedUrlId drives which
+// slice of `scans` is shown; it defaults to the primary URL on first load
+// and is preserved across reloads (e.g. after a scan completes) so the
+// user doesn't get bounced back to the primary URL mid-flow.
+const urls = ref<CompanyUrlRow[]>([]);
+const selectedUrlId = ref<string | null>(null);
+const addingUrl = ref(false);
+const newUrlInput = ref('');
+const addUrlError = ref('');
+const addingUrlBusy = ref(false);
 
 const scanning = ref(false);
 const scanStatus = ref('');
@@ -56,6 +77,11 @@ async function load() {
     }
     company.value = data.company;
     scans.value = data.scans;
+    urls.value = data.urls || [];
+    const stillPresent = urls.value.some((u) => u.id === selectedUrlId.value);
+    if (!stillPresent) {
+      selectedUrlId.value = (urls.value.find((u) => u.is_primary) || urls.value[0])?.id ?? null;
+    }
   } catch (err) {
     loadError.value = (err as Error).message;
   } finally {
@@ -90,7 +116,7 @@ async function pollScan(scanId: string) {
       scanError.value = data.errorMessage || 'Scan failed.';
       return;
     }
-    scanStatus.value = data.status === 'running' ? 'Running checks (~20-30s)…' : 'Queued…';
+    scanStatus.value = data.status === 'running' ? 'Running checks (~20-60s)…' : 'Queued…';
     pollHandle = setTimeout(() => pollScan(scanId), 2000);
   } catch (err) {
     scanError.value = (err as Error).message;
@@ -107,7 +133,7 @@ async function runNewScan() {
     const res = await authFetch('/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company_id: company.value.id }),
+      body: JSON.stringify({ company_id: company.value.id, url_id: selectedUrlId.value }),
     });
     const data = await res.json();
     if (!data.ok) {
@@ -122,17 +148,59 @@ async function runNewScan() {
   }
 }
 
+const selectedUrl = computed(() => urls.value.find((u) => u.id === selectedUrlId.value) ?? null);
+
+// Each URL's scans are independent — scans.website and company_urls.url are
+// both always written through the same normalizeUrl(), so a direct string
+// match is reliable without needing a company_url_id FK on scans.
+const filteredScans = computed(() => {
+  if (!selectedUrl.value) return scans.value;
+  return scans.value.filter((s) => s.website === selectedUrl.value!.url);
+});
+
 const scanTrend = computed(() =>
-  scans.value.map((s) => ({
+  filteredScans.value.map((s) => ({
     generatedAt: typeof s.generatedAt === 'string' ? s.generatedAt : '',
     score: typeof s.score === 'number' ? s.score : null,
   }))
 );
 
 const selectedScan = computed(() =>
-  selectedIndex.value === null ? null : scans.value[selectedIndex.value] ?? null
+  selectedIndex.value === null ? null : filteredScans.value[selectedIndex.value] ?? null
 );
 const selectedPayload = computed(() => (selectedScan.value ? validatePayload(selectedScan.value) : null));
+
+function onSelectUrl(urlId: string) {
+  selectedUrlId.value = urlId;
+  selectedIndex.value = null;
+}
+
+async function onAddUrl() {
+  if (!company.value || !newUrlInput.value.trim()) return;
+  addingUrlBusy.value = true;
+  addUrlError.value = '';
+  try {
+    const res = await authFetch(`/companies/${company.value.id}/urls`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: newUrlInput.value.trim() }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      addUrlError.value = data.error || 'Failed to add URL.';
+      return;
+    }
+    newUrlInput.value = '';
+    addingUrl.value = false;
+    await load();
+    selectedUrlId.value = data.url.id;
+    selectedIndex.value = null;
+  } catch (err) {
+    addUrlError.value = (err as Error).message;
+  } finally {
+    addingUrlBusy.value = false;
+  }
+}
 
 async function runDeepAdvice() {
   if (selectedIndex.value === null || !selectedPayload.value) return;
@@ -146,7 +214,10 @@ async function runDeepAdvice() {
       scanError.value = data.error || 'Failed to generate deeper advice.';
       return;
     }
-    scans.value[selectedIndex.value] = data.scan;
+    // Replace by id, not selectedIndex — selectedIndex indexes into
+    // filteredScans (a per-URL slice), not the full scans array.
+    const idx = scans.value.findIndex((s) => s.id === data.scan.id);
+    if (idx !== -1) scans.value[idx] = data.scan;
   } catch (err) {
     scanError.value = (err as Error).message;
   } finally {
@@ -190,16 +261,37 @@ watch(() => route.params.id, load);
         </div>
       </div>
 
-      <p class="empty" v-if="scans.length === 0">
-        No scans yet for this company — click "Run new scan" to check its AI search visibility.
+      <div class="url-row" v-if="urls.length">
+        <button
+          v-for="u in urls"
+          :key="u.id"
+          type="button"
+          class="url-chip"
+          :class="{ active: u.id === selectedUrlId }"
+          @click="onSelectUrl(u.id)"
+        >
+          {{ u.label || u.url }}
+        </button>
+        <button type="button" class="url-chip add" @click="addingUrl = !addingUrl">
+          {{ addingUrl ? 'Cancel' : '+ Add URL' }}
+        </button>
+      </div>
+      <form class="add-url-form" v-if="addingUrl" @submit.prevent="onAddUrl">
+        <input type="text" v-model="newUrlInput" placeholder="another-site.com" required />
+        <button type="submit" :disabled="addingUrlBusy">{{ addingUrlBusy ? 'Adding…' : 'Add' }}</button>
+        <div class="status error" v-if="addUrlError">{{ addUrlError }}</div>
+      </form>
+
+      <p class="empty" v-if="filteredScans.length === 0">
+        No scans yet for {{ selectedUrl ? (selectedUrl.label || selectedUrl.url) : 'this company' }} — click "Run new scan" to check its AI search visibility.
       </p>
 
-      <CompanyProgressChart v-if="scans.length >= 2" :scans="scanTrend" />
+      <CompanyProgressChart v-if="filteredScans.length >= 2" :scans="scanTrend" />
 
-      <div class="dashboard" v-if="scans.length" :class="{ 'has-selection': selectedIndex !== null }">
+      <div class="dashboard" v-if="filteredScans.length" :class="{ 'has-selection': selectedIndex !== null }">
         <div class="list-pane">
           <button
-            v-for="(scan, index) in scans"
+            v-for="(scan, index) in filteredScans"
             :key="keyOf(scan, index)"
             type="button"
             class="scan-card"
@@ -238,13 +330,14 @@ watch(() => route.params.id, load);
 <style scoped>
 main { max-width: 1100px; margin: 0 auto; padding: 48px 20px 80px; }
 .back-link { font-size: 0.85rem; color: var(--muted); text-decoration: underline; }
-.head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-top: 12px; margin-bottom: 24px; }
+.head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-top: 12px; margin-bottom: 24px; }
+.head-row > div:first-child { min-width: 0; }
 h1 { font-size: 1.5rem; margin: 0 0 4px; }
 .legacy-tag {
   font-size: 0.7rem; font-weight: 600; color: var(--muted);
   border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: middle;
 }
-p.sub { color: var(--muted); margin: 0; }
+p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .scan-trigger { flex: none; text-align: right; }
 .scan-trigger button {
   padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
@@ -253,6 +346,27 @@ p.sub { color: var(--muted); margin: 0; }
 .scan-trigger button:disabled { opacity: 0.6; cursor: wait; }
 .scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 220px; }
 .scan-status.error { color: var(--critical); }
+
+.url-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.url-chip {
+  padding: 6px 12px; font-size: 0.82rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 999px; background: transparent;
+  color: var(--muted); cursor: pointer; max-width: 260px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.url-chip.active { border-color: var(--accent); color: var(--fg); background: var(--card); }
+.url-chip.add { color: var(--accent); border-style: dashed; }
+.add-url-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.add-url-form input {
+  flex: 1 1 220px; padding: 8px 12px; font-size: 0.9rem;
+  border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg);
+}
+.add-url-form button {
+  padding: 8px 14px; font-size: 0.85rem; font-weight: 600;
+  border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+}
+.add-url-form button:disabled { opacity: 0.6; cursor: wait; }
+.add-url-form .status.error { flex-basis: 100%; margin-top: 0; }
 
 .status.error { font-size: 0.9rem; color: var(--critical); }
 .empty { color: var(--muted); font-size: 0.9rem; }

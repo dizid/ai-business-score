@@ -39,11 +39,16 @@ export default async (req: Request, context: Context) => {
     SELECT * FROM public.scans WHERE company_id = ${companyId} ORDER BY generated_at DESC NULLS LAST
   `;
 
+  const urls = await db`
+    SELECT * FROM public.company_urls WHERE company_id = ${companyId} ORDER BY is_primary DESC, created_at ASC
+  `;
+
   return new Response(
     JSON.stringify({
       ok: true,
       company: companies[0],
       scans: scanRows.map(toScanPayload),
+      urls,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );

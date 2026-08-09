@@ -25,7 +25,7 @@ export default async (req: Request) => {
     throw err;
   }
 
-  let body: { company_id?: string };
+  let body: { company_id?: string; url_id?: string };
   try {
     body = await req.json();
   } catch {
@@ -55,9 +55,33 @@ export default async (req: Request) => {
   }
   const company = companies[0];
 
+  // Multi-URL support: url_id picks which of the company's tracked URLs
+  // this scan targets. Omitted (old callers, or a company with only its
+  // original URL) falls back to the primary company_urls row — every
+  // company has one since the 2026-08-09 backfill migration, with
+  // company.website itself as the ultimate fallback for safety.
+  let targetUrl: string = company.website;
+  if (body.url_id) {
+    const urls = await db`
+      SELECT url FROM public.company_urls WHERE id = ${body.url_id} AND company_id = ${companyId}
+    `;
+    if (urls.length === 0) {
+      return new Response(JSON.stringify({ error: 'url_id does not belong to this company' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    targetUrl = urls[0].url;
+  } else {
+    const primary = await db`
+      SELECT url FROM public.company_urls WHERE company_id = ${companyId} AND is_primary = true LIMIT 1
+    `;
+    if (primary.length > 0) targetUrl = primary[0].url;
+  }
+
   const inserted = await db`
     INSERT INTO public.scans (id, company_id, status, brand, website, category)
-    VALUES (gen_random_uuid(), ${companyId}, 'pending', ${company.brand}, ${company.website}, ${company.category})
+    VALUES (gen_random_uuid(), ${companyId}, 'pending', ${company.brand}, ${targetUrl}, ${company.category})
     RETURNING id
   `;
   const scanId = inserted[0].id as string;
