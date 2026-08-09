@@ -16,8 +16,14 @@ function normalizeCategory(category) {
   return category.split(/[,/]+/).map((s) => s.trim()).filter(Boolean).join(' / ');
 }
 
-// ---------- Prompts (8, generic — brand/competitor substitution only) ----------
-// Vertical-adjusted templating explicitly deferred, see TODOS.md.
+// ---------- Prompts (10, generic — brand/competitor substitution only) ----------
+// Vertical-adjusted templating explicitly deferred, see TODOS.md. Grew from
+// 8 to 10 on 2026-08-09 (added 8/9 below) after the hosted site's original
+// 3-prompt subset (0-2, the most generically-worded of the set) read as too
+// narrow/generic to a live user — rather than rewriting 0-2, the fix is to
+// widen the query-intent variety (criteria-based, switcher-intent) and have
+// the hosted site run the full set like proof-script always has (see
+// run-scan-background.mts).
 export const PROMPT_TEMPLATES = [
   (p) => `What's the best ${normalizeCategory(p.category)} option for ${p.use_case}?`,
   (p) => `Compare ${p.brand} vs ${p.competitors[0]} vs ${p.competitors[1] ?? p.competitors[0]}.`,
@@ -27,10 +33,36 @@ export const PROMPT_TEMPLATES = [
   (p) => `What are people saying about ${p.brand} vs ${p.competitors[0]}?`,
   (p) => `Best ${p.category} for ${p.customer_segment}?`,
   (p) => `Who are the leaders in ${p.category}?`,
+  (p) => `What should I look for when choosing a ${normalizeCategory(p.category)}, and which brands do that well?`,
+  (p) => `I'm looking to switch away from ${p.competitors[0]} — what's a good ${normalizeCategory(p.category)} alternative?`,
 ];
 
-// ---------- Models (2, cheap tier, per office-hours cost model) ----------
-export const MODELS = ['openai/gpt-5-mini', 'google/gemini-3-flash-preview'];
+// ---------- Models ----------
+// Grew from 2 to 6 on 2026-08-09 at a live user's request for broader model
+// coverage. IMPORTANT: only the first two entries have ever been confirmed
+// against a real Perplexity call (see PPLX_URL's comment above — live
+// smoke-tested 2026-07-28). The other four are best-effort from a web search
+// of Perplexity's Agent API changelog, NOT a live-verified smoke test —
+// docs.perplexity.ai was unreachable (network egress policy) to confirm
+// exact identifiers or pricing tier directly. They may be misspelled,
+// already retired, or a far more expensive tier than gpt-5-mini/
+// gemini-3-flash-preview's "cheap tier" — Perplexity's own preview models do
+// get retired underneath callers (e.g. google/gemini-3.1-flash-lite-preview
+// was retired when Google pulled the underlying model). A wrong/dead model
+// string here degrades gracefully — callModelWithRetry just burns 3 failed
+// attempts and that model's calls count toward failedCalls, nothing breaks
+// — but failed-call detail (which model/prompt) isn't persisted anywhere
+// currently (see run-scan-background.mts), so confirming which of these
+// actually work requires reading Netlify function logs after a real scan,
+// not just looking at the app UI. Trim this list once that's known.
+export const MODELS = [
+  'openai/gpt-5-mini',
+  'google/gemini-3-flash-preview',
+  'anthropic/claude-opus-5',
+  'openai/gpt-5.6-luna',
+  'google/gemini-3.6-flash',
+  'xai/grok-4.5',
+];
 
 // ---------- Common-word stoplist for brand-name ambiguity flag ----------
 // Design doc: "common-word or ambiguous brand names (e.g. a brand literally
@@ -373,14 +405,22 @@ export function parseEnrichmentResponse(text) {
   }
 }
 
-// Human labels for the 3 prompt templates the hosted site runs (PROMPT_TEMPLATES
-// indices 0-2 above). Originally deep-advice-only; now also imported by
-// ScanDetail.vue for the check-by-check breakdown, so the same wording
-// appears in both places rather than drifting out of sync.
+// Human labels for all 10 PROMPT_TEMPLATES above, in order. Originally
+// deep-advice-only and covering just the hosted site's old 3-prompt subset;
+// now covers the full set and is also imported by ScanDetail.vue for the
+// check-by-check breakdown, so the same wording appears in both places
+// rather than drifting out of sync.
 export const PROMPT_LABELS = [
   'category-recommendation query ("what\'s the best [category] for [use case]?")',
   'brand-vs-competitor comparison query',
   'general recommendation query ("I need a good [category], what do you recommend?")',
+  'regional "top companies" query ("top [category] companies in [region]?")',
+  'alternatives query ("is [brand] good for [use case]? what are the alternatives?")',
+  'reputation query ("what are people saying about [brand] vs [competitor]?")',
+  'segment-specific recommendation query ("best [category] for [customer segment]?")',
+  'category-leaders query ("who are the leaders in [category]?")',
+  'criteria-based query ("what should I look for when choosing a [category]?")',
+  'switcher-intent query ("switching away from [competitor] — what\'s a good alternative?")',
 ];
 
 // Groups perPromptRank (one entry per completed model call, keyed by which
