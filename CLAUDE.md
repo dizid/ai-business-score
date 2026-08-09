@@ -45,21 +45,34 @@ original reasoning (see `TODOS.md`).
 
 **Known limitation, unchanged by the pivot:** real Perplexity calls with
 `web_search` grounding routinely take 15-20s, sometimes longer. A scan runs
-10 prompts x 6 models = 60 calls in parallel (grown from the original 3x2=6
-on 2026-08-09 at a live user's request — see `shared/aivis-core.mjs`'s
-`PROMPT_TEMPLATES`/`MODELS` comments) with a 60s per-call timeout and 2
-retries (`callModelWithRetry`, also raised 2026-08-09 from a 20s/no-retry
-setup that failed ~50% of calls); individual calls that still fail after
-retries are counted as failed rather than silently dropped. This used to
-force the whole `/scan` request to stay synchronous and tightly
-timeout-budgeted — that constraint is gone since Milestone 5 made scans
-asynchronous (see "Async scan execution" below). Of the 6 models, only the
-first two (`openai/gpt-5-mini`, `google/gemini-3-flash-preview`) have ever
-been confirmed against a live call; the other four came from a web search of
-Perplexity's changelog (docs.perplexity.ai was unreachable directly) and are
-unverified — see the `MODELS` comment for what to check if a live scan shows
-a cluster of failures. Firing all 60 calls at once via `Promise.all` (no
-batching) is also untested against Perplexity's per-key rate limits.
+10 prompts x 2 models = 20 calls (prompts grew from 3 to 10 on 2026-08-09 at
+a live user's request — see `shared/aivis-core.mjs`'s `PROMPT_TEMPLATES`
+comment; models briefly grew to 6 the same day, then were reverted to the 2
+live-verified ones — see the `MODELS` comment for why) with a 60s per-call
+timeout. This used to force the whole `/scan` request to stay synchronous
+and tightly timeout-budgeted — that constraint is gone since Milestone 5
+made scans asynchronous (see "Async scan execution" below).
+
+Also changed 2026-08-09, after a live user flagged the original
+fire-everything-via-`Promise.all` approach as a real risk once call counts
+grew: `run-scan-background.mts` now runs calls through a concurrency-limited
+worker pool (`runWithConcurrency` in `aivis-core.mjs`, limit 10) instead of
+all at once, and every call shares one scan-wide `SCAN_DEADLINE_MS` (100s)
+via a single `AbortController` — this is what actually bounds worst-case
+scan latency as prompt/model count grows, since previously each call got
+its own full retry budget regardless of how long the batch had already run
+(one straggler retrying 3x at 60s with no backoff could drag a 6-call scan
+past 3 minutes even though the other 5 finished in 20s). `callModelWithRetry`
+also dropped from 3 attempts to 2 and added a 1s backoff between them —
+losing one call out of 6 was a meaningful chunk of the data, but with more
+prompts each individual call matters less to the aggregate score, so it's
+worth capping per-call worst-case latency instead of retrying aggressively;
+the backoff specifically avoids re-hammering a live rate limit. Calls still
+in flight when the scan deadline fires are aborted and counted as failed,
+same as any other failure — and per-check failure detail (which
+prompt/model) still isn't persisted to the DB, only the aggregate count, so
+diagnosing *which* calls hit the deadline vs. a real error needs the
+Netlify function logs.
 
 ## Deployment
 
