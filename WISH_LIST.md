@@ -68,3 +68,26 @@ latency, not measured against a real scan at the new 20-call (10 prompts x
 feel slow, or if the deadline is cutting off calls that would have
 succeeded given a few more seconds, tune the numbers — but do that from
 observed behavior (which item #1 would make visible), not another guess.
+
+## From testing PR #2's deploy preview (2026-08-09)
+
+**6. Neon Auth's `trusted_origins` blocks testing auth on any PR deploy
+preview.** Only `https://aivis-scan.netlify.app` (production) is trusted —
+every Netlify deploy preview lives on its own `deploy-preview-<N>--
+aivis-scan.netlify.app` origin, so sign-up/sign-in there fails with
+"Invalid origin" (and, as a side effect, Chrome has no saved password for
+an origin it's never seen, which looked like a separate bug but wasn't).
+Fix requires Neon console access this session doesn't have (no Neon MCP
+connector exists in the claude.ai directory — the Neon MCP tools referenced
+elsewhere in this repo's docs came from a different, interactive session).
+Try adding a wildcard trusted origin (`https://deploy-preview-*--
+aivis-scan.netlify.app`) first; if Neon Auth only accepts exact matches,
+this'll need a per-PR entry, which probably isn't worth doing routinely —
+plan to test auth-touching changes against production instead.
+
+**7. No password-reset flow.** `LoginView.vue`/`auth.ts` have no
+forgot-password link, route, or handler — confirmed by reading the code,
+not a bug, just never built. Better Auth (what Neon Auth runs on) supports
+password reset, but wiring it up needs both new UI (a "forgot password"
+route + form) and email-sending configured on the Neon Auth project side,
+which also needs Neon console access this session doesn't have.
