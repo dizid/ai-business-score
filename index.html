@@ -26,56 +26,74 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "AIVis",
-  "applicationCategory": "BusinessApplication",
-  "operatingSystem": "Web",
-  "description": "Checks whether a business is mentioned when AI search engines like ChatGPT and Gemini are asked about its category, scores the result 0-100, and tracks it over time.",
-  "url": "https://aivis-scan.netlify.app/",
-  "offers": {
-    "@type": "Offer",
-    "name": "Free plan",
-    "price": "0",
-    "priceCurrency": "USD"
-  }
-}
-</script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
+  "@graph": [
     {
-      "@type": "Question",
-      "name": "What is AI search visibility?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "It's whether ChatGPT, Gemini, and other AI-powered search tools mention your business when someone asks a question in your category — the same way SEO tracks whether Google ranks you, but for AI-generated answers instead of a list of links."
+      "@type": "WebSite",
+      "@id": "https://aivis-scan.netlify.app/#website",
+      "url": "https://aivis-scan.netlify.app/",
+      "name": "AIVis",
+      "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://aivis-scan.netlify.app/#organization",
+      "name": "AIVis",
+      "url": "https://aivis-scan.netlify.app/"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://aivis-scan.netlify.app/#software",
+      "name": "AIVis",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Checks whether a business is mentioned when AI search engines like ChatGPT and Gemini are asked about its category, scores the result 0-100, and tracks it over time.",
+      "url": "https://aivis-scan.netlify.app/",
+      "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" },
+      "offers": {
+        "@type": "Offer",
+        "name": "Free plan",
+        "price": "0",
+        "priceCurrency": "USD"
       }
     },
     {
-      "@type": "Question",
-      "name": "How is the score calculated?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "AIVis runs category-relevant prompts through multiple AI models and checks whether your business is mentioned, how it ranks against competitors, and how often. The 0-100 score reflects how consistently you show up first versus not at all."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Which AI models does it check?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "OpenAI's GPT-5 mini and Google's Gemini 3 Flash, both queried through Perplexity's grounded search API so responses reflect real web results rather than each model's static training data."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What does it cost?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Free to try — one company and three scans, no credit card required. A paid plan unlocks unlimited companies and scans for a single flat monthly price."
-      }
+      "@type": "FAQPage",
+      "@id": "https://aivis-scan.netlify.app/#faq",
+      "isPartOf": { "@id": "https://aivis-scan.netlify.app/#website" },
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is AI search visibility?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "It's whether ChatGPT, Gemini, and other AI-powered search tools mention your business when someone asks a question in your category — the same way SEO tracks whether Google ranks you, but for AI-generated answers instead of a list of links."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is the score calculated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AIVis runs category-relevant prompts through multiple AI models and checks whether your business is mentioned, how it ranks against competitors, and how often. The 0-100 score reflects how consistently you show up first versus not at all."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which AI models does it check?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "OpenAI's GPT-5 mini and Google's Gemini 3 Flash, both queried through Perplexity's grounded search API so responses reflect real web results rather than each model's static training data."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What does it cost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Free to try — one company and three scans, no credit card required. A paid plan unlocks unlimited companies and scans for a single flat monthly price."
+          }
+        }
+      ]
     }
   ]
 }
