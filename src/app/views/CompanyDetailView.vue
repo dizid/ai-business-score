@@ -50,6 +50,8 @@ const addingUrlBusy = ref(false);
 const scanning = ref(false);
 const scanStatus = ref('');
 const scanError = ref('');
+const scanUpgradeRequired = ref(false);
+const upgrading = ref(false);
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
 const deepAdviceLoading = ref(false);
@@ -128,6 +130,7 @@ async function runNewScan() {
   if (!company.value) return;
   scanning.value = true;
   scanError.value = '';
+  scanUpgradeRequired.value = false;
   scanStatus.value = 'Starting scan…';
   try {
     const res = await authFetch('/scan', {
@@ -138,6 +141,7 @@ async function runNewScan() {
     const data = await res.json();
     if (!data.ok) {
       scanError.value = data.error || 'Failed to start scan.';
+      scanUpgradeRequired.value = !!data.upgradeRequired;
       scanning.value = false;
       return;
     }
@@ -145,6 +149,26 @@ async function runNewScan() {
   } catch (err) {
     scanError.value = (err as Error).message;
     scanning.value = false;
+  }
+}
+
+// Same shape as CompaniesListView's startCheckout — kept duplicated rather
+// than shared, matching this codebase's convention of copy-pasted per-file
+// auth/billing calls over a shared abstraction (see auth.mts's own comment).
+async function startCheckout() {
+  upgrading.value = true;
+  try {
+    const res = await authFetch('/create-checkout-session', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) {
+      scanError.value = data.error || 'Failed to start checkout.';
+      upgrading.value = false;
+      return;
+    }
+    window.location.href = data.url;
+  } catch (err) {
+    scanError.value = (err as Error).message;
+    upgrading.value = false;
   }
 }
 
@@ -257,7 +281,12 @@ watch(() => route.params.id, load);
             {{ scanning ? 'Scanning…' : 'Run new scan' }}
           </button>
           <div class="scan-status" v-if="scanStatus">{{ scanStatus }}</div>
-          <div class="scan-status error" v-if="scanError">{{ scanError }}</div>
+          <div class="scan-status error" v-if="scanError">
+            {{ scanError }}
+            <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="upgrading" @click="startCheckout">
+              Upgrade to Pro
+            </button>
+          </div>
         </div>
       </div>
 
@@ -346,6 +375,11 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .scan-trigger button:disabled { opacity: 0.6; cursor: wait; }
 .scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 220px; }
 .scan-status.error { color: var(--critical); }
+.inline-upgrade {
+  display: block; margin-top: 6px; padding: 4px 10px; font-size: 0.8rem; font-weight: 600;
+  border: 1px solid var(--critical); border-radius: 999px; background: transparent; color: var(--critical); cursor: pointer;
+}
+.inline-upgrade:disabled { opacity: 0.6; cursor: wait; }
 
 .url-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .url-chip {

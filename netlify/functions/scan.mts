@@ -8,6 +8,7 @@
 import type { Config } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
+import { FREE_PLAN_SCAN_LIMIT, isPro } from './_shared/plan.mts';
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
@@ -54,6 +55,25 @@ export default async (req: Request) => {
     });
   }
   const company = companies[0];
+
+  const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
+  if (!isPro(profiles[0]?.plan_tier)) {
+    const [{ count }] = await db`
+      SELECT count(*)::int AS count FROM public.scans s
+      JOIN public.companies c ON c.id = s.company_id
+      WHERE c.owner_user_id = ${userId}
+    `;
+    if (count >= FREE_PLAN_SCAN_LIMIT) {
+      return new Response(
+        JSON.stringify({
+          error: `Free plan is limited to ${FREE_PLAN_SCAN_LIMIT} scans total. Upgrade to Pro for unlimited scans.`,
+          upgradeRequired: true,
+          limit: FREE_PLAN_SCAN_LIMIT,
+        }),
+        { status: 402, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+  }
 
   // Multi-URL support: url_id picks which of the company's tracked URLs
   // this scan targets. Omitted (old callers, or a company with only its

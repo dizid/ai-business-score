@@ -14,13 +14,22 @@ interface CompanyRow {
   created_at: string;
 }
 
+interface Profile {
+  plan_tier: string;
+  subscription_status: string | null;
+}
+
 const companies = ref<CompanyRow[]>([]);
+const profile = ref<Profile>({ plan_tier: 'free', subscription_status: null });
 const loading = ref(true);
 const loadError = ref('');
+const upgrading = ref(false);
+const upgradeError = ref('');
 
 const showCreate = ref(false);
 const creating = ref(false);
 const createError = ref('');
+const createUpgradeRequired = ref(false);
 const detailsRevealed = ref(false);
 const enriching = ref(false);
 const enrichError = ref('');
@@ -57,10 +66,29 @@ async function loadCompanies() {
       return;
     }
     companies.value = data.companies;
+    if (data.profile) profile.value = data.profile;
   } catch (err) {
     loadError.value = (err as Error).message;
   } finally {
     loading.value = false;
+  }
+}
+
+async function startCheckout() {
+  upgrading.value = true;
+  upgradeError.value = '';
+  try {
+    const res = await authFetch('/create-checkout-session', { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) {
+      upgradeError.value = data.error || 'Failed to start checkout.';
+      upgrading.value = false;
+      return;
+    }
+    window.location.href = data.url;
+  } catch (err) {
+    upgradeError.value = (err as Error).message;
+    upgrading.value = false;
   }
 }
 
@@ -69,6 +97,7 @@ function resetForm() {
   detailsRevealed.value = false;
   enrichError.value = '';
   createError.value = '';
+  createUpgradeRequired.value = false;
 }
 
 function toggleCreate() {
@@ -131,6 +160,7 @@ function onSubmit() {
 async function onCreate() {
   creating.value = true;
   createError.value = '';
+  createUpgradeRequired.value = false;
   try {
     const res = await authFetch('/companies', {
       method: 'POST',
@@ -140,6 +170,7 @@ async function onCreate() {
     const data = await res.json();
     if (!data.ok) {
       createError.value = data.error || 'Failed to create company.';
+      createUpgradeRequired.value = !!data.upgradeRequired;
       return;
     }
     showCreate.value = false;
@@ -162,8 +193,17 @@ onMounted(loadCompanies);
         <h1>Companies</h1>
         <p class="sub">Track AI search visibility over time for each business you're watching.</p>
       </div>
-      <button type="button" @click="toggleCreate">{{ showCreate ? 'Cancel' : '+ New company' }}</button>
+      <div class="head-actions">
+        <span class="plan-badge" :class="{ pro: profile.plan_tier === 'pro' }">
+          {{ profile.plan_tier === 'pro' ? 'Pro' : 'Free plan' }}
+        </span>
+        <button type="button" class="upgrade-btn" v-if="profile.plan_tier !== 'pro'" :disabled="upgrading" @click="startCheckout">
+          {{ upgrading ? 'Redirecting…' : 'Upgrade to Pro' }}
+        </button>
+        <button type="button" @click="toggleCreate">{{ showCreate ? 'Cancel' : '+ New company' }}</button>
+      </div>
     </div>
+    <p class="status error" v-if="upgradeError">{{ upgradeError }}</p>
 
     <form class="card create-card" v-if="showCreate" @submit.prevent="onSubmit">
       <template v-if="!detailsRevealed">
@@ -202,7 +242,12 @@ onMounted(loadCompanies);
         <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'GO' }}</button>
       </template>
 
-      <div class="status error" v-if="createError">{{ createError }}</div>
+      <div class="status error" v-if="createError">
+        {{ createError }}
+        <button type="button" class="inline-upgrade" v-if="createUpgradeRequired" :disabled="upgrading" @click="startCheckout">
+          Upgrade to Pro
+        </button>
+      </div>
     </form>
 
     <p class="status error" v-if="loadError">{{ loadError }}</p>
@@ -235,10 +280,23 @@ main { max-width: 800px; margin: 0 auto; padding: 48px 20px 80px; }
 .head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
 h1 { font-size: 1.5rem; margin: 0 0 4px; }
 p.sub { color: var(--muted); margin: 0; }
+.head-actions { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .head-row button {
   flex: none; padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
   border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
 }
+.head-row button:disabled { opacity: 0.6; cursor: wait; }
+.plan-badge {
+  font-size: 0.78rem; font-weight: 600; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
+}
+.plan-badge.pro { color: var(--good); border-color: var(--good); }
+.upgrade-btn { background: transparent !important; border: 1px solid var(--accent) !important; color: var(--accent) !important; }
+.inline-upgrade {
+  margin-left: 10px; padding: 4px 10px; font-size: 0.82rem; font-weight: 600;
+  border: 1px solid var(--critical); border-radius: 999px; background: transparent; color: var(--critical); cursor: pointer;
+}
+.inline-upgrade:disabled { opacity: 0.6; cursor: wait; }
 
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 8px 20px 20px; margin-bottom: 24px; }
 .card label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 18px; margin-bottom: 6px; }

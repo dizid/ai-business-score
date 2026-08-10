@@ -5,6 +5,7 @@ import type { Config } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { normalizeUrl } from '../../shared/aivis-core.mjs';
+import { FREE_PLAN_COMPANY_LIMIT, isPro } from './_shared/plan.mts';
 
 export default async (req: Request) => {
   let userId: string;
@@ -32,7 +33,13 @@ export default async (req: Request) => {
       WHERE c.owner_user_id = ${userId}
       ORDER BY c.created_at DESC
     `;
-    return new Response(JSON.stringify({ ok: true, companies }), {
+    // Lazily created if this is the caller's first request of any kind —
+    // matches the POST handler's on-demand provisioning below.
+    const profiles = await db`
+      SELECT plan_tier, subscription_status FROM public.user_profiles WHERE user_id = ${userId}
+    `;
+    const profile = profiles[0] || { plan_tier: 'free', subscription_status: null };
+    return new Response(JSON.stringify({ ok: true, companies, profile }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -43,6 +50,23 @@ export default async (req: Request) => {
     // creates their profile row on demand rather than requiring a separate
     // provisioning step.
     await db`INSERT INTO public.user_profiles (user_id) VALUES (${userId}) ON CONFLICT (user_id) DO NOTHING`;
+
+    const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
+    if (!isPro(profiles[0]?.plan_tier)) {
+      const [{ count }] = await db`
+        SELECT count(*)::int AS count FROM public.companies WHERE owner_user_id = ${userId}
+      `;
+      if (count >= FREE_PLAN_COMPANY_LIMIT) {
+        return new Response(
+          JSON.stringify({
+            error: `Free plan is limited to ${FREE_PLAN_COMPANY_LIMIT} company. Upgrade to Pro for unlimited companies.`,
+            upgradeRequired: true,
+            limit: FREE_PLAN_COMPANY_LIMIT,
+          }),
+          { status: 402, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+    }
 
     let body: Record<string, string>;
     try {

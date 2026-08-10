@@ -1,0 +1,23 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+
+# Explicit allow rules for known AI answer-engine crawlers — nothing
+# currently blocks them, this just makes the intent self-documenting
+# rather than relying on an implicit default-allow.
+User-agent: GPTBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://aivis-scan.netlify.app/sitemap.xml

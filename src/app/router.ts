@@ -12,6 +12,12 @@ const routes = [
     meta: { requiresAuth: true },
     props: true,
   },
+  {
+    path: '/app/billing/success',
+    name: 'billing-success',
+    component: () => import('./views/BillingSuccessView.vue'),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({

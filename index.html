@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIVis — See if AI search recommends your business</title>
+<meta name="description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. AIVis checks whether your business gets mentioned — or a competitor does instead — and tracks it over time." />
+<link rel="canonical" href="https://aivis-scan.netlify.app/" />
+
+<!-- Open Graph / Twitter Card. No og:image yet — a polished raster share
+     image needs a design pass this session can't do (no image-generation
+     tool available); omitted rather than shipped low-quality. Falls back
+     to no preview image when the link is shared, not a broken one. -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="AIVis — See if AI search recommends your business" />
+<meta property="og:description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. AIVis checks whether your business gets mentioned — or a competitor does instead." />
+<meta property="og:url" content="https://aivis-scan.netlify.app/" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="AIVis — See if AI search recommends your business" />
+<meta name="twitter:description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. AIVis checks whether your business gets mentioned — or a competitor does instead." />
+
+<!-- Structured data: only the Free tier gets a machine-readable price —
+     the Pro price isn't finalized yet (see the pricing section below), and
+     shipping a JSON-LD price that doesn't match the real Stripe price
+     later would be worse than omitting it for now. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "AIVis",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "description": "Checks whether a business is mentioned when AI search engines like ChatGPT and Gemini are asked about its category, scores the result 0-100, and tracks it over time.",
+  "url": "https://aivis-scan.netlify.app/",
+  "offers": {
+    "@type": "Offer",
+    "name": "Free plan",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is AI search visibility?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It's whether ChatGPT, Gemini, and other AI-powered search tools mention your business when someone asks a question in your category — the same way SEO tracks whether Google ranks you, but for AI-generated answers instead of a list of links."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How is the score calculated?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AIVis runs category-relevant prompts through multiple AI models and checks whether your business is mentioned, how it ranks against competitors, and how often. The 0-100 score reflects how consistently you show up first versus not at all."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which AI models does it check?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "OpenAI's GPT-5 mini and Google's Gemini 3 Flash, both queried through Perplexity's grounded search API so responses reflect real web results rather than each model's static training data."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does it cost?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Free to try — one company and three scans, no credit card required. A paid plan unlocks unlimited companies and scans for a single flat monthly price."
+      }
+    }
+  ]
+}
+</script>
+
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f9f9f7;
+    --card: #fcfcfb;
+    --fg: #0b0b0b;
+    --muted: #52514e;
+    --faint: #898781;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --good: #0ca30c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #0d0d0d;
+      --card: #1a1a19;
+      --fg: #ffffff;
+      --muted: #c3c2b7;
+      --faint: #898781;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+      --good: #0ca30c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+  nav.top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 0;
+  }
+  nav.top .logo { font-weight: 800; font-size: 1.1rem; text-decoration: none; color: var(--fg); }
+  nav.top .links { display: flex; gap: 20px; align-items: center; font-size: 0.9rem; }
+  nav.top .links a { text-decoration: none; color: var(--muted); }
+  nav.top .links a.cta {
+    color: #fff; background: var(--accent); padding: 8px 16px; border-radius: 8px; font-weight: 600;
+  }
+
+  .hero { display: flex; align-items: center; gap: 48px; padding: 40px 0 70px; flex-wrap: wrap; }
+  .hero-copy { flex: 1 1 380px; min-width: 280px; }
+  .hero-art { flex: 1 1 320px; min-width: 260px; max-width: 420px; }
+  .hero h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 18px; }
+  .hero p.lead { color: var(--muted); font-size: 1.1rem; margin: 0 0 28px; max-width: 46ch; }
+  .btn-primary {
+    display: inline-block; padding: 14px 24px; font-size: 1rem; font-weight: 700;
+    background: var(--accent); color: #fff; border-radius: 10px; text-decoration: none;
+  }
+  .hero-note { margin-top: 14px; font-size: 0.85rem; color: var(--faint); }
+
+  section { padding: 50px 0; border-top: 1px solid var(--border); }
+  section h2 { font-size: 1.5rem; margin: 0 0 8px; text-align: center; }
+  section p.section-sub { color: var(--muted); text-align: center; margin: 0 0 36px; }
+
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+  .step { text-align: center; padding: 0 12px; }
+  .step .icon { width: 52px; height: 52px; margin: 0 auto 16px; color: var(--accent); }
+  .step h3 { font-size: 1.05rem; margin: 0 0 8px; }
+  .step p { color: var(--muted); font-size: 0.92rem; margin: 0; }
+
+  .pricing { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 760px; margin: 0 auto; }
+  .plan-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+  .plan-card.pro { border-color: var(--accent); }
+  .plan-card h3 { margin: 0 0 4px; font-size: 1.2rem; }
+  .plan-card .price { font-size: 1.8rem; font-weight: 800; margin: 8px 0 18px; }
+  .plan-card .price span { font-size: 0.95rem; font-weight: 500; color: var(--muted); }
+  .plan-card ul { list-style: none; margin: 0 0 22px; padding: 0; color: var(--muted); font-size: 0.92rem; }
+  .plan-card li { padding: 5px 0; }
+  .plan-card li::before { content: "✓ "; color: var(--good); font-weight: 700; }
+  .plan-card .btn-secondary {
+    display: block; text-align: center; padding: 11px 16px; border-radius: 8px;
+    border: 1px solid var(--border); color: var(--fg); text-decoration: none; font-weight: 600; font-size: 0.92rem;
+  }
+  .plan-card.pro .btn-secondary { border-color: var(--accent); color: var(--accent); }
+
+  .faq { max-width: 700px; margin: 0 auto; }
+  .faq details { border-bottom: 1px solid var(--border); padding: 16px 0; }
+  .faq summary { font-weight: 600; cursor: pointer; }
+  .faq p { color: var(--muted); margin: 10px 0 0; }
+
+  footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="top">
+    <span class="logo">AIVis</span>
+    <div class="links">
+      <a href="/app/login">Log in</a>
+      <a class="cta" href="/app/signup">Sign up free</a>
+    </div>
+  </nav>
+
+  <section class="hero" style="border-top:none;">
+    <div class="hero-copy">
+      <h1>See if ChatGPT and Gemini recommend your business — or send customers to a competitor instead.</h1>
+      <p class="lead">
+        People ask AI search "who does X near me" instead of typing it into Google.
+        AIVis checks what those AI answers actually say about you, scores it, and
+        tracks it over time.
+      </p>
+      <a class="btn-primary" href="/app/signup">Check your AI visibility — free</a>
+      <div class="hero-note">No credit card required. Takes about a minute.</div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <!-- Hand-drawn illustration: a chat-style answer card next to a score
+           ring, the same ring-drawing approach ScanDetail.vue uses for a
+           real scan result, so the pitch visually matches the product. -->
+      <svg viewBox="0 0 380 300" width="100%" height="100%">
+        <rect x="10" y="20" width="230" height="140" rx="16" fill="var(--card)" stroke="var(--border)" />
+        <circle cx="42" cy="52" r="10" fill="var(--accent)" opacity="0.25" />
+        <rect x="60" y="46" width="150" height="12" rx="6" fill="var(--border)" />
+        <rect x="30" y="80" width="190" height="10" rx="5" fill="var(--border)" />
+        <rect x="30" y="98" width="160" height="10" rx="5" fill="var(--border)" />
+        <rect x="30" y="116" width="130" height="10" rx="5" fill="var(--good)" opacity="0.5" />
+        <rect x="30" y="134" width="90" height="10" rx="5" fill="var(--border)" />
+
+        <g transform="translate(250,120)">
+          <circle r="62" fill="none" stroke="var(--border)" stroke-width="12" />
+          <circle r="62" fill="none" stroke="var(--good)" stroke-width="12"
+                  stroke-dasharray="389.6" stroke-dashoffset="90"
+                  stroke-linecap="round" transform="rotate(-90)" />
+          <text text-anchor="middle" dy="10" font-size="34" font-weight="800" fill="var(--fg)">78</text>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <p class="section-sub">Three prompts, two AI models, one score.</p>
+    <div class="steps">
+      <div class="step">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9s1.3-6.4 3.8-9z" />
+        </svg>
+        <h3>1. Enter your website</h3>
+        <p>Tell us your business, category, and who you compete with.</p>
+      </div>
+      <div class="step">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 5h16v11H8l-4 4V5z" />
+        </svg>
+        <h3>2. We ask AI search</h3>
+        <p>The same "who does X near me" questions real customers ask ChatGPT and Gemini.</p>
+      </div>
+      <div class="step">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3.5 2" />
+        </svg>
+        <h3>3. See your score</h3>
+        <p>A 0-100 visibility score, who's beating you, and what to fix — tracked over time.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pricing</h2>
+    <p class="section-sub">Start free. Upgrade when you outgrow it.</p>
+    <div class="pricing">
+      <div class="plan-card">
+        <h3>Free</h3>
+        <div class="price">$0</div>
+        <ul>
+          <li>1 company</li>
+          <li>3 scans total</li>
+          <li>No credit card required</li>
+        </ul>
+        <a class="btn-secondary" href="/app/signup">Get started</a>
+      </div>
+      <!-- Pro price intentionally left unset in copy and in the JSON-LD
+           above — not finalized yet (see plan's Part 2 note). The actual
+           charge is whatever Price is configured in Stripe; update this
+           card's wording once that number is confirmed. -->
+      <div class="plan-card pro">
+        <h3>Pro</h3>
+        <div class="price">One flat price<span> /month</span></div>
+        <ul>
+          <li>Unlimited companies</li>
+          <li>Unlimited scans</li>
+          <li>Deeper, AI-generated advice</li>
+        </ul>
+        <a class="btn-secondary" href="/app/signup">Sign up to upgrade</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>FAQ</h2>
+    <div class="faq">
+      <details open>
+        <summary>What is AI search visibility?</summary>
+        <p>It's whether ChatGPT, Gemini, and other AI-powered search tools mention your business when someone asks a question in your category — the same way SEO tracks whether Google ranks you, but for AI-generated answers instead of a list of links.</p>
+      </details>
+      <details>
+        <summary>How is the score calculated?</summary>
+        <p>AIVis runs category-relevant prompts through multiple AI models and checks whether your business is mentioned, how it ranks against competitors, and how often. The 0-100 score reflects how consistently you show up first versus not at all.</p>
+      </details>
+      <details>
+        <summary>Which AI models does it check?</summary>
+        <p>OpenAI's GPT-5 mini and Google's Gemini 3 Flash, both queried through Perplexity's grounded search API so responses reflect real web results rather than each model's static training data.</p>
+      </details>
+      <details>
+        <summary>What does it cost?</summary>
+        <p>Free to try — one company and three scans, no credit card required. A paid plan unlocks unlimited companies and scans for a single flat monthly price.</p>
+      </details>
+    </div>
+  </section>
+
+  <footer>
+    &copy; 2026 AIVis. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
+  </footer>
+</div>
+
+</body>
+</html>

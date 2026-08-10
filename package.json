@@ -14,6 +14,7 @@
     "@netlify/blobs": "^8.2.0",
     "better-auth": "^1.4.18",
     "jose": "^5.9.6",
+    "stripe": "^22.4.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },

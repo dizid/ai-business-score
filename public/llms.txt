@@ -1,0 +1,33 @@
+# AIVis
+
+AIVis checks whether a business is mentioned when AI search engines
+(ChatGPT, Gemini) are asked about its category, scores the result from
+0-100, and tracks the score over time.
+
+## How it works
+
+AIVis sends category-relevant questions (e.g. "who does emergency
+plumbing in Rotterdam") through OpenAI's GPT-5 mini and Google's Gemini 3
+Flash, both queried via Perplexity's grounded search API so answers
+reflect live web results rather than each model's static training data.
+It checks whether the business is mentioned, how it ranks relative to
+named competitors, and how consistently that happens across repeated
+prompts.
+
+## Scoring
+
+Score = round(100 * (timesRankedFirst + 0.4 * timesBeatenButMentioned) /
+completedCalls), 0-100, or no score if every call failed. Higher means the
+business shows up first more consistently; a null score means AIVis
+couldn't get a usable answer from the models, not that the business
+scored zero.
+
+## Pricing
+
+Free: 1 tracked company, 3 scans total, no credit card required.
+Paid ("Pro"): unlimited companies and scans, single flat monthly price.
+
+## Links
+
+- Product: https://aivis-scan.netlify.app/
+- Sign up: https://aivis-scan.netlify.app/app/signup
