@@ -68,7 +68,7 @@ export default async (req: Request) => {
       }
     }
 
-    let body: Record<string, string>;
+    let body: Record<string, any>;
     try {
       body = await req.json();
     } catch {
@@ -92,14 +92,18 @@ export default async (req: Request) => {
     const customerSegment = (body.customer_segment || '').trim();
     const competitors = (body.competitors || '')
       .split(',')
-      .map((s) => s.trim())
+      .map((s: string) => s.trim())
       .filter(Boolean);
+    // Opt-in only, default false — a company isn't necessarily the caller's
+    // own business (see is_legacy_import), so nothing goes public unless the
+    // owner explicitly asks for it, here or later via company.mts's PATCH.
+    const isPublic = body.is_public === true;
 
     const inserted = await db`
       INSERT INTO public.companies (
-        owner_user_id, brand, website, category, use_case, region, customer_segment, competitors
+        owner_user_id, brand, website, category, use_case, region, customer_segment, competitors, is_public
       ) VALUES (
-        ${userId}, ${brand}, ${normalizeUrl(website)}, ${category}, ${useCase}, ${region}, ${customerSegment}, ${competitors}
+        ${userId}, ${brand}, ${normalizeUrl(website)}, ${category}, ${useCase}, ${region}, ${customerSegment}, ${competitors}, ${isPublic}
       )
       RETURNING *
     `;

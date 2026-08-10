@@ -9,6 +9,7 @@ interface CompanyRow {
   website: string;
   category: string;
   is_legacy_import: boolean;
+  is_public: boolean;
   scan_count: number;
   latest_score: number | null;
   created_at: string;
@@ -41,6 +42,7 @@ const form = ref({
   region: '',
   customer_segment: '',
   competitors: '',
+  is_public: false,
 });
 
 const BAND_COLOR: Record<string, string> = {
@@ -93,7 +95,7 @@ async function startCheckout() {
 }
 
 function resetForm() {
-  form.value = { brand: '', website: '', category: '', use_case: '', region: '', customer_segment: '', competitors: '' };
+  form.value = { brand: '', website: '', category: '', use_case: '', region: '', customer_segment: '', competitors: '', is_public: false };
   detailsRevealed.value = false;
   enrichError.value = '';
   createError.value = '';
@@ -132,6 +134,7 @@ async function onEnrich() {
         region: data.region,
         customer_segment: data.customer_segment,
         competitors: (data.competitors || []).join(', '),
+        is_public: false,
       };
     } else {
       enrichError.value = data.error || "Couldn't auto-fill from that URL — fill in the details below.";
@@ -194,6 +197,7 @@ onMounted(loadCompanies);
         <p class="sub">Track AI search visibility over time for each business you're watching.</p>
       </div>
       <div class="head-actions">
+        <router-link class="leaderboard-link" to="/app/leaderboard">Public leaderboard</router-link>
         <span class="plan-badge" :class="{ pro: profile.plan_tier === 'pro' }">
           {{ profile.plan_tier === 'pro' ? 'Pro' : 'Free plan' }}
         </span>
@@ -238,6 +242,11 @@ onMounted(loadCompanies);
 
         <label>Competitors <span class="hint">(comma-separated, 2-3)</span></label>
         <input type="text" v-model="form.competitors" required placeholder="Bob's Pipes, QuickFlow Plumbing" />
+
+        <label class="checkbox-label">
+          <input type="checkbox" v-model="form.is_public" />
+          List this company's score on the public leaderboard (optional)
+        </label>
 
         <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'GO' }}</button>
       </template>
@@ -286,6 +295,7 @@ p.sub { color: var(--muted); margin: 0; }
   border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
 }
 .head-row button:disabled { opacity: 0.6; cursor: wait; }
+.leaderboard-link { font-size: 0.85rem; color: var(--muted); text-decoration: underline; }
 .plan-badge {
   font-size: 0.78rem; font-weight: 600; color: var(--muted);
   border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
@@ -301,6 +311,8 @@ p.sub { color: var(--muted); margin: 0; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 8px 20px 20px; margin-bottom: 24px; }
 .card label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 18px; margin-bottom: 6px; }
 .card label .hint { font-weight: 400; color: var(--muted); }
+.checkbox-label { display: flex !important; align-items: center; gap: 8px; font-weight: 400 !important; }
+.checkbox-label input { width: auto; }
 .hint-text { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
 .back-link {
   display: block; margin: 18px 0 4px; padding: 0; border: none; background: none;

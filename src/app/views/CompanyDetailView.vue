@@ -18,6 +18,7 @@ interface CompanyRow {
   customer_segment: string;
   competitors: string[];
   is_legacy_import: boolean;
+  is_public: boolean;
 }
 
 interface CompanyUrlRow {
@@ -55,6 +56,8 @@ const upgrading = ref(false);
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
 const deepAdviceLoading = ref(false);
+const togglingPublic = ref(false);
+const togglePublicError = ref('');
 
 function keyOf(scan: Record<string, unknown>, index: number): string {
   return (scan.id as string) || String(index);
@@ -172,6 +175,32 @@ async function startCheckout() {
   }
 }
 
+// Toggles public-leaderboard listing via company.mts's PATCH — separate
+// from the create-time checkbox in CompaniesListView.vue, this is how an
+// already-tracked company opts in/out later.
+async function togglePublic() {
+  if (!company.value) return;
+  togglingPublic.value = true;
+  togglePublicError.value = '';
+  try {
+    const res = await authFetch(`/companies/${company.value.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_public: !company.value.is_public }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      togglePublicError.value = data.error || 'Failed to update.';
+      return;
+    }
+    company.value.is_public = data.company.is_public;
+  } catch (err) {
+    togglePublicError.value = (err as Error).message;
+  } finally {
+    togglingPublic.value = false;
+  }
+}
+
 const selectedUrl = computed(() => urls.value.find((u) => u.id === selectedUrlId.value) ?? null);
 
 // Each URL's scans are independent — scans.website and company_urls.url are
@@ -275,6 +304,10 @@ watch(() => route.params.id, load);
             <span class="legacy-tag" v-if="company.is_legacy_import">legacy import</span>
           </h1>
           <p class="sub">{{ company.category }} · {{ company.website }}</p>
+          <button type="button" class="public-toggle" :class="{ active: company.is_public }" :disabled="togglingPublic" @click="togglePublic">
+            {{ company.is_public ? 'Listed on public leaderboard ✓' : 'List on public leaderboard' }}
+          </button>
+          <p class="status error" v-if="togglePublicError">{{ togglePublicError }}</p>
         </div>
         <div class="scan-trigger">
           <button type="button" :disabled="scanning" @click="runNewScan">
@@ -367,6 +400,12 @@ h1 { font-size: 1.5rem; margin: 0 0 4px; }
   border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: middle;
 }
 p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
+.public-toggle {
+  margin-top: 8px; padding: 4px 10px; font-size: 0.78rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.public-toggle.active { border-color: var(--good); color: var(--good); }
+.public-toggle:disabled { opacity: 0.6; cursor: wait; }
 .scan-trigger { flex: none; text-align: right; }
 .scan-trigger button {
   padding: 10px 16px; font-size: 0.9rem; font-weight: 600;

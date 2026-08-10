@@ -7,7 +7,7 @@ import { sql } from './_shared/db.mts';
 import { toScanPayload } from './_shared/scanRow.mts';
 
 export default async (req: Request, context: Context) => {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'PATCH') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { 'Content-Type': 'application/json' },
@@ -24,6 +24,37 @@ export default async (req: Request, context: Context) => {
 
   const companyId = context.params.id;
   const db = sql();
+
+  if (req.method === 'PATCH') {
+    // Toggles public-leaderboard listing after creation — companies.mts's
+    // POST only sets is_public at creation time, this is how an existing
+    // company opts in/out later. Same ownership scoping as GET below.
+    let body: Record<string, any>;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const isPublic = body.is_public === true;
+    const updated = await db`
+      UPDATE public.companies SET is_public = ${isPublic}, updated_at = now()
+      WHERE id = ${companyId} AND owner_user_id = ${userId}
+      RETURNING *
+    `;
+    if (updated.length === 0) {
+      return new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, company: updated[0] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   const companies = await db`
     SELECT * FROM public.companies WHERE id = ${companyId} AND owner_user_id = ${userId}
