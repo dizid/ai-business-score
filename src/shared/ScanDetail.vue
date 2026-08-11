@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { scoreBand, PROMPT_LABELS } from '../../shared/aivis-core.mjs';
-import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceTone, type Rank } from './scanPayload';
+import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceId, type Rank } from './scanPayload';
 
 // Shared between result/App.vue (a shareable, standalone page) and
 // CompanyDetailView.vue's detail pane (master-detail dashboard) — same
@@ -32,8 +32,20 @@ const BAND_EXPLAIN: Record<string, string> = {
   invisible: 'Never came up in any completed check.',
   unavailable: 'No checks completed — try running the scan again.',
 };
-const ADVICE_TAG: Record<AdviceTone, string> = {
-  critical: 'Priority', warning: 'Watch this', positive: 'Working well', neutral: 'Also worth noting',
+// Milestone A6: was keyed by `tone`, which collapsed multiple distinct
+// insights onto one shared label — 'mixed' and 'top-rival' both use
+// tone 'neutral', so a scan with both cards showed two identically-labeled
+// "ALSO WORTH NOTING" cards (real, reported bug, read as a duplicate/
+// glitch). Keying by `id` instead gives every distinct insight branch in
+// selectAdvice() its own heading — id has always been part of the payload
+// shape, so this is backward compatible with every already-persisted scan.
+const ADVICE_HEADING: Record<AdviceId, string> = {
+  'no-data': 'No data',
+  'zero-citations': 'Priority',
+  'consistently-beaten': 'Watch this',
+  leading: 'Working well',
+  mixed: 'Mixed results',
+  'top-rival': 'Top competitor',
 };
 const CHECK_BADGE_LABEL: Record<Rank, string> = {
   'ranked-1': 'Mentioned first',
@@ -60,12 +72,14 @@ const headlineKind = computed<'none' | 'zero' | 'beaten' | 'good'>(() => {
   return 'good';
 });
 
-interface ScoreboardRow { name: string; isYou: boolean; mentionCount: number; beatBrandCount: number; }
+interface ScoreboardRow { name: string; isYou: boolean; mentionCount: number; beatBrandCount: number; ambiguous: boolean; }
 const scoreboardRows = computed<ScoreboardRow[]>(() => {
   if (props.payload.completedCalls === 0) return [];
   const rivals = [...props.payload.competitorTallies].sort((a, b) => b.mentionCount - a.mentionCount);
   return [
-    { name: props.payload.brand, isYou: true, mentionCount: props.payload.citedCount, beatBrandCount: 0 },
+    // The brand's own row already gets the top-level "common word" warning
+    // banner above (payload.ambiguousBrandFlag) — never flag it again here.
+    { name: props.payload.brand, isYou: true, mentionCount: props.payload.citedCount, beatBrandCount: 0, ambiguous: false },
     ...rivals.map((r) => ({ ...r, isYou: false })),
   ];
 });
@@ -99,6 +113,19 @@ const checkBreakdown = computed<CheckGroup[]>(() => {
       checks,
     }));
 });
+
+// Per-call failure detail (Milestone A3 — restores what commit 522eb63
+// shipped and 74afa41 accidentally deleted the next day). Joins each
+// failure's promptIndex against PROMPT_LABELS for a human-readable
+// description, same pattern checkBreakdown above already uses.
+interface FailureRow { model: string; promptLabel: string; error: string; }
+const failureRows = computed<FailureRow[]>(() =>
+  props.payload.failures.map((f) => ({
+    model: f.model,
+    promptLabel: PROMPT_LABELS[f.promptIndex] || `Prompt ${f.promptIndex + 1}`,
+    error: f.error,
+  }))
+);
 
 // Only 'top-rival' can produce an empty body (when no valid competitor
 // name survives re-validation) — the other advice ids always render
@@ -167,6 +194,7 @@ const visibleAdvice = computed(() =>
           </div>
           <div class="board-track"><div class="board-fill" :class="row.isYou ? 'you' : 'rival'" :style="{ width: rowPct(row) + '%' }"></div></div>
           <div class="board-beat" v-if="!row.isYou && row.beatBrandCount > 0">beat you {{ row.beatBrandCount }}×</div>
+          <div class="board-ambiguous" v-if="row.ambiguous">Name is a common word — automated detection was skipped for some checks. This tally may undercount.</div>
         </div>
       </div>
     </template>
@@ -175,7 +203,7 @@ const visibleAdvice = computed(() =>
     <template v-if="visibleAdvice.length">
       <h2>What to do next</h2>
       <div class="advice-card" :class="`tone-${card.tone}`" v-for="card in visibleAdvice" :key="card.id">
-        <div class="advice-tag">{{ ADVICE_TAG[card.tone] || 'Note' }}</div>
+        <div class="advice-tag">{{ ADVICE_HEADING[card.id] || 'Note' }}</div>
         <div class="advice-body">
           <template v-if="card.id === 'no-data'">We couldn't complete any checks this time — likely a temporary API issue. Try running the scan again.</template>
           <template v-else-if="card.id === 'zero-citations'">You're invisible in AI search. Across {{ asNonNegativeInt(card.params.completedCalls) ?? '?' }} checks, this brand was never mentioned — not once. Getting cited even occasionally is the highest-leverage fix here: AI models lean on third-party mentions (reviews, directories, comparison content), not a brand's own site.</template>
@@ -235,7 +263,17 @@ const visibleAdvice = computed(() =>
             <div class="check-text">{{ c.text }}</div>
           </details>
         </div>
-        <div class="check-failed-note" v-if="payload.failedCalls > 0">
+        <!-- Milestone A3: rendered per-call failure detail when available. -->
+        <div class="check-failed-note" v-if="failureRows.length">
+          {{ payload.failedCalls }} additional {{ payload.failedCalls === 1 ? 'check' : 'checks' }} failed to complete and aren't shown above:
+          <ul class="fail-reasons">
+            <li v-for="(f, i) in failureRows" :key="i">
+              <span class="check-model">{{ f.model }}</span> — {{ f.promptLabel }}: {{ f.error || 'no error message' }}
+            </li>
+          </ul>
+        </div>
+        <!-- Fallback for old, pre-migration scans where failures wasn't recorded yet. -->
+        <div class="check-failed-note" v-else-if="payload.failedCalls > 0">
           {{ payload.failedCalls }} additional {{ payload.failedCalls === 1 ? 'check' : 'checks' }} failed to
           complete (API error or timeout) and aren't shown here — which specific prompt/model failed isn't
           currently recorded.
@@ -318,6 +356,7 @@ h1 { font-size: 1.5rem; margin: 0 0 2px; }
 .board-fill.you { background: var(--accent); }
 .board-fill.rival { background: var(--debar); }
 .board-beat { color: var(--serious); font-size: 0.8rem; margin-top: 2px; }
+.board-ambiguous { color: var(--muted); font-size: 0.78rem; margin-top: 2px; font-style: italic; }
 
 /* ---- advice cards ---- */
 .advice-card {
@@ -403,6 +442,9 @@ h2:first-of-type { margin-top: 0; }
   font-size: 0.82rem; color: var(--muted);
   border-top: 1px solid var(--border);
 }
+.check-failed-note .fail-reasons { margin: 8px 0 0; padding-left: 18px; line-height: 1.6; }
+.check-failed-note .fail-reasons li { margin-bottom: 4px; }
+.check-failed-note .fail-reasons .check-model { color: var(--fg); }
 
 footer { margin-top: 28px; color: var(--faint); font-size: 0.78rem; }
 </style>

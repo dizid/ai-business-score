@@ -17,6 +17,10 @@ export function toScanPayload(row: Record<string, any>) {
     score: row.score,
     advice: row.advice,
     rawResponses: row.raw_responses,
+    // failures is new (Milestone A3) — old rows predate the column and read
+    // back as null, default to [] so scanPayload.ts never has to special-
+    // case null vs. a genuinely empty list.
+    failures: row.failures ?? [],
     generatedAt: row.generated_at,
     deepAdvice: row.deep_advice ?? null,
     deepAdviceGeneratedAt: row.deep_advice_generated_at ?? null,
