@@ -25,12 +25,31 @@ async function handleSignOut() {
         <button type="button" class="link" @click="handleSignOut">Sign out</button>
       </div>
     </header>
-    <router-view />
+    <div class="page">
+      <router-view />
+    </div>
+
+    <footer class="app-footer">
+      <nav class="footer-links">
+        <router-link to="/app/privacy">Privacy Policy</router-link>
+        <router-link to="/app/terms">Terms of Service</router-link>
+        <router-link to="/app/how-it-works">How this works</router-link>
+        <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
+      </nav>
+      <p class="footer-support">
+        Questions or support: <a href="mailto:dev@dizid.com">dev@dizid.com</a>
+      </p>
+      <p class="footer-note">
+        Your data is stored securely and never sold — see our
+        <router-link to="/app/privacy">Privacy Policy</router-link> for details.
+      </p>
+    </footer>
   </div>
 </template>
 
 <style scoped>
-.shell { min-height: 100vh; }
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.page { flex: 1; }
 .topbar {
   display: flex; justify-content: space-between; align-items: center;
   padding: 20px 24px; border-bottom: 1px solid var(--border);
@@ -46,4 +65,22 @@ async function handleSignOut() {
   background: none; border: none; padding: 0; color: var(--muted);
   text-decoration: underline; cursor: pointer; font-size: 0.85rem;
 }
+
+.app-footer {
+  border-top: 1px solid var(--border);
+  padding: 24px 24px 32px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+.footer-links {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 8px 20px; margin-bottom: 12px;
+}
+.footer-links a { color: var(--muted); text-decoration: none; }
+.footer-links a:hover { text-decoration: underline; }
+.footer-support { margin: 0 0 6px; }
+.footer-support a { color: var(--muted); }
+.footer-note { margin: 0; max-width: 480px; margin-inline: auto; }
+.footer-note a { color: var(--muted); }
 </style>

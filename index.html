@@ -7,6 +7,17 @@
 <meta name="description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. AIVis checks whether your business gets mentioned — or a competitor does instead — and tracks it over time." />
 <link rel="canonical" href="https://aivis-scan.netlify.app/" />
 
+<!-- Favicon: inline mark reusing the same circle+pointer glyph as the app
+     shell's wordmark (src/app/App.vue), so the browser tab matches the
+     in-app logo. SVG-only — no apple-touch-icon since a proper PNG export
+     needs a design pass this session can't produce; an SVG favicon alone is
+     still a real improvement over having none at all. -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+<!-- Matches --bg's dark-mode value in src/shared/theme.css, so the browser
+     chrome (mobile address bar, etc.) matches the app's dark theme. -->
+<meta name="theme-color" content="#0d0d0d" />
+
 <!-- Open Graph / Twitter Card. No og:image yet — a polished raster share
      image needs a design pass this session can't do (no image-generation
      tool available); omitted rather than shipped low-quality. Falls back
@@ -321,6 +332,9 @@
 
   <footer>
     &copy; 2026 AIVis. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
+    · <a href="/app/privacy">Privacy</a> · <a href="/app/terms">Terms</a>
+    · <a href="/app/how-it-works">How this works</a>
+    · <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
   </footer>
 </div>
 

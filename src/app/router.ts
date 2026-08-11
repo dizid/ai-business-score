@@ -25,6 +25,24 @@ const routes = [
     // No requiresAuth — public, no-login page. Only shows companies that
     // explicitly opted in via is_public (see leaderboard.mts).
   },
+  {
+    path: '/app/privacy',
+    name: 'privacy',
+    component: () => import('./views/PrivacyView.vue'),
+    // No requiresAuth — a privacy policy has to be readable before signup.
+  },
+  {
+    path: '/app/terms',
+    name: 'terms',
+    component: () => import('./views/TermsView.vue'),
+    // No requiresAuth — same reasoning as /app/privacy.
+  },
+  {
+    path: '/app/how-it-works',
+    name: 'how-it-works',
+    component: () => import('./views/HowItWorksView.vue'),
+    // No requiresAuth — genuine product content, shareable pre-signup.
+  },
 ];
 
 const router = createRouter({
