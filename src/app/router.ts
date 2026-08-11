@@ -18,13 +18,6 @@ const routes = [
     component: () => import('./views/BillingSuccessView.vue'),
     meta: { requiresAuth: true },
   },
-  {
-    path: '/app/leaderboard',
-    name: 'leaderboard',
-    component: () => import('./views/LeaderboardView.vue'),
-    // No requiresAuth — public, no-login page. Only shows companies that
-    // explicitly opted in via is_public (see leaderboard.mts).
-  },
 ];
 
 const router = createRouter({
