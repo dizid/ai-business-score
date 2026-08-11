@@ -154,13 +154,24 @@ wasn't revisited by it.
   flags companies created by the one-off Blobs backfill (Milestone 3) —
   those are the founder's own prospect-research history (scans of *other*
   businesses for outbound), not "the user's own company," labeled honestly
-  rather than force-fit into the new model.
+  rather than force-fit into the new model. `is_public` is an **unused,
+  present-but-dead column** — it backed an opt-in public leaderboard feature
+  (shipped, then deleted per Milestone B of `PLAN_NEXT_PHASE.md`) and is no
+  longer read or written anywhere in the app. Left in place deliberately
+  (not dropped) rather than a destructive live migration.
 - **`scans`** — one row per scan, `company_id` FK, `status` (`pending` →
   `running` → `completed`/`failed`), denormalized `brand`/`website`/
   `category` snapshot at scan time, `jsonb` columns for
   `per_prompt_rank`/`competitor_tallies`/`raw_responses`/`advice`/
   `deep_advice`, plus `legacy_blob_key` (traceability back to the original
   Blobs entry, for legacy-imported scans only).
+- **`company_urls`** — an **unused, present-but-dead table**. It backed
+  multi-URL-per-company tracking (shipped, then deleted per Milestone B of
+  `PLAN_NEXT_PHASE.md`): every company got a primary row equal to its
+  `website`, and scans could target a non-primary URL via `url_id`. Nothing
+  in the app reads, writes, or joins against this table anymore — `scan.mts`
+  always uses `companies.website` directly. Left in place rather than
+  dropped, same reasoning as `is_public` above.
 
 Schema and Neon Auth were provisioned via the Neon MCP tools
 (`create_project`, `provision_neon_auth`, `prepare_database_migration` →
