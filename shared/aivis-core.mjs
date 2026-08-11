@@ -66,7 +66,7 @@ const COMMON_WORD_STOPLIST = new Set([
 
 export function isAmbiguousBrandName(name) {
   const words = name.trim().toLowerCase().split(/\s+/);
-  return words.length === 1 && (words[0].length <= 4 || COMMON_WORD_STOPLIST.has(words[0]));
+  return words.length === 1 && COMMON_WORD_STOPLIST.has(words[0]);
 }
 
 function escapeRegex(s) {
@@ -269,7 +269,7 @@ export function aggregateProspect(prospect, callResults) {
   let ambiguousBrandFlag = false;
   const perPromptRank = [];
   const competitorTallies = prospect.competitors.map((name) => ({
-    name, mentionCount: 0, beatBrandCount: 0,
+    name, mentionCount: 0, beatBrandCount: 0, ambiguous: false,
   }));
 
   for (const r of completed) {
@@ -286,7 +286,15 @@ export function aggregateProspect(prospect, callResults) {
     let beatenBy = false;
     prospect.competitors.forEach((c, i) => {
       const m = findMentions(r.text, c);
-      if (m.ambiguous || !m.mentioned) return;
+      if (m.ambiguous) {
+        // Ambiguous means detection was skipped for this check, not that the
+        // competitor was genuinely absent — flag it so the tally doesn't
+        // silently read the same as "never mentioned" (see ScanDetail.vue's
+        // per-competitor ambiguous note).
+        competitorTallies[i].ambiguous = true;
+        return;
+      }
+      if (!m.mentioned) return;
       competitorTallies[i].mentionCount++;
       const brandWasFirst = cited && brandMatch.firstIndex < m.firstIndex;
       if (!brandWasFirst) {
@@ -314,6 +322,11 @@ export function aggregateProspect(prospect, callResults) {
     perPromptRank,
     competitorTallies,
     rawResponses: completed.map((r) => ({ model: r.model, promptIndex: r.promptIndex, text: r.text })),
+    // Per-call failure detail (model/prompt/why) — restores what commit
+    // 522eb63 shipped and 74afa41 accidentally deleted the next day during
+    // an unrelated "flatten repo" refactor. Truncated to 300 chars: error
+    // text is free-form (HTTP body, gateway message), not a bounded field.
+    failures: failed.map((r) => ({ model: r.model, promptIndex: r.promptIndex, error: String(r.error).slice(0, 300) })),
     totalTokens: completed.reduce((sum, r) => sum + (r.usage?.total_tokens ?? 0), 0),
   };
 }

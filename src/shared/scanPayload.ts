@@ -13,9 +13,10 @@ export type AdviceTone = 'critical' | 'warning' | 'positive' | 'neutral';
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
 export interface PerPromptRank { promptIndex: number; rank: Rank; }
-export interface CompetitorTally { name: string; mentionCount: number; beatBrandCount: number; }
+export interface CompetitorTally { name: string; mentionCount: number; beatBrandCount: number; ambiguous: boolean; }
 export interface AdviceCard { id: AdviceId; tone: AdviceTone; params: Record<string, unknown>; }
 export interface RawResponse { promptIndex: number; model: string; text: string; }
+export interface FailureItem { model: string; promptIndex: number; error: string; }
 export interface DeepAdviceStep { title: string; reasoning: string; difficulty: Difficulty; }
 export interface DeepAdvice { steps: DeepAdviceStep[]; }
 
@@ -34,6 +35,7 @@ export interface ValidatedPayload {
   score: number | null;
   advice: AdviceCard[];
   rawResponses: RawResponse[];
+  failures: FailureItem[];
   generatedAtDate: Date;
   deepAdvice: DeepAdvice | null;
   deepAdviceGeneratedAtDate: Date | null;
@@ -48,6 +50,8 @@ const MAX_ADVICE_CARDS = 3;
 const MAX_DEEP_ADVICE_STEPS = 5;
 const MAX_NAME_LEN = 120;
 const MAX_TEXT_LEN = 600;
+const MAX_FAILURES = 40;
+const MAX_ERROR_LEN = 300;
 
 export function asNonNegativeInt(v: unknown): number | null {
   const n = Number(v);
@@ -111,7 +115,11 @@ export function validatePayload(raw: any): ValidatedPayload | null {
       const beatBrandCount = asNonNegativeInt(c && c.beatBrandCount);
       if (name === null || mentionCount === null || beatBrandCount === null) return null;
       if (mentionCount > completedCalls || beatBrandCount > mentionCount) return null;
-      competitorTallies.push({ name, mentionCount, beatBrandCount });
+      // ambiguous is new (Milestone A2) — missing/old data (pre-migration
+      // scans, or a forged payload that omits it) defaults to false rather
+      // than rejecting the whole payload.
+      const ambiguous = c && c.ambiguous === true;
+      competitorTallies.push({ name, mentionCount, beatBrandCount, ambiguous });
     }
   }
 
@@ -132,6 +140,22 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     const promptIndex = asNonNegativeInt(r && r.promptIndex);
     if (promptIndex === null || typeof r.model !== 'string' || typeof r.text !== 'string') return null;
     rawResponses.push({ promptIndex, model: r.model, text: r.text });
+  }
+
+  // failures: optional diagnostic list (why calls failed) — new in
+  // Milestone A3. Missing/malformed degrades to [] rather than rejecting
+  // the whole payload (old rows predate the column; a forged payload might
+  // omit it entirely) — same lenient discipline as competitorTallies'
+  // ambiguous flag above, since this is diagnostic detail, not something
+  // the rest of the UI depends on for correctness.
+  const failures: FailureItem[] = [];
+  if (Array.isArray(raw.failures)) {
+    for (const f of raw.failures.slice(0, MAX_FAILURES)) {
+      const promptIndex = asNonNegativeInt(f && f.promptIndex);
+      if (promptIndex === null || typeof (f && f.model) !== 'string') continue;
+      const error = typeof f.error === 'string' ? f.error.slice(0, MAX_ERROR_LEN) : '';
+      failures.push({ model: f.model.slice(0, MAX_NAME_LEN), promptIndex, error });
+    }
   }
 
   const generatedAtDate = new Date(raw.generatedAt);
@@ -180,6 +204,7 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     score,
     advice,
     rawResponses,
+    failures,
     generatedAtDate,
     deepAdvice,
     deepAdviceGeneratedAtDate,
