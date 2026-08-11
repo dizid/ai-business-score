@@ -7,14 +7,18 @@ import { callModel, buildDeepAdvicePrompt, parseDeepAdviceResponse } from '../..
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { toScanPayload } from './_shared/scanRow.mts';
+import { corsHeaders, handleOptions } from './_shared/cors.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
 export default async (req: Request, context: Context) => {
+  const preflight = handleOptions(req);
+  if (preflight) return preflight;
+
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
 
@@ -37,14 +41,14 @@ export default async (req: Request, context: Context) => {
   if (rows.length === 0) {
     return new Response(JSON.stringify({ error: 'Not found' }), {
       status: 404,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
   const scanRow = rows[0];
   if (scanRow.status !== 'completed') {
     return new Response(JSON.stringify({ error: 'Scan is not completed yet' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
 
@@ -52,7 +56,7 @@ export default async (req: Request, context: Context) => {
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'Server misconfigured: PERPLEXITY_API_KEY not set' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
 
@@ -68,12 +72,12 @@ export default async (req: Request, context: Context) => {
     `;
     return new Response(JSON.stringify({ ok: true, scan: toScanPayload(updated[0]) }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   } catch (err) {
     return new Response(JSON.stringify({ ok: false, error: (err as Error).message }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
 };

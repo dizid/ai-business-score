@@ -5,8 +5,12 @@ import type { Config, Context } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { toScanPayload } from './_shared/scanRow.mts';
+import { corsHeaders, handleOptions } from './_shared/cors.mts';
 
 export default async (req: Request, context: Context) => {
+  const preflight = handleOptions(req);
+  if (preflight) return preflight;
+
   let userId: string;
   try {
     userId = await requireAuth(req);
@@ -26,7 +30,7 @@ export default async (req: Request, context: Context) => {
   if (rows.length === 0) {
     return new Response(JSON.stringify({ error: 'Not found' }), {
       status: 404,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
 
@@ -38,7 +42,7 @@ export default async (req: Request, context: Context) => {
       errorMessage: row.error_message,
       scan: row.status === 'completed' ? toScanPayload(row) : null,
     }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
+    { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } }
   );
 };
 

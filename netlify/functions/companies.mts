@@ -6,8 +6,12 @@ import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { normalizeUrl } from '../../shared/aivis-core.mjs';
 import { FREE_PLAN_COMPANY_LIMIT, isPro } from './_shared/plan.mts';
+import { corsHeaders, handleOptions } from './_shared/cors.mts';
 
 export default async (req: Request) => {
+  const preflight = handleOptions(req);
+  if (preflight) return preflight;
+
   let userId: string;
   try {
     userId = await requireAuth(req);
@@ -41,7 +45,7 @@ export default async (req: Request) => {
     const profile = profiles[0] || { plan_tier: 'free', subscription_status: null };
     return new Response(JSON.stringify({ ok: true, companies, profile }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
 
@@ -63,7 +67,7 @@ export default async (req: Request) => {
             upgradeRequired: true,
             limit: FREE_PLAN_COMPANY_LIMIT,
           }),
-          { status: 402, headers: { 'Content-Type': 'application/json' } },
+          { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
         );
       }
     }
@@ -74,7 +78,7 @@ export default async (req: Request) => {
     } catch {
       return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
       });
     }
 
@@ -83,7 +87,7 @@ export default async (req: Request) => {
     if (!brand || !website) {
       return new Response(JSON.stringify({ error: 'brand and website are required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
       });
     }
     const category = (body.category || '').trim();
@@ -94,40 +98,26 @@ export default async (req: Request) => {
       .split(',')
       .map((s: string) => s.trim())
       .filter(Boolean);
-    // Opt-in only, default false — a company isn't necessarily the caller's
-    // own business (see is_legacy_import), so nothing goes public unless the
-    // owner explicitly asks for it, here or later via company.mts's PATCH.
-    const isPublic = body.is_public === true;
 
     const inserted = await db`
       INSERT INTO public.companies (
-        owner_user_id, brand, website, category, use_case, region, customer_segment, competitors, is_public
+        owner_user_id, brand, website, category, use_case, region, customer_segment, competitors
       ) VALUES (
-        ${userId}, ${brand}, ${normalizeUrl(website)}, ${category}, ${useCase}, ${region}, ${customerSegment}, ${competitors}, ${isPublic}
+        ${userId}, ${brand}, ${normalizeUrl(website)}, ${category}, ${useCase}, ${region}, ${customerSegment}, ${competitors}
       )
       RETURNING *
     `;
     const company = inserted[0];
 
-    // Multi-URL support: every company always has a primary company_urls
-    // row equal to its website — CompanyDetailView's URL selector and
-    // scan.mts's url_id resolution both rely on at least one row existing.
-    // Existing companies got this via the 2026-08-09 backfill migration;
-    // new ones get it here.
-    await db`
-      INSERT INTO public.company_urls (company_id, url, is_primary)
-      VALUES (${company.id}, ${company.website}, true)
-    `;
-
     return new Response(JSON.stringify({ ok: true, company }), {
       status: 201,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
 
   return new Response(JSON.stringify({ error: 'Method not allowed' }), {
     status: 405,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
   });
 };
 
