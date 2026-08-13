@@ -37,20 +37,39 @@ export const PROMPT_TEMPLATES = [
   (p) => `I'm looking to switch away from ${p.competitors[0]} — what's a good ${normalizeCategory(p.category)} alternative?`,
 ];
 
-// ---------- Models (2, cheap tier, live-verified) ----------
+// ---------- Models (4, cheap tier, live-verified) ----------
 // Briefly grew to 6 on 2026-08-09 (4 unverified additions sourced from a web
 // search of Perplexity's changelog, since docs.perplexity.ai itself was
 // unreachable through this network's egress policy to smoke-test directly)
 // — reverted same day after that combined with the 10-prompt expansion to
-// push per-scan calls to 60, which is what run-scan-background.mts's scan
-// deadline + reduced retry count below are actually defending against. Only
-// these two have ever been confirmed against a real Perplexity call (see
-// PPLX_URL's comment above — live smoke-tested 2026-07-28). Re-add more
-// once each candidate has been smoke-tested the same way, one at a time —
-// not as a batch of guesses.
+// push per-scan calls to 60, an untested load. 'openai/gpt-5-mini' and
+// 'google/gemini-3-flash-preview' were the only two confirmed against a
+// real Perplexity call at that point (see PPLX_URL's comment above —
+// live smoke-tested 2026-07-28).
+//
+// 2026-08-13: grew from 2 to 4, this time smoke-tested one at a time before
+// being trusted, per the discipline the 2026-08-09 revert established.
+// 'anthropic/claude-haiku-4-5' and 'xai/grok-4.6' were both confirmed live
+// against a real single-call smoke test first (a throwaway script, deleted
+// after use). The Anthropic call initially failed outright — HTTP 400
+// "max_output_tokens is required when using Anthropic models" — fixed by
+// having callModel send that field only for anthropic/* models (see below).
+//
+// The SAME smoke-testing pass also found something much bigger than the
+// model additions: Perplexity's real per-key concurrency limit is ~1, not
+// the 4 this file's callers were already using. Bursts of 2-4 concurrent
+// calls — even across different providers — failed 50-83% of the time with
+// HTTP 429, while fully sequential (no overlap) calls succeeded 100%. That
+// means the CONCURRENCY_LIMIT=4 shipped earlier the same day (itself a fix
+// for an even worse CONCURRENCY_LIMIT=10 incident) was ALSO still silently
+// dropping a large fraction of calls to 429 — see
+// run-scan-background.mts's CONCURRENCY_LIMIT comment for the resulting
+// fix (concurrency dropped to 1, i.e. fully sequential).
 export const MODELS = [
   'openai/gpt-5-mini',
   'google/gemini-3-flash-preview',
+  'anthropic/claude-haiku-4-5',
+  'xai/grok-4.6',
 ];
 
 // ---------- Common-word stoplist for brand-name ambiguity flag ----------
@@ -144,23 +163,36 @@ export async function callModel(apiKey, model, prompt, timeoutMs, externalSignal
   const signals = [controller?.signal, externalSignal].filter(Boolean);
   const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
   try {
+    const requestBody = {
+      model,
+      input: prompt,
+      tools: [{ type: 'web_search' }],
+    };
+    // Anthropic models reject the request outright without this (confirmed
+    // live, 2026-08-13: HTTP 400 "max_output_tokens is required when using
+    // Anthropic models") — the other providers don't need it and default
+    // sensibly, so it's only added for that one provider rather than always.
+    if (model.startsWith('anthropic/')) {
+      requestBody.max_output_tokens = 2048;
+    }
     const res = await fetch(PPLX_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model,
-        input: prompt,
-        tools: [{ type: 'web_search' }],
-      }),
+      body: JSON.stringify(requestBody),
       signal,
     });
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`HTTP ${res.status} from ${model}: ${body.slice(0, 300)}`);
+      const err = new Error(`HTTP ${res.status} from ${model}: ${body.slice(0, 300)}`);
+      // Attached so callModelWithRetry can back off harder specifically on
+      // 429 (rate limit) instead of treating it the same as any other
+      // failure — see that function's comment.
+      err.status = res.status;
+      throw err;
     }
 
     const json = await res.json();
@@ -199,7 +231,19 @@ function sleep(ms) {
 // retrying instantly into a live rate limit just compounds it. Skips the
 // backoff (and any further attempt) once externalSignal has already fired —
 // no point waiting to retry into a deadline that's already passed.
+//
+// 2026-08-13: live scans (TSMC, Google LLC, Hotel De Nara) were observed
+// losing 16-18 of 20 calls to HTTP 429 "request_rate_limit_exceeded" —
+// CONCURRENCY_LIMIT's burst of simultaneous calls (see
+// run-scan-background.mts) was exceeding Perplexity's actual per-key rate
+// limit, and a flat 1s backoff wasn't long enough for that window to clear
+// before the retry landed on the same limit again, producing near-total
+// scan failure (e.g. a real brand reading as "Invisible / 0" purely from
+// rate-limiting, not actual absence). Rate-limit errors now get a longer,
+// escalating backoff instead of the flat short one used for other
+// failures.
 const RETRY_BACKOFF_MS = 1000;
+const RATE_LIMIT_BACKOFF_MS = 5000;
 
 export async function callModelWithRetry(apiKey, model, prompt, timeoutMs, maxAttempts = 2, externalSignal) {
   let lastErr;
@@ -209,7 +253,10 @@ export async function callModelWithRetry(apiKey, model, prompt, timeoutMs, maxAt
     } catch (err) {
       lastErr = err;
       if (externalSignal?.aborted) break;
-      if (attempt < maxAttempts) await sleep(RETRY_BACKOFF_MS);
+      if (attempt < maxAttempts) {
+        const backoff = err.status === 429 ? RATE_LIMIT_BACKOFF_MS * attempt : RETRY_BACKOFF_MS;
+        await sleep(backoff);
+      }
     }
   }
   throw lastErr;

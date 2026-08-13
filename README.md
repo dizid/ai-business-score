@@ -48,48 +48,73 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
    required: brand, website, category, use case, region, customer
    segment, competitors (comma-separated, 2-3). Example: brand "Acme
    Plumbing", category "emergency plumber", competitors "Bob's Pipes,
-   QuickFlow Plumbing".
-3. **Run a scan** — click "Run new scan" on the company's detail page.
-   Expect **20-30 seconds** — it's making 6 real parallel Perplexity calls
-   (3 prompts x 2 models) and polls every 2s. The status line will say
-   "Queued…" then "Running checks (~20-30s)…".
+   QuickFlow Plumbing". **Since 2026-08-12**: on submit, you're taken
+   straight to the new company's detail page and its first scan starts
+   automatically — you won't land back on the list.
+3. **Watch the auto-triggered scan** (or click "Run new scan" on any
+   existing company). **Since 2026-08-13, expect 5-8 minutes, not
+   30-45 seconds** — it's making 20 real Perplexity calls (a 5-prompt slice
+   × 4 models) fully sequentially (`CONCURRENCY_LIMIT = 1` — Perplexity's
+   real per-key concurrency limit turned out to be ~1, confirmed via a live
+   smoke test; anything higher silently dropped a large fraction of calls
+   to HTTP 429) and polls every 2s. The status line will say "Queued…" then
+   "Running checks (~5-8 min)…". A scan-complete notification (so you don't
+   have to sit and watch this) is planned but not yet built.
 4. **Check the result** — score ring, scoreboard (your brand vs.
-   competitors), 1-3 advice cards, raw responses in a collapsible
-   `<details>`. **A banner saying some calls failed is normal, not a
+   competitors), advice cards, a check-by-check breakdown grouped by
+   prompt (per-model raw text, expandable), and — **since 2026-08-12** — a
+   list of exactly which prompt/model failed and why, if any did, instead
+   of just an aggregate count. **Some calls failing is normal, not a
    bug** — see "Known quirks" below.
 5. **Generate deep advice** — the "Generate deeper advice" button on a
    completed scan. This is a second, on-demand live Perplexity call
    (another 15-20s wait) — only trigger it a few times while testing, it
-   roughly doubles the Perplexity spend for that scan.
+   roughly doubles the Perplexity spend for that scan. Free for any
+   signed-in owner today — not yet plan-gated (see `CLAUDE.md`'s Billing
+   section).
 6. **Run a second scan on the same company** — once you have 2+ scans,
    `CompanyProgressChart.vue` renders a score-over-time line on the
    company detail page. With only 1 scan, no chart shows (by design — a
    single point isn't a trend).
 7. **Log out / log back in** — confirm the session round-trips and you
    land back on `/app`, not stuck on a blank page.
-8. **Legacy link check (optional)** — `result.html#d=<encoded>` still
+8. **Check the footer** — every `/app/*` page (added 2026-08-12) has a
+   footer linking to `/app/privacy`, `/app/terms`, `/app/how-it-works`, and
+   Dizid's site. Click through all three — they're real static content,
+   not placeholders.
+9. **Legacy link check (optional)** — `result.html#d=<encoded>` still
    renders old pre-2026-08-03 shareable links client-side, no login, no
    API call. There's no way to generate a *new* one of these anymore
    (see `CLAUDE.md` if you're wondering why) — this step just confirms
    old links weren't broken by later changes.
+10. **Confirm removed features stay removed** — `/app/leaderboard` should
+    resolve to nothing (deleted 2026-08-12); a company's detail page should
+    show no "+ Add URL" / multi-URL chip selector and no public-leaderboard
+    toggle (also removed 2026-08-12).
 
 ### Known quirks (expected, not bugs)
 
-- **~50% of individual scan calls time out or fail.** Real-world
-  Perplexity `web_search` latency, not a bug — the result page shows
-  "N calls failed" honestly instead of hiding it. A scan with 3-4 of 6
-  calls succeeding is normal.
+- **Some individual scan calls time out or fail.** Real-world Perplexity
+  `web_search` latency, not a bug — the result page lists exactly which
+  prompt/model failed and why (since 2026-08-12) instead of hiding it
+  behind an aggregate count. A scan with most of the 20 calls succeeding
+  is normal; occasional failures don't invalidate the score.
+- **Scans take 5-8 minutes, not under a minute** (since 2026-08-13). This
+  is a deliberate reliability tradeoff, not a regression to "fix" by
+  raising concurrency back up — see `CLAUDE.md`'s "Update 2026-08-13" note.
 - **Score shows "unavailable", never a fake 0**, if every call in a scan
   failed. A 0 always means "genuinely invisible," never "the API broke."
-- **Brand names that are common words** (e.g. "Best") get flagged
-  ambiguous and skip auto-detection rather than false-matching everywhere
-  in the raw responses.
-- **`enrich.mts` (URL auto-fill) isn't wired into "+ New company" yet** —
-  the endpoint works and is auth-gated, but the form is manual-entry only
-  for now. Not a bug, just not connected.
-- Two throwaway test accounts already exist in the database
-  (`milestone2-test@example.com`, `milestone4-test-23215@example.com`)
-  from building this app — ignore them, sign up with your own email.
+- **Brand names that are actual common words** (e.g. "Best", "Pro") get
+  flagged ambiguous and skip auto-detection rather than false-matching
+  everywhere in the raw responses. **Fixed 2026-08-12**: this used to also
+  (incorrectly) trigger for any single-word brand of 4 characters or
+  fewer regardless of whether it was a real common word — short real
+  brands (ASML, TSMC, NRC, IBM, SAP) were getting a false `0/100` because
+  of this. No longer does; see `CLAUDE.md`'s Detection section.
+- Throwaway test accounts already exist in the database
+  (`milestone2-test@example.com`, `milestone4-test-23215@example.com`,
+  `aivis-qa-test-20260811@dizid.com`) from building/verifying this app —
+  ignore them, sign up with your own email.
 
 ### Why there's no test suite
 
@@ -119,8 +144,12 @@ append a row to `tracking.csv` (both gitignored — run output, not source).
 
 - **`CLAUDE.md`** — full architecture, database schema, why decisions
   were made the way they were. The authoritative technical reference.
+- **`PLAN_NEXT_PHASE.md`** — the active roadmap (correctness fixes,
+  scope cuts, model coverage, monetization), what's shipped vs. deferred,
+  and why.
 - **`DASHBOARD.md`** — plain-English explanation of the score formula and
   what the scoreboard/advice cards mean.
 - **`TODOS.md`** — project history and current status.
+- **`WISH_LIST.md`** — deferred ideas not yet promoted to `TODOS.md`.
 - **`proof-script/OUTREACH.md`** — the cold-outreach playbook for using
   `proof-script` against a real prospect list.

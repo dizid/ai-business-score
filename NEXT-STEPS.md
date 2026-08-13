@@ -8,8 +8,16 @@ domain redirect).
 ## Where this stands
 
 - **AIVis** (this repo, `aivis-scan.netlify.app`) is built, deployed, and
-  working. Not the revenue product itself — `plan_tier` on `user_profiles`
-  exists but pricing is unresolved and unused.
+  working. **Update 2026-08-12**: the line below ("pricing is unresolved
+  and unused") is now stale — a real Stripe subscription (Free vs. Pro)
+  shipped since this was written, and a bug-fix/hardening pass just landed
+  (see `TODOS.md`'s 2026-08-12 entry and `PLAN_NEXT_PHASE.md` for the
+  active roadmap, including a planned one-time report SKU still gated on
+  a manual sales test). Kept below as the original framing for context.
+- ~~Not the revenue product itself — `plan_tier` on `user_profiles`
+  exists but pricing is unresolved and unused.~~ Pro exists and gates
+  company/scan limits; the *price* itself is still unset, and deep advice
+  (arguably the real value prop) isn't plan-gated yet.
 - **The actual close is Site Improver** (Dizid's website-rebuild offer).
   AIVis is the cold-outreach hook: proof a prospect's business is invisible
   to AI search, then pitch the rebuild that fixes it. Full sequence in

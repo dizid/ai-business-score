@@ -238,5 +238,5 @@ No competitive brand research and no fabricated market stats — skipped
 per the CEO's "keep it simple" instruction, and per the "no competitive
 brand research" reasoning already established in the original version of
 this doc. Positioning is grounded entirely in what the product verifiably
-does (see `CLAUDE.md`'s Architecture section: 2 models, Perplexity-grounded,
+does (see `CLAUDE.md`'s Architecture section: 4 models, Perplexity-grounded,
 0-100 score), not claims about competitors.

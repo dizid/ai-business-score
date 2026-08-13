@@ -44,35 +44,97 @@ Vertical prompt templating is still deliberately deferred per that doc's
 original reasoning (see `TODOS.md`).
 
 **Known limitation, unchanged by the pivot:** real Perplexity calls with
-`web_search` grounding routinely take 15-20s, sometimes longer. A scan runs
-10 prompts x 2 models = 20 calls (prompts grew from 3 to 10 on 2026-08-09 at
-a live user's request — see `shared/aivis-core.mjs`'s `PROMPT_TEMPLATES`
-comment; models briefly grew to 6 the same day, then were reverted to the 2
-live-verified ones — see the `MODELS` comment for why) with a 60s per-call
+`web_search` grounding routinely take 15-20s, sometimes longer. proof-script
+runs the full 10 prompts x 4 models = 40 calls (prompts grew from 3 to 10 on
+2026-08-09 at a live user's request — see `shared/aivis-core.mjs`'s
+`PROMPT_TEMPLATES` comment; models grew from 2 to 4 on 2026-08-13, after a
+briefly-reverted attempt at 6 on 2026-08-09 — see the `MODELS` comment for
+the full history). The hosted site's `run-scan-background.mts` uses a
+**5-prompt slice** of the same `PROMPT_TEMPLATES` array (20 calls, not 40)
+— see "Async scan execution" below for why. Each call has a 60s per-call
 timeout. This used to force the whole `/scan` request to stay synchronous
 and tightly timeout-budgeted — that constraint is gone since Milestone 5
 made scans asynchronous (see "Async scan execution" below).
 
 Also changed 2026-08-09, after a live user flagged the original
 fire-everything-via-`Promise.all` approach as a real risk once call counts
-grew: `run-scan-background.mts` now runs calls through a concurrency-limited
-worker pool (`runWithConcurrency` in `aivis-core.mjs`, limit 10) instead of
-all at once, and every call shares one scan-wide `SCAN_DEADLINE_MS` (100s)
-via a single `AbortController` — this is what actually bounds worst-case
-scan latency as prompt/model count grows, since previously each call got
-its own full retry budget regardless of how long the batch had already run
-(one straggler retrying 3x at 60s with no backoff could drag a 6-call scan
-past 3 minutes even though the other 5 finished in 20s). `callModelWithRetry`
-also dropped from 3 attempts to 2 and added a 1s backoff between them —
-losing one call out of 6 was a meaningful chunk of the data, but with more
-prompts each individual call matters less to the aggregate score, so it's
-worth capping per-call worst-case latency instead of retrying aggressively;
-the backoff specifically avoids re-hammering a live rate limit. Calls still
-in flight when the scan deadline fires are aborted and counted as failed,
-same as any other failure — and per-check failure detail (which
-prompt/model) still isn't persisted to the DB, only the aggregate count, so
-diagnosing *which* calls hit the deadline vs. a real error needs the
-Netlify function logs.
+grew: `run-scan-background.mts` runs calls through a concurrency-limited
+worker pool (`runWithConcurrency` in `aivis-core.mjs`) instead of all at
+once, and every call shares one scan-wide `SCAN_DEADLINE_MS` via a single
+`AbortController` — this is what actually bounds worst-case scan latency as
+prompt/model count grows, since otherwise each call gets its own full retry
+budget regardless of how long the batch had already run. Calls still in
+flight when the scan deadline fires are aborted and counted as failed, same
+as any other failure. **The concurrency limit and deadline value have
+changed twice since, most recently to 1 / 600000ms (10 min) — see "Update
+2026-08-13" below; don't trust a specific number in older prose without
+checking `run-scan-background.mts` directly.** `callModelWithRetry` uses 3
+attempts with a rate-limit-aware escalating backoff between them (longer for
+HTTP 429 specifically than other failures) — the backoff exists specifically
+to avoid re-hammering a live rate limit rather than to guard against generic
+flakiness.
+
+**Update 2026-08-12 (Milestone A of `PLAN_NEXT_PHASE.md`, shipped):**
+per-check failure detail (which prompt/model failed, and why) is now
+persisted — a `failures jsonb` column on `scans`, populated by
+`aggregateProspect`'s return value and rendered in `ScanDetail.vue` in
+place of the old "isn't currently recorded" note. This resurrects a feature
+that briefly existed (commit `522eb63`) and was accidentally deleted the
+next day during an unrelated refactor (`74afa41`) — diagnosing which calls
+failed no longer needs the Netlify function logs. A `total_tokens integer`
+column on `scans` was added the same migration, DB-only (not surfaced in
+any UI), so real per-scan Perplexity cost can be queried directly via Neon
+MCP — this exists to inform report/subscription pricing, not as a product
+feature.
+
+Also fixed the same milestone: `isAmbiguousBrandName()`
+(`shared/aivis-core.mjs`) used to flag **any** single-word brand name of 4
+characters or fewer as ambiguous and skip detection entirely, regardless of
+whether it was an actual common word — a real bug, not a design choice,
+that gave real brands (ASML, TSMC, NRC, IBM, SAP) a false `0/100 —
+Invisible` score. Ambiguity is now driven only by `COMMON_WORD_STOPLIST`
+membership. Competitor-name ambiguity (which previously failed silently,
+indistinguishable from "never mentioned") now sets a per-competitor
+`ambiguous` flag surfaced in `ScanDetail.vue`'s scoreboard.
+
+**Update 2026-08-13 (Milestone C1 of `PLAN_NEXT_PHASE.md`, shipped):**
+`MODELS` grew from 2 to 4 (`anthropic/claude-haiku-4-5`, `xai/grok-4.6`
+added, both live-smoke-tested first — see `shared/aivis-core.mjs`'s
+`MODELS` comment). Anthropic models need an explicit `max_output_tokens` in
+the request body that the other providers don't (`callModel` now sends it
+conditionally). The same smoke-testing pass found something bigger than the
+model additions: **Perplexity's real per-key concurrency limit is ~1**, not
+the 4 this file previously documented — bursts of 2-4 concurrent calls,
+including across different providers, failed 50-83% of the time with HTTP
+429, while fully sequential calls succeeded 100%. `CONCURRENCY_LIMIT` is
+now `1` (fully sequential) and `SCAN_DEADLINE_MS` is `600000` (10 min) —
+see `run-scan-background.mts`'s `CONCURRENCY_LIMIT` comment for the full
+incident writeup (this is the second retune the same day; an earlier
+same-day fix for a *worse* incident, concurrency=10 causing 16-18/20 calls
+to fail, had already dropped it to 4 — which turned out to still be wrong).
+Sequential-only means wall-clock time scales directly with call count, so
+the hosted site's scan was cut to a 5-prompt slice of `PROMPT_TEMPLATES`
+(20 calls total, same as before the model expansion) rather than growing to
+40 — proof-script keeps the full 10-prompt set since it isn't
+latency-constrained by a live browser tab. A scan now takes several minutes
+end to end; a Pro-plan monthly fair-use cap (`PRO_PLAN_MONTHLY_SCAN_LIMIT`,
+`_shared/plan.mts`) was added the same change since per-scan Perplexity
+cost also went up with the pricier model mix. A scan-complete email
+notification was also added the same day (`_shared/email.mts`,
+`sendScanCompleteEmail`, called from `run-scan-background.mts` after every
+scan finalizes, success or failure) via Resend's plain HTTP API — best-
+effort, a failed send is logged but never changes the scan's own
+already-persisted status. Sends from `scans@notifications.dizid.com` — this
+domain is registered and **DNS-verified with Resend** (`region: eu-west-1`;
+DKIM/MX/SPF records live on `dizid.com`'s Netlify-managed DNS zone),
+confirmed working end-to-end with a real delivered test email to a
+non-owner address the same day, not just the sandbox-restricted
+`onboarding@resend.dev` address.
+
+`RESEND_API_KEY`/`RESEND_FROM_EMAIL` are set on the Netlify site (see
+"Deployment" below) — `RESEND_API_KEY` is reused from an existing personal
+Resend account (also used by other unrelated Dizid projects), not a new
+account created for AIVis specifically.
 
 ## Deployment
 
@@ -90,8 +152,11 @@ Netlify function logs.
   just `localhost`).
 - Env vars on the Netlify site (all non-secret, per standing rule):
   `PERPLEXITY_API_KEY`, `DATABASE_URL` (Neon pooled connection string),
-  `NEON_AUTH_JWKS_URL`. `SCAN_PASSPHRASE` was removed 2026-08-03 (Milestone 8
-  cleanup) once nothing in code referenced it anymore.
+  `NEON_AUTH_JWKS_URL`, `RESEND_API_KEY`/`RESEND_FROM_EMAIL` (added
+  2026-08-13, scan-complete email, sending domain DNS-verified same day —
+  see "Update 2026-08-13" note above). `SCAN_PASSPHRASE` was removed
+  2026-08-03 (Milestone 8 cleanup) once nothing in code referenced it
+  anymore.
 
 ## Commands
 
@@ -164,7 +229,11 @@ wasn't revisited by it.
   `category` snapshot at scan time, `jsonb` columns for
   `per_prompt_rank`/`competitor_tallies`/`raw_responses`/`advice`/
   `deep_advice`, plus `legacy_blob_key` (traceability back to the original
-  Blobs entry, for legacy-imported scans only).
+  Blobs entry, for legacy-imported scans only). Added 2026-08-12
+  (Milestone A of `PLAN_NEXT_PHASE.md`): `failures jsonb` (per-failed-call
+  `{model, promptIndex, error}` detail, nullable — old rows have `null`,
+  rendered as `[]`) and `total_tokens integer` (DB-only, for cost queries,
+  never surfaced in the UI).
 - **`company_urls`** — an **unused, present-but-dead table**. It backed
   multi-URL-per-company tracking (shipped, then deleted per Milestone B of
   `PLAN_NEXT_PHASE.md`): every company got a primary row equal to its
@@ -218,22 +287,70 @@ for the exact migration SQL if it needs revisiting.
   `authHeaders()` itself is kept (still used internally by `authFetch()`)
   rather than removed.
 
+### Billing (Stripe), `netlify/functions/_shared/plan.mts` + `stripe.mts`
+
+Shipped in commit `5f47127` — not documented here until now, a pre-existing
+gap this update fixes rather than something built this session.
+
+- **`_shared/plan.mts`** — `FREE_PLAN_COMPANY_LIMIT = 1`,
+  `FREE_PLAN_SCAN_LIMIT = 3`, `isPro(planTier)`. Centralized so limits are
+  tunable in one place instead of scattered magic numbers.
+- **`_shared/stripe.mts`** — cached Stripe singleton reading
+  `STRIPE_SECRET_KEY`.
+- **`create-checkout-session.mts`** — POST, auth-gated. Creates a Stripe
+  Checkout session, `mode: 'subscription'` (real recurring billing, not a
+  one-time charge), rejects if already Pro.
+- **`stripe-webhook.mts`** — POST, deliberately *not* `requireAuth` (Stripe
+  signs the raw body itself, verified via `STRIPE_WEBHOOK_SECRET`).
+  `checkout.session.completed` sets `plan_tier='pro'` on `user_profiles`;
+  `customer.subscription.updated`/`.deleted` sync `subscription_status` and
+  flip back to `'free'` if the subscription is no longer active/trialing.
+- **What Pro actually gates today**: only two quantity limits, both via
+  `isPro()` — `scan.mts` (3 scans total on Free) and `companies.mts` (1
+  company on Free), both returning a `402 {error, upgradeRequired, limit}`
+  the frontend renders as an inline "Upgrade to Pro" CTA
+  (`CompaniesListView.vue`/`CompanyDetailView.vue`). **Nothing else is
+  plan-gated** — deep advice is free for anyone today (see "Deep advice"
+  below), and the Pro price itself is still unset in both Stripe and the
+  landing page copy (`index.html`'s pricing card intentionally says "One
+  flat price /month" — not finalized).
+- **Not yet built**: a one-time "Full AI Visibility Report" purchase SKU
+  (separate from the subscription) and gating deep advice behind
+  Pro-or-purchased — both are Milestone E of `PLAN_NEXT_PHASE.md`, gated on
+  Marc's manual sales test (E0) actually landing a real payment first.
+
 ### `shared/aivis-core.mjs`
 
 The single source of truth, imported by every consumer:
 
-- **Prompt templates** (8, generic brand/competitor substitution only —
-  vertical-specific templating still deferred, see `TODOS.md`) x **2 models**
-  (`openai/gpt-5-mini`, `google/gemini-3-flash-preview`). `proof-script`
-  uses all 8; the hosted site uses only the first 3.
+- **Prompt templates** (10, generic brand/competitor substitution only —
+  vertical-specific templating still deferred, see `TODOS.md`) x **4
+  models** (`openai/gpt-5-mini`, `google/gemini-3-flash-preview`,
+  `anthropic/claude-haiku-4-5`, `xai/grok-4.6`, the latter two added
+  2026-08-13). Prompt count grew from 8 to 10 on 2026-08-09, and the hosted
+  site briefly ran the full 10-prompt set (both `proof-script` and the
+  hosted site running all 10) before being cut back to a **5-prompt slice**
+  on 2026-08-13 when the model count grew — see this file's "Update
+  2026-08-13" note above for why (concurrency dropped to 1, so more calls
+  means direct wall-clock cost with no parallelism to hide it behind).
+  `proof-script` still runs the full 10.
 - **Perplexity Agent API client** (`callModel`) — `POST
   https://api.perplexity.ai/v1/responses`, routing both OpenAI- and
   Google-branded models through one Perplexity key via `provider/model-name`
   addressing. Optional `timeoutMs` (via `AbortController`).
 - **Detection** (`findBrandMention`, `findMentions`) — whole-word,
   case-insensitive regex match on the brand name and a domain-derived alias.
-  Presence-only, not sentiment-aware. Common-word brand names are flagged
-  ambiguous and skip auto-detection.
+  Presence-only, not sentiment-aware. Common-word brand names (from a
+  curated `COMMON_WORD_STOPLIST`) are flagged ambiguous and skip
+  auto-detection. **Fixed 2026-08-12**: a blanket "any single word ≤4
+  characters" clause used to also trigger this, independent of the
+  stoplist — a real bug that gave short real brand names (ASML, TSMC, NRC,
+  IBM, SAP) a false ambiguous flag and a `0/100` score. Removed; ambiguity
+  now comes only from stoplist membership. Competitor names get the same
+  check but no domain-alias fallback (they have no associated website in
+  the schema) — an ambiguous competitor now sets a visible `ambiguous` flag
+  on its tally instead of silently staying indistinguishable from "never
+  mentioned."
 - **Aggregation** (`aggregateProspect`) — cited count, completed vs. failed
   call counts, heuristic first-mention-order ranking, and
   `competitorTallies` (computed unconditionally per completed response, not
@@ -252,8 +369,13 @@ The single source of truth, imported by every consumer:
   block this is described on `selectAdvice` above, and no longer applies to
   this one). Deliberately on-demand (a "Generate deeper advice" button on a
   completed scan, not automatic) — it roughly doubles Perplexity spend per
-  scan, and pricing/plan limits for the new self-serve product aren't
-  decided yet. `buildDeepAdvicePrompt` grounds the prompt in the actual scan
+  scan. Free/Pro plan limits now exist (see "Billing (Stripe)" below), but
+  deep advice itself is **not yet plan-gated** — any authenticated owner of
+  a completed scan can generate it, unlimited times, regardless of plan.
+  Gating it behind Pro/a one-time report purchase is Milestone E of
+  `PLAN_NEXT_PHASE.md`, not yet built — deliberately deferred until Marc's
+  manual outbound sales test (Milestone E0) shows someone will actually pay
+  for it. `buildDeepAdvicePrompt` grounds the prompt in the actual scan
   data (citation rate, competitor tallies) rather than generic SEO advice;
   `parseDeepAdviceResponse` follows the same lenient-JSON-extraction,
   always-safe-shape pattern as `parseEnrichmentResponse` below.
@@ -297,11 +419,29 @@ doesn't have that constraint.
 ### `src/app/` — the authenticated app shell
 
 - **`router.ts`** — routes: `/app` (companies list), `/app/login`,
-  `/app/signup`, `/app/companies/:id`. A global `beforeEach` guard calls
-  `restoreSession()` once, then redirects unauthenticated visitors to
-  `/app/login?redirect=<intended path>` (and authenticated visitors away
-  from `/app/login`/`/app/signup`) — verified end-to-end including the
-  redirect-preservation round trip.
+  `/app/signup`, `/app/companies/:id`, `/app/billing/success`, plus three
+  no-auth-required content routes added 2026-08-12:  `/app/privacy`,
+  `/app/terms`, `/app/how-it-works` (see `App.vue`'s footer below). A
+  global `beforeEach` guard calls `restoreSession()` once, then redirects
+  unauthenticated visitors to `/app/login?redirect=<intended path>` (and
+  authenticated visitors away from `/app/login`/`/app/signup`) — verified
+  end-to-end including the redirect-preservation round trip. The
+  `/app/leaderboard` route (a public opt-in leaderboard, shipped commit
+  `1b0c7a9`) was deleted 2026-08-12 per Milestone B of `PLAN_NEXT_PHASE.md`
+  — Marc decided the feature was unwanted scope; `companies.is_public`
+  remains as an unused DB column (see Database schema above).
+- **`App.vue`** — the shared shell wrapping every `/app/*` route. Added a
+  footer 2026-08-12: links to Privacy Policy, Terms of Service, How this
+  works, "Made by Dizid" (external), a `dev@dizid.com` contact line, and a
+  one-line data-handling note. Renders on every authenticated and
+  unauthenticated app page alike, since it's in the shell, not per-view.
+- **`views/PrivacyView.vue` / `TermsView.vue` / `HowItWorksView.vue`** —
+  added 2026-08-12, plain static content, no DB/API calls. Privacy and
+  Terms both carry a "Draft — have this reviewed before relying on it for
+  compliance" notice; How This Works is real polished product content
+  (accurately describes the 5-prompt × 4-model / 20-check scan mechanism
+  and the actual score bands, not generic filler — updated 2026-08-13 when
+  the model expansion changed those numbers).
 - **`views/LoginView.vue` / `SignupView.vue`** — plain email/password forms
   against `lib/auth.ts`'s `signIn`/`signUp`.
 - **`views/CompaniesListView.vue`** — lists the caller's companies
@@ -311,13 +451,27 @@ doesn't have that constraint.
   customer_segment/competitors, then an editable review step before
   `POST /companies` — falling back to a blank editable form on enrichment
   failure (`enrich.mts` always returns 200 even on internal failure).
+  **Changed 2026-08-12**: on successful creation, `onCreate()` now
+  navigates straight to the new company's detail view with `?autoscan=1`
+  instead of just closing the form and staying on the list — a brand-new,
+  never-scanned company used to show the same bare `0` a real zero score
+  would, which read as broken.
 - **`views/CompanyDetailView.vue`** — one company's master-detail dashboard:
   `CompanyProgressChart.vue` (score-over-time, shown once a company has 2+
   scans — a single point isn't a trend) above a scan list, selecting a scan
   renders it via the shared `ScanDetail.vue`. Also owns the "Run new scan"
-  button (POSTs `/scan`, then polls `/scans/:id` every ~2s) and the
-  "Generate deeper advice" flow (POSTs `/scans/:id/deep-advice`, replaces
-  the scan in local state with the response on success).
+  button (POSTs `/scan`, then polls `/scans/:id` every ~2s — `pollScan()`
+  now retries a transient fetch failure up to 3x with backoff before giving
+  up, added 2026-08-12, since it previously abandoned polling permanently
+  on one network blip) and the "Generate deeper advice" flow (POSTs
+  `/scans/:id/deep-advice`, replaces the scan in local state with the
+  response on success). `onMounted` auto-triggers a scan when
+  `route.query.autoscan === '1'` (set by `CompaniesListView.vue` above),
+  then strips the query param via `router.replace` so a refresh doesn't
+  re-trigger it. Multi-URL-per-company tracking (a `company_urls` table,
+  a URL-chip selector, "+ Add URL") was **removed 2026-08-12** per
+  Milestone B of `PLAN_NEXT_PHASE.md` — every company now has exactly one
+  URL (`companies.website`), matching `scan.mts`'s current behavior.
 - **`views/CompanyProgressChart.vue`** — hand-rolled SVG line chart (no
   chart library, matching `ScanDetail.vue`'s score ring/scoreboard
   approach), single series so no legend needed per the `dataviz` skill's
@@ -364,6 +518,14 @@ motivated the change.
 
 ### `netlify/functions/` — one function per file, all auth-scoped except `enrich`
 
+- **`_shared/cors.mts`** — added 2026-08-12, `corsHeaders()` +
+  `handleOptions(req)`, applied across every JSON-returning function
+  (`scan.mts`, `scan-status.mts`, `companies.mts`, `company.mts`,
+  `enrich.mts`, `generate-deep-advice.mts`). Defensive hardening, not a
+  functional requirement today (every call is same-origin) — guards
+  against a hard, ungraceful "Failed to fetch" if origins ever diverge
+  (a preview URL, a custom domain added without updating Neon Auth's
+  `trusted_origins`).
 - **`scan.mts`** — POST `/scan`, `{ company_id }`. Auth + company-ownership
   checked, inserts a `pending` scans row, fires a **Background Function**
   trigger (`run-scan-background.mts`) and returns `{ scanId }` in well under
@@ -371,8 +533,14 @@ motivated the change.
   throwaway spike before committing to this design (Milestone 0): a
   Background Function POST returns 202 immediately, the actual work
   continues afterward. No more 302 redirect, no more Blobs write, no more
-  synchronous-request timeout budget.
-- **`run-scan-background.mts`** — the actual 6-call scan (`-background`
+  synchronous-request timeout budget. Free-tier callers are capped at
+  `FREE_PLAN_SCAN_LIMIT` (lifetime); Pro callers are capped at
+  `PRO_PLAN_MONTHLY_SCAN_LIMIT` (calendar-month, added 2026-08-13 alongside
+  the model expansion — see `_shared/plan.mts`) — both 402 with a plain
+  `error` message, only the free-tier one sets `upgradeRequired: true`.
+- **`run-scan-background.mts`** — the actual 20-call scan (a 5-prompt slice
+  × 4 models, updated 2026-08-13 — this bullet previously said "10 prompts
+  × 2 models," stale since that date's model expansion) (`-background`
   filename suffix required by Netlify's convention). Atomically claims the
   scan (`UPDATE ... WHERE status='pending'`) so a duplicate trigger is a
   cheap no-op instead of double-spending Perplexity calls, then updates the

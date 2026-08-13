@@ -8,7 +8,7 @@
 import type { Config } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
-import { FREE_PLAN_SCAN_LIMIT, isPro } from './_shared/plan.mts';
+import { FREE_PLAN_SCAN_LIMIT, PRO_PLAN_MONTHLY_SCAN_LIMIT, isPro } from './_shared/plan.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 
 export default async (req: Request) => {
@@ -73,6 +73,26 @@ export default async (req: Request) => {
           error: `Free plan is limited to ${FREE_PLAN_SCAN_LIMIT} scans total. Upgrade to Pro for unlimited scans.`,
           upgradeRequired: true,
           limit: FREE_PLAN_SCAN_LIMIT,
+        }),
+        { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+      );
+    }
+  } else {
+    // Pro fair-use cap — monthly, not lifetime (see PRO_PLAN_MONTHLY_SCAN_LIMIT's
+    // comment in _shared/plan.mts). No upgradeRequired here — Pro is already
+    // the top tier, there's nothing to upsell, so the frontend's generic
+    // scanError display just shows a plain message without rendering an
+    // "Upgrade to Pro" CTA that would have nowhere to send the user.
+    const [{ count }] = await db`
+      SELECT count(*)::int AS count FROM public.scans s
+      JOIN public.companies c ON c.id = s.company_id
+      WHERE c.owner_user_id = ${userId} AND s.created_at >= date_trunc('month', now())
+    `;
+    if (count >= PRO_PLAN_MONTHLY_SCAN_LIMIT) {
+      return new Response(
+        JSON.stringify({
+          error: `Pro plan is limited to ${PRO_PLAN_MONTHLY_SCAN_LIMIT} scans per month (fair use) — resets at the start of next month.`,
+          limit: PRO_PLAN_MONTHLY_SCAN_LIMIT,
         }),
         { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
       );

@@ -1,5 +1,17 @@
 # AIVis — Next Phase: Reliability, Model Coverage, Product Depth & Monetization
 
+## Status (updated 2026-08-13)
+
+| Milestone | Status |
+|---|---|
+| A — Correctness & trust | **Shipped**, pushed to `master` (`8af2803`). Live scan not yet re-verified due to a sandbox network limitation during testing — see `TODOS.md`'s 2026-08-12 entry. |
+| B — Remove leaderboard + multi-URL | **Shipped**, pushed to `master`. |
+| C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13** (model count, concurrency/deadline retune — see Milestone C below for what actually happened, which differs from this section's original plan). C3 (locale-aware prompts) not started. |
+| D — Product depth & trust surfaces | **D3 (footer/legal) and D4 (technical SEO) shipped.** D1 (raw data — likely already satisfied by A3, needs Marc's confirmation) and D2 (competitor click-through) not started. |
+| F — Differentiation | Not started — deliberately deferred this round (needs live API exploration + calibration, shouldn't be rushed). |
+| E — Monetization | Not started. E0 (manual sales test) is Marc's task, not engineering — see "The assignment" below. |
+| G — Growth loop | Not started, gated on E0. |
+
 ## Context
 
 Marc reviewed the live app on his phone across 15 annotated screenshots and a
@@ -42,9 +54,14 @@ loops, not feature-count — see Milestones F and G below.
 - **Architecture**: Vue 3 SPA (`app.html`) + Netlify Functions + Neon
   Postgres + Neon Auth, async scans via a Background Function. Single source
   of truth for prompts/models/detection/scoring is `shared/aivis-core.mjs`.
-- **Scanning**: 10 prompt templates × 2 models (`openai/gpt-5-mini`,
-  `google/gemini-3-flash-preview`), all routed through Perplexity's Agent
-  API. ~30-45s happy path, hard-capped at 100s (`SCAN_DEADLINE_MS`).
+- **Scanning**: as of 2026-08-13 (Milestone C1/C2, see below), a 5-prompt
+  slice of `PROMPT_TEMPLATES` × 4 models (`openai/gpt-5-mini`,
+  `google/gemini-3-flash-preview`, `anthropic/claude-haiku-4-5`,
+  `xai/grok-4.6`), all routed through Perplexity's Agent API, fully
+  sequential (`CONCURRENCY_LIMIT = 1` — Perplexity's real per-key
+  concurrency limit turned out to be ~1). ~5-8 min happy path, hard-capped
+  at 10 min (`SCAN_DEADLINE_MS`). Was 10 prompts × 2 models, ~30-45s,
+  100s-capped, before this milestone.
 - **Enrichment ("Perplexity or scraped?" — screenshot 1)**: it's Perplexity,
   not scraping. `enrich.mts` makes one `web_search`-grounded Perplexity call
   (`openai/gpt-5-mini`) asking the model to research the URL — no HTML
@@ -138,7 +155,7 @@ proof-script/index.mjs --dry-run` after any `shared/aivis-core.mjs` change;
 a real scan against a short-name brand (ASML/TSMC/NRC) after Milestone A to
 confirm the fix actually changes output, not just passes type-checking.
 
-### Milestone A — Correctness & trust (do first)
+### Milestone A — Correctness & trust (do first) — ✅ SHIPPED 2026-08-12
 
 1. **Fix the ambiguity heuristic** (`shared/aivis-core.mjs:67-70`): remove
    the `words[0].length <= 4` clause entirely; ambiguity should come only
@@ -185,7 +202,7 @@ confirm the fix actually changes output, not just passes type-checking.
    navigate to the new company's detail view and auto-trigger the first
    scan, so users never see a bare, ambiguous `0` for an unscanned company.
 
-### Milestone B — Remove leaderboard + multi-URL
+### Milestone B — Remove leaderboard + multi-URL — ✅ SHIPPED 2026-08-12
 
 Both are fully committed, live features — this is deletion, not abandoning
 WIP. Leave the underlying DB columns/tables in place (unused, harmless)
@@ -209,23 +226,33 @@ full cleanup.
 3. Update CLAUDE.md's Database schema section so it doesn't re-drift once
    these features are gone from the UI but their columns remain.
 
-### Milestone C — More models, speed, locale-aware prompts
+### Milestone C — More models, speed, locale-aware prompts — C1/C2 ✅ SHIPPED 2026-08-13, C3 not started
 
-1. Grow `MODELS` (`shared/aivis-core.mjs:51-54`) one candidate at a time,
-   each live-smoke-tested against a real Perplexity call before being
-   trusted — the exact discipline the file's own comment already prescribes
-   after the 2026-08-09 revert. Do not batch-add unverified model strings.
-2. **Speed** ("Scanning... too long" — screenshot 14): re-tune
-   `CONCURRENCY_LIMIT` / `SCAN_DEADLINE_MS` / `CALL_TIMEOUT_MS`
-   (`run-scan-background.mts:107-109`) — check Perplexity's actual per-key
-   rate limit (not just guess) and raise `CONCURRENCY_LIMIT` toward 20 if it
-   tolerates that, since the pool of 10 roughly doubles best-case wall-clock
-   time versus firing all calls at once. If growing model count in this
-   milestone would otherwise push latency back up, consider a slimmer
-   prompt set for quick/tracked scans (fewer prompts, still all models)
-   while the full 10-prompt set is reserved for the paid one-time report
-   (Milestone E) where thoroughness matters more than speed. Re-verify
-   worst-case latency stays acceptable before shipping either way.
+1. **✅ Shipped.** Grew `MODELS` from 2 to 4, one candidate at a time, each
+   live-smoke-tested against a real Perplexity call before being trusted —
+   `anthropic/claude-haiku-4-5` and `xai/grok-4.6` added (see
+   `shared/aivis-core.mjs`'s `MODELS` comment for the full writeup,
+   including the Anthropic `max_output_tokens` fix that was needed).
+2. **✅ Shipped, but not the way this item originally proposed** ("Scanning...
+   too long" — screenshot 14). ~~Check Perplexity's actual per-key rate
+   limit (not just guess) and raise `CONCURRENCY_LIMIT` toward 20 if it
+   tolerates that~~ — **this guidance was wrong.** It was written before any
+   empirical test; the actual check (done as part of C1's smoke-testing,
+   2026-08-13) found Perplexity's real per-key concurrency limit is ~1, not
+   20 or even the 4 that was live in production at the time — bursts of
+   2-4 concurrent calls, across any provider mix, failed 50-83% of the time
+   with HTTP 429, while fully sequential calls succeeded 100%.
+   `CONCURRENCY_LIMIT` is now `1`. The "slimmer prompt set for quick/tracked
+   scans" fallback this item already anticipated *did* end up being needed,
+   just for a different reason (sequential-only means calls-in-scan is the
+   direct latency knob, not concurrency) — the hosted site now runs a
+   5-prompt slice (20 calls, 4 models) instead of the full 10 (which would
+   have been 40 calls, ~13 min sequential); `proof-script` still runs the
+   full 10. Net effect: scans now take 5-8 minutes, up from 30-45 seconds —
+   slower in raw terms, but the old speed was partly an illusion built on
+   top of a large fraction of calls silently failing. A scan-complete
+   notification (so a user isn't stuck watching a multi-minute scan) is
+   identified as necessary follow-up, not yet built.
 3. **Locale-aware prompts**: capture a `language` field at
    enrichment/company-creation time (extend `buildEnrichPrompt` to infer
    it too). Maintain a small set of parallel-translated `PROMPT_TEMPLATES`
@@ -234,7 +261,7 @@ full cleanup.
    per scan — keeps cost/latency down and lets the wording be reviewed for
    quality since these are real queries sent to grounded search.
 
-### Milestone D — Product depth & trust surfaces
+### Milestone D — Product depth & trust surfaces — D3/D4 ✅ SHIPPED 2026-08-12, D1/D2 not started
 
 1. **Raw data**: Milestone A3 already restores per-prompt/per-model failure
    detail; combined with the existing "check-by-check" `<details>` UI
@@ -279,7 +306,7 @@ full cleanup.
    wasn't among the 15 images provided — if it has requirements beyond this
    audit, share it and it'll get folded in before this milestone ships.*
 
-### Milestone F — Differentiation (before Milestone E0 — strengthens the report being tested)
+### Milestone F — Differentiation (before Milestone E0 — strengthens the report being tested) — not started
 
 An office-hours pass on this plan (see "Competitive landscape" above) found
 the real gap: detection is presence-only regex, and Perplexity's responses
@@ -314,7 +341,7 @@ test converts.
 deferred — no point building a growth-loop entry point before Milestone E0
 proves anyone pays for what's behind it.
 
-### Milestone G — Growth loop (after Milestone E0 shows at least one real payment)
+### Milestone G — Growth loop (after Milestone E0 shows at least one real payment) — not started
 
 **Embeddable "AI Visibility Verified" badge**: once a company scores above
 a threshold, offer an embed snippet linking back to its result page. This
@@ -324,21 +351,23 @@ no per-company public/private toggle to maintain; each badge is a static
 asset the site owner controls on their own page. Gated on E0 deliberately:
 no point building a growth loop around a product nobody's paid for yet.
 
-### Milestone E — Monetization
+### Milestone E — Monetization — not started
 
-**Guardrail, ship independently of E0 — Pro fair-use cap.** A CFO-style
-pass on this plan (not asked for, but worth flagging) found that raw
-Perplexity API cost per scan today is roughly $0.20-0.60 (20 calls) —
-meaning a €499 one-time report has 99%+ gross margin, and cost is not the
-real financial risk. The actual risk is the opposite direction: the
-**already-live** Pro subscription's "unlimited scans" has no usage cap, and
-Milestone C deliberately grows model count, which raises per-scan cost
-linearly. A heavy Pro user at a fixed low monthly price could produce
-negative gross margin the moment more models ship. Fix: add a generous
-monthly fair-use cap (e.g. 50 scans/month) reusing the exact counting-query
-pattern `scan.mts` already uses for the free-tier limit
-(`FREE_PLAN_SCAN_LIMIT`) — cheap, and worth shipping regardless of how the
-E0 test below goes, since it protects revenue that already exists today.
+**Guardrail — Pro fair-use cap. ✅ SHIPPED 2026-08-13, alongside Milestone
+C1.** A CFO-style pass on this plan (not asked for, but worth flagging)
+found that raw Perplexity API cost per scan was roughly $0.20-0.60 (20
+calls, 2 models) — meaning a €499 one-time report has 99%+ gross margin,
+and cost was not the real financial risk. The actual risk was the opposite
+direction: the **already-live** Pro subscription's "unlimited scans" had no
+usage cap, and Milestone C deliberately grew model count, which raises
+per-scan cost roughly linearly (now ~$0.30-0.80/scan — still 20 calls, but
+a pricier 4-model mix). A heavy Pro user at a fixed low monthly price could
+have produced negative gross margin the moment more models shipped. Fixed
+same-day: `PRO_PLAN_MONTHLY_SCAN_LIMIT = 20` (chosen low, per Marc's
+explicit instruction, rather than the 50 originally proposed here) added to
+`_shared/plan.mts`, reusing the exact counting-query pattern `scan.mts`
+already uses for the free-tier limit (`FREE_PLAN_SCAN_LIMIT`) — see
+`CLAUDE.md`'s "Update 2026-08-13" note.
 
 **E0 — Validate before building (do this first, before E1-E4).** A quick
 office-hours pass on this plan surfaced the one real gap: the €499/$299

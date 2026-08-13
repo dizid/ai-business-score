@@ -1,6 +1,148 @@
 # TODOs
 
-## STATUS 2026-08-09: Scan coverage + reliability + check-by-check UI — PR open, not yet merged
+## STATUS 2026-08-13: Model expansion + concurrency fix + Pro fair-use cap (Milestone C1/C2 of `PLAN_NEXT_PHASE.md`) — uncommitted, not yet pushed
+
+**Trigger:** Marc reviewed annotated screenshots showing a live production
+incident — TSMC/Google LLC/Hotel De Nara scans losing 16-18 of 20 calls to
+HTTP 429, one real brand (Google LLC) reading as a false "Invisible / 0"
+purely from rate-limiting — plus an explicit ask to check more AI models
+than just OpenAI/Gemini ("WE NEED MORE MODELS" per an earlier screenshot,
+tracked as Milestone C1 in `PLAN_NEXT_PHASE.md`).
+
+**What shipped, in order:**
+1. **429 incident fix, part 1** (same session, before the model work):
+   `CONCURRENCY_LIMIT` 10 → 4, `SCAN_DEADLINE_MS` 100000 → 120000, added a
+   rate-limit-aware escalating backoff in `callModelWithRetry`
+   (`shared/aivis-core.mjs`) and bumped retry attempts 2 → 3
+   (`run-scan-background.mts`).
+2. **Model candidates identified.** Live-queried Perplexity's `GET
+   /v1/models` (42 models across openai/google/anthropic/xai/perplexity) to
+   find real, current model IDs rather than guessing from a changelog like
+   the reverted 2026-08-09 attempt did. Marc picked `anthropic/claude-haiku-4-5`
+   + `xai/grok-4.6` (over Claude-only or a broader 5-model set).
+3. **Smoke-tested both, per the established one-at-a-time discipline** — a
+   throwaway Node script (deleted after use), calling `callModel` directly.
+   `xai/grok-4.6` worked immediately. `anthropic/claude-haiku-4-5` failed
+   with HTTP 400 "max_output_tokens is required when using Anthropic
+   models" — fixed by having `callModel` send that field, but only for
+   `anthropic/*` models.
+4. **Bigger finding from the same smoke-testing pass:** a deliberate
+   concurrency burst test (bursts of 2, 3, 4 concurrent calls, including
+   across different providers simultaneously) found Perplexity's real
+   per-key concurrency limit is **~1**, not the 4 that had just been shipped
+   in step 1 — every burst above size 1 failed 50-83% of the time with
+   HTTP 429; fully sequential (no overlap) succeeded 100%. This means the
+   step-1 fix, while a real improvement over concurrency=10, was **still
+   silently dropping a large fraction of calls** in production. Confirmed
+   with Marc before proceeding rather than guessing again (this is exactly
+   the mistake the original incident and the 2026-08-09 model revert both
+   already punished).
+5. **Retuned for real:** `CONCURRENCY_LIMIT = 1` (fully sequential),
+   `SCAN_DEADLINE_MS = 600000` (10 min, up from 120000). Sequential-only
+   means wall-clock time scales directly with call count, so growing
+   `MODELS` from 2 to 4 while keeping the full 10-prompt set would have
+   pushed a scan to ~13 minutes — instead, `run-scan-background.mts` now
+   uses a 5-prompt slice of `PROMPT_TEMPLATES` (20 calls total, same as
+   before the model expansion). `proof-script` keeps the full 10 prompts
+   (not latency-constrained by a live browser tab).
+6. **Pro fair-use cap added**, per Marc's explicit instruction ("usage cap
+   ON! at low limit"): `PRO_PLAN_MONTHLY_SCAN_LIMIT = 20` in
+   `_shared/plan.mts`, a new monthly-count branch in `scan.mts` for Pro
+   users (calendar-month, vs. the free tier's lifetime cap), 402 with a
+   plain error message and no `upgradeRequired` (Pro is already the top
+   tier). Confirmed no frontend changes needed — `CompanyDetailView.vue`'s
+   existing generic error display already handles it.
+7. **Doc/comment sweep**: `CLAUDE.md`, `README.md`, `PLAN_NEXT_PHASE.md`,
+   `WISH_LIST.md`, `brand/BRAND.md`, `src/app/views/HowItWorksView.vue`
+   updated to reflect 4 models / 20 calls (5-prompt slice, not 10) instead
+   of the old 2 models / 20 calls (10 prompts). `CompanyDetailView.vue`'s
+   "Running checks (~20-60s)…" status text updated to "~5-8 min".
+
+**Also shipped, same session:** Marc asked for a scan-complete notification
+(email and/or phone alert) so nobody has to sit and watch a 5-8 minute scan
+run live. Scoped to email-only. `_shared/email.mts`
+(`sendScanCompleteEmail`) sends via Resend's HTTP API, called from
+`run-scan-background.mts` after every scan finalizes (success or failure),
+best-effort (a failed send is logged, never blocks/fails the scan itself).
+Sends from `scans@notifications.dizid.com` — registered with Resend, DNS
+records (DKIM/MX/SPF) added to `dizid.com`'s Netlify-managed DNS zone,
+verified, and confirmed working with a real delivered test email to a
+non-owner address. `RESEND_API_KEY` reused from an existing personal Resend
+account (shared with other unrelated Dizid projects) rather than a new
+account created for AIVis.
+
+**Verification done:** `npm run type-check`, `npm run build`,
+`node proof-script/index.mjs --dry-run` all clean. Real-money smoke tests
+(model verification + concurrency burst tests) run live against Perplexity,
+total spend well under $1. **Not yet verified:** a real end-to-end scan
+through the actual hosted app (would cost real money per the new 4-model
+mix and take 5-8 min) — recommend doing this once, timed, before trusting
+`SCAN_DEADLINE_MS`'s margin in practice. Also not yet committed/pushed.
+
+## STATUS 2026-08-12: Bug-fix phase (Milestones A, B, D3/D4 of `PLAN_NEXT_PHASE.md`) — SHIPPED to master, pushed
+
+**Trigger:** Marc reviewed the live app on his phone (15 annotated
+screenshots) and found real brands scoring a false `0/100 — Invisible`
+(ASML, TSMC, NRC), plus reliability complaints ("Failed to fetch" on scan,
+scans feeling slow, failed checks not explained) and scope-cut requests
+(kill the leaderboard, kill multi-URL tracking). Full plan, root-cause
+table, and screenshot-to-fix traceability live in `PLAN_NEXT_PHASE.md` —
+not duplicated here.
+
+**What shipped, in order (7 commits, `1b0c7a9..8af2803`, pushed to
+`origin/master`):**
+1. Deleted the leaderboard entirely (route, `leaderboard.mts`,
+   `LeaderboardView.vue`) — it was fully committed/live (`1b0c7a9`), not
+   WIP; Marc decided it was unwanted scope.
+2. Three parallel agents (isolated git worktrees, merged back with one
+   manual conflict resolution in `router.ts`):
+   - **detection-core**: fixed `isAmbiguousBrandName()`'s false-positive
+     bug (see `CLAUDE.md`'s Detection section for the root cause), added a
+     per-competitor `ambiguous` flag, resurrected per-call `failures`
+     detail + `total_tokens` (new Neon migration, verified on a temp
+     branch), fixed duplicate "ALSO WORTH NOTING" advice headings.
+   - **company-flow**: removed multi-URL-per-company tracking and
+     `is_public`/leaderboard plumbing, added retry-with-backoff to
+     `pollScan()` and `enrich.mts`, added a shared CORS helper, fixed the
+     create-company flow to auto-navigate + auto-scan instead of leaving
+     an ambiguous bare `0` on the list.
+   - **product-surfaces**: added a footer (Privacy/Terms/How-it-works/
+     Dizid attribution) to the app shell, three real content pages (not
+     filler — Privacy/Terms carry an explicit "have this reviewed" notice;
+     How This Works accurately describes the actual scoring mechanism),
+     a favicon, theme-color, sitemap entries.
+3. Verified: `npm run build` clean after every merge, `proof-script
+   --dry-run` clean, hand-traced the ambiguity fix for ASML/TSMC/NRC/IBM/
+   SAP/VK, and a live browser pass (real signup, footer/legal pages, and
+   confirmed `/app/leaderboard` no longer resolves to any route).
+
+**What that verification pass could NOT confirm, and why:** creating a
+company and running a live scan requires a Netlify Function to reach Neon
+Postgres, and the sandboxed shell this session ran in can't complete that
+outbound connection (confirmed environment-level, not a code bug — `curl`
+reaches the same Neon host fine; Node's own fetch from the same container
+times out). **The actual "does a short-name brand score correctly now"
+scan has not been run live yet.** Do that first, on the real deployed site
+or Marc's own machine, before treating Milestone A as fully proven — the
+code fix is verified by direct trace + build, not by a live scan result.
+
+**Deliberately not attempted this round** (see `PLAN_NEXT_PHASE.md` for
+full reasoning): Milestone F's semantic/sentiment citation judge (needs a
+calibration pass, shouldn't be rushed), Milestone C's model expansion
+(needs one-at-a-time live smoke-testing per this file's own 2026-08-09
+entry's lesson), Milestone E/G (monetization — gated on Marc's manual
+€499 outbound sales test, Milestone E0, actually landing a payment first).
+
+**Immediate next steps:**
+1. Run one real scan against a short-name brand (ASML/TSMC/NRC) on the
+   deployed site to confirm Milestone A1's fix live, not just by trace.
+2. Milestone E0 (sales task, not engineering): hand-run scans for 3-5 real
+   prospects, send the report, ask for €499 via a plain Stripe Payment
+   Link. Do this in parallel with more engineering, not after.
+3. Pick up Milestone C (more models) one candidate at a time once A is
+   confirmed live.
+
+## STATUS 2026-08-09: Scan coverage + reliability + check-by-check UI — PR open, not yet merged (superseded: merged since, see 2026-08-12 entry above)
 
 **Where things stand:** all work is on branch `claude/url-brand-checks-analysis-e7hwc4`,
 already pushed, with **open PR https://github.com/dizid/ai-business-score/pull/2**

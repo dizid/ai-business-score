@@ -37,10 +37,11 @@
     <section>
       <h2>How a scan works</h2>
       <p>
-        When you run a scan, AIVis sends <strong>10 different prompts</strong>
+        When you run a scan, AIVis sends <strong>5 different prompts</strong>
         — phrased the way a real customer would actually ask, not just "tell
-        me about {your brand}" — to <strong>2 AI models</strong>
-        (OpenAI's GPT-5 mini and Google's Gemini 3 Flash), for
+        me about {your brand}" — to <strong>4 AI models</strong>
+        (OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude
+        Haiku 4.5, and xAI's Grok 4.6), for
         <strong>20 checks total</strong> per scan. Some prompts ask for a
         recommendation directly ("what's the best X for Y?"), some ask for a
         comparison against your named competitors, some ask "who are the
@@ -48,10 +49,10 @@
         genuinely deciding between options might ask.
       </p>
       <p>
-        Both models are queried through <strong>Perplexity's grounded search
-        API</strong>, which means each answer is backed by a live web search
-        rather than only the model's static training data — closer to what a
-        real user would see today than asking a model in isolation.
+        All four models are queried through <strong>Perplexity's grounded
+        search API</strong>, which means each answer is backed by a live web
+        search rather than only the model's static training data — closer to
+        what a real user would see today than asking a model in isolation.
       </p>
       <p>
         For each of the 20 responses, AIVis checks whether your brand name

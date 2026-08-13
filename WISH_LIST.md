@@ -8,18 +8,15 @@ actually being picked up.
 
 ## From the 2026-08-09 "check-by-check breakdown / prompt & model expansion" conversation
 
-**1. Persist failed-call detail (prompt + model + error), not just a count.**
-`aggregateProspect`/`run-scan-background.mts` currently only track
-`failedCalls` as a number — which specific prompt/model failed and why is
-logged to Netlify function output but never written to the `scans` row.
-This matters more now than it used to: diagnosing whether a model string is
-simply wrong (see #2 below) or whether the new `SCAN_DEADLINE_MS` is cutting
-off otherwise-fine calls both currently require reading Netlify logs by
-hand after every test scan. Would need: a `failed_call_details` jsonb
-column (migration), `aggregateProspect` returning failed entries with
-promptIndex/model/error instead of discarding them, and a small addition to
-the check-by-check breakdown UI (`ScanDetail.vue`) to show failed checks
-alongside completed ones instead of just the aggregate warning banner.
+**1. ~~Persist failed-call detail (prompt + model + error), not just a
+count.~~ DONE 2026-08-12.** Shipped as Milestone A3 of `PLAN_NEXT_PHASE.md`:
+a `failures jsonb` column on `scans`, `aggregateProspect` returns
+`{model, promptIndex, error}` per failed call, `ScanDetail.vue` renders the
+list in place of the old aggregate-only warning. Diagnosing a failed model
+string or a deadline cutoff no longer needs Netlify logs. This was
+originally a restoration, not new design — the same feature briefly
+existed (commit `522eb63`) and was accidentally deleted the next day
+(`74afa41`) before this wish-list entry was even written.
 
 **2. Re-add more Perplexity Agent API models — one at a time, live-verified.**
 `MODELS` was briefly expanded from 2 to 6, then reverted the same day after
@@ -61,13 +58,18 @@ scraping fragility (JS-rendered pages, blocks). Worth a deliberate go/no-go
 conversation, not a default next step. Do #3 first and see whether that's
 enough before considering this.
 
-**5. Validate `CONCURRENCY_LIMIT` (10) and `SCAN_DEADLINE_MS` (100s)
-against real usage.** Both were picked by reasoning about worst-case
-latency, not measured against a real scan at the new 20-call (10 prompts x
-2 models) volume. Once a few real scans have run, revisit: if scans still
-feel slow, or if the deadline is cutting off calls that would have
-succeeded given a few more seconds, tune the numbers — but do that from
-observed behavior (which item #1 would make visible), not another guess.
+**5. ~~Validate `CONCURRENCY_LIMIT` and `SCAN_DEADLINE_MS` against real
+usage.~~ RESOLVED 2026-08-13.** Both were originally picked by reasoning
+about worst-case latency, not measured — which turned out to matter: a live
+smoke test found Perplexity's real per-key concurrency limit is ~1, not the
+10 (then 4) this item's numbers assumed. `CONCURRENCY_LIMIT` is now `1`
+(fully sequential) and `SCAN_DEADLINE_MS` is `600000` (10 min) — see
+`CLAUDE.md`'s "Update 2026-08-13" note and `run-scan-background.mts` for
+the full writeup. Tracked as Milestone C in `PLAN_NEXT_PHASE.md`, now
+shipped. Trade-off this surfaced: scans now take 5-8 minutes wall-clock
+(sequential, no parallelism to hide call count behind) — a scan-complete
+notification is the follow-up needed to make that acceptable UX, not yet
+built.
 
 ## From testing PR #2's deploy preview (2026-08-09)
 

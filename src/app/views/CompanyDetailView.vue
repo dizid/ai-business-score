@@ -101,7 +101,7 @@ async function pollScan(scanId: string, retriesLeft = POLL_RETRY_BACKOFFS_MS.len
       scanError.value = data.errorMessage || 'Scan failed.';
       return;
     }
-    scanStatus.value = data.status === 'running' ? 'Running checks (~20-60s)…' : 'Queued…';
+    scanStatus.value = data.status === 'running' ? 'Running checks (~5-8 min)…' : 'Queued…';
     pollHandle = setTimeout(() => pollScan(scanId), 2000);
   } catch (err) {
     if (retriesLeft > 0) {
