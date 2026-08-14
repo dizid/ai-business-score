@@ -61,17 +61,23 @@ export default async (req: Request) => {
 
   const normalizedWebsite = normalizeUrl(website);
 
-  // Same 20s per-call ceiling as /scan's individual calls — this is a single
-  // web_search-grounded call, not six in parallel, so it typically finishes
-  // faster than a full scan even at the same timeout.
-  const CALL_TIMEOUT_MS = 20000;
+  // 45s per-call ceiling — was 20s, which is too tight against this app's
+  // own documented finding elsewhere (see CLAUDE.md / run-scan-background.mts)
+  // that real Perplexity web_search-grounded calls routinely take 15-20s and
+  // sometimes longer. At 20s, a call that would have succeeded at 25s instead
+  // hits every field with an empty default, reading as "enrichment is
+  // inaccurate" when it was actually just cut off. Enrichment's prompt also
+  // asks for six researched fields (vs. a scan prompt's single answer), so if
+  // anything it needs more headroom than a scan call, not less.
+  const CALL_TIMEOUT_MS = 45000;
 
   try {
-    // 2 attempts, same as run-scan-background.mts's calls — one transient
-    // timeout/rate-limit blip shouldn't immediately read as "Couldn't
-    // auto-fill." No shared scan-wide deadline to abort against here (this
-    // is a single standalone call, not a batch), so no AbortSignal is passed.
-    const result = await callModelWithRetry(apiKey, 'openai/gpt-5-mini', buildEnrichPrompt(normalizedWebsite), CALL_TIMEOUT_MS, 2);
+    // 3 attempts, matching run-scan-background.mts's retry budget — this is
+    // a single standalone call (not one of a 20-call batch sharing a fixed
+    // deadline), so the extra attempt only costs latency on this one form,
+    // not scan-wide reliability. No shared scan-wide deadline to abort
+    // against here, so no AbortSignal is passed.
+    const result = await callModelWithRetry(apiKey, 'openai/gpt-5-mini', buildEnrichPrompt(normalizedWebsite), CALL_TIMEOUT_MS, 3);
     const fields = parseEnrichmentResponse(result.text);
     return new Response(JSON.stringify({ ok: true, website: normalizedWebsite, ...fields }), {
       status: 200,
@@ -79,9 +85,13 @@ export default async (req: Request) => {
     });
   } catch (err) {
     // Enrichment failing is never fatal — the caller falls back to a blank,
-    // manually-filled form. Report why (200, not 500) so the UI can show the
-    // reason instead of just silently doing nothing.
-    return new Response(JSON.stringify({ ok: false, error: (err as Error).message }), {
+    // manually-filled form. Report why (200, not 500) so the UI can show a
+    // reason instead of just silently doing nothing — but log the raw
+    // error server-side and return a generic message to the client instead
+    // of exposing internal detail (timeout durations, model names, HTTP
+    // status bodies) in end-user-facing copy.
+    console.error(`Enrichment failed for ${normalizedWebsite}: ${(err as Error).message}`);
+    return new Response(JSON.stringify({ ok: false, error: "Couldn't research that site right now — try again, or fill in the details below." }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });

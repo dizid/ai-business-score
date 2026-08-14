@@ -560,7 +560,7 @@ export function buildEnrichPrompt(website) {
   "customer_segment": "who typically buys from them, e.g. 'homeowners' or 'small marketing teams'",
   "competitors": ["2-3 real, named competing companies or brands in the same category"]
 }
-Leave a field as an empty string (or empty array for competitors) if you can't confidently determine it from the site. Do not invent facts.`;
+Rules: only include a competitor if it's a real, currently-operating company distinct from ${website} itself — never list the company you're researching as its own competitor. Leave a field as an empty string (or empty array for competitors) if you can't confidently determine it from the site or can't verify it's real. Do not guess or invent facts to fill a field.`;
 }
 
 // Lenient JSON extraction: models sometimes wrap JSON in markdown fences or
@@ -574,15 +574,25 @@ export function parseEnrichmentResponse(text) {
   if (!match) return empty;
   try {
     const parsed = JSON.parse(match[0]);
+    const brand = typeof parsed.brand === 'string' ? parsed.brand.trim() : '';
+    // Defense-in-depth against the prompt's "never list the company you're
+    // researching as its own competitor" rule — models occasionally ignore
+    // instructions, so also filter it out here rather than trusting the
+    // prompt alone.
+    const competitors = Array.isArray(parsed.competitors)
+      ? parsed.competitors
+          .filter((c) => typeof c === 'string' && c.trim())
+          .map((c) => c.trim())
+          .filter((c) => !brand || c.toLowerCase() !== brand.toLowerCase())
+          .slice(0, 3)
+      : [];
     return {
-      brand: typeof parsed.brand === 'string' ? parsed.brand.trim() : '',
+      brand,
       category: typeof parsed.category === 'string' ? parsed.category.trim() : '',
       use_case: typeof parsed.use_case === 'string' ? parsed.use_case.trim() : '',
       region: typeof parsed.region === 'string' ? parsed.region.trim() : '',
       customer_segment: typeof parsed.customer_segment === 'string' ? parsed.customer_segment.trim() : '',
-      competitors: Array.isArray(parsed.competitors)
-        ? parsed.competitors.filter((c) => typeof c === 'string' && c.trim()).map((c) => c.trim()).slice(0, 3)
-        : [],
+      competitors,
     };
   } catch {
     return empty;
