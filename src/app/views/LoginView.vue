@@ -55,7 +55,7 @@ input {
 input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 button {
   margin-top: 28px; width: 100%; padding: 12px 16px; font-size: 1rem; font-weight: 600;
-  border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+  border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;
 }
 button:disabled { opacity: 0.6; cursor: wait; }
 .status.error { margin-top: 16px; font-size: 0.9rem; color: var(--critical); }

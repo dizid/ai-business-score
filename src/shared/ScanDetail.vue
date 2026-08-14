@@ -410,7 +410,7 @@ h1 { font-size: 1.5rem; margin: 0 0 2px; }
 .deep-advice-meta { margin-top: 14px; font-size: 0.78rem; color: var(--faint); }
 .deep-advice-button {
   padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
-  border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+  border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;
 }
 .deep-advice-button:disabled { opacity: 0.6; cursor: wait; }
 

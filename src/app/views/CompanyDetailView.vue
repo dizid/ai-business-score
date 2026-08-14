@@ -417,7 +417,7 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .scan-trigger { flex: none; text-align: right; }
 .scan-trigger button {
   padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
-  border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+  border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;
 }
 .scan-trigger button:disabled { opacity: 0.6; cursor: wait; }
 .scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 220px; }
@@ -443,7 +443,7 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
   border: 1px solid var(--accent); border-radius: 8px;
   background: transparent; color: var(--accent); cursor: pointer;
 }
-.public-toggle.on { background: var(--accent); color: #fff; }
+.public-toggle.on { background: var(--accent); color: var(--accent-ink); }
 .public-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 .public-share-hint { color: var(--muted); font-size: 0.82rem; margin: 10px 0 0; }
 .public-share-consent {

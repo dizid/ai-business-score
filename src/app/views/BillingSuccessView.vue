@@ -67,6 +67,6 @@ h1 { font-size: 1.3rem; margin: 0 0 8px; }
 .sub { color: var(--muted); margin: 0 0 20px; }
 .cta {
   display: inline-block; padding: 10px 20px; font-size: 0.9rem; font-weight: 600;
-  border-radius: 8px; background: var(--accent); color: #fff; text-decoration: none;
+  border-radius: 8px; background: var(--accent); color: var(--accent-ink); text-decoration: none;
 }
 </style>

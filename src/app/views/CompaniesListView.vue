@@ -290,7 +290,7 @@ p.sub { color: var(--muted); margin: 0; }
 .head-actions { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .head-row button {
   flex: none; padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
-  border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+  border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;
 }
 .head-row button:disabled { opacity: 0.6; cursor: wait; }
 .plan-badge {
@@ -320,7 +320,7 @@ p.sub { color: var(--muted); margin: 0; }
 .card input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .card button[type="submit"] {
   margin-top: 24px; width: 100%; padding: 12px 16px; font-size: 1rem; font-weight: 600;
-  border: none; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+  border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;
 }
 .card button:disabled { opacity: 0.6; cursor: wait; }
 
