@@ -31,9 +31,9 @@ async function handleSignOut() {
 
     <footer class="app-footer">
       <nav class="footer-links">
-        <router-link to="/app/privacy">Privacy Policy</router-link>
-        <router-link to="/app/terms">Terms of Service</router-link>
-        <router-link to="/app/how-it-works">How this works</router-link>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="/how-it-works">How this works</a>
         <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
       </nav>
       <p class="footer-support">
@@ -41,7 +41,7 @@ async function handleSignOut() {
       </p>
       <p class="footer-note">
         Your data is stored securely and never sold — see our
-        <router-link to="/app/privacy">Privacy Policy</router-link> for details.
+        <a href="/privacy">Privacy Policy</a> for details.
       </p>
     </footer>
   </div>

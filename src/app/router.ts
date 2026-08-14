@@ -1,40 +1,31 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { isAuthenticated, restoreSession } from './lib/auth';
 
+// privacy/terms/how-it-works used to live here as SPA routes nested under
+// this shell. Converted to static HTML pages (privacy.html, terms.html,
+// how-it-works.html at the repo root, served at clean top-level URLs via
+// netlify.toml redirects) since app.html carries a blanket noindex and
+// requires JS to render — AI crawlers (GPTBot, ClaudeBot, PerplexityBot)
+// never saw that content regardless of the per-page robots intent. Removed
+// here rather than kept as duplicate routes: one canonical URL per page
+// avoids a duplicate-content SEO penalty. App.vue's footer now links to the
+// static pages with plain <a> tags instead of router-link.
 const routes = [
-  { path: '/app', name: 'companies', component: () => import('./views/CompaniesListView.vue'), meta: { requiresAuth: true } },
-  { path: '/app/login', name: 'login', component: () => import('./views/LoginView.vue') },
-  { path: '/app/signup', name: 'signup', component: () => import('./views/SignupView.vue') },
+  { path: '/app', name: 'companies', component: () => import('./views/CompaniesListView.vue'), meta: { requiresAuth: true, title: 'Your companies — AIVis' } },
+  { path: '/app/login', name: 'login', component: () => import('./views/LoginView.vue'), meta: { title: 'Log in — AIVis' } },
+  { path: '/app/signup', name: 'signup', component: () => import('./views/SignupView.vue'), meta: { title: 'Sign up — AIVis' } },
   {
     path: '/app/companies/:id',
     name: 'company',
     component: () => import('./views/CompanyDetailView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, title: 'AIVis' }, // real title set dynamically elsewhere (other workstream)
     props: true,
   },
   {
     path: '/app/billing/success',
     name: 'billing-success',
     component: () => import('./views/BillingSuccessView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
-    path: '/app/privacy',
-    name: 'privacy',
-    component: () => import('./views/PrivacyView.vue'),
-    // No requiresAuth — a privacy policy has to be readable before signup.
-  },
-  {
-    path: '/app/terms',
-    name: 'terms',
-    component: () => import('./views/TermsView.vue'),
-    // No requiresAuth — same reasoning as /app/privacy.
-  },
-  {
-    path: '/app/how-it-works',
-    name: 'how-it-works',
-    component: () => import('./views/HowItWorksView.vue'),
-    // No requiresAuth — genuine product content, shareable pre-signup.
+    meta: { requiresAuth: true, title: 'Billing — AIVis' },
   },
 ];
 
@@ -53,6 +44,10 @@ router.beforeEach(async (to) => {
     return { name: 'companies' };
   }
   return true;
+});
+
+router.afterEach((to) => {
+  document.title = (to.meta.title as string) || 'AIVis';
 });
 
 export default router;

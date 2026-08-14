@@ -21,3 +21,4 @@ User-agent: CCBot
 Allow: /
 
 Sitemap: https://aivis-scan.netlify.app/sitemap.xml
+Sitemap: https://aivis-scan.netlify.app/sitemap-reports.xml

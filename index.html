@@ -9,31 +9,43 @@
 
 <!-- Favicon: inline mark reusing the same circle+pointer glyph as the app
      shell's wordmark (src/app/App.vue), so the browser tab matches the
-     in-app logo. SVG-only — no apple-touch-icon since a proper PNG export
-     needs a design pass this session can't produce; an SVG favicon alone is
-     still a real improvement over having none at all. -->
+     in-app logo. SVG is the primary modern-browser icon; the PNG sizes and
+     apple-touch-icon below are rasterized fallbacks generated via the
+     `browse` skill (headless-browser screenshot of the SVG at each target
+     pixel size) — added once that conversion path became available. -->
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
 
 <!-- Matches --bg's dark-mode value in src/shared/theme.css, so the browser
      chrome (mobile address bar, etc.) matches the app's dark theme. -->
-<meta name="theme-color" content="#0d0d0d" />
+<meta name="theme-color" content="#0c0b09" />
 
-<!-- Open Graph / Twitter Card. No og:image yet — a polished raster share
-     image needs a design pass this session can't do (no image-generation
-     tool available); omitted rather than shipped low-quality. Falls back
-     to no preview image when the link is shared, not a broken one. -->
+<!-- Open Graph / Twitter Card. og:image/twitter:image point at a shared
+     1200x630 card (public/og-image.png) — dark background matching --bg,
+     the circle+pointer glyph, and the tagline — generated the same way as
+     the favicon PNGs above (an HTML card rendered and screenshotted via
+     the `browse` skill). -->
 <meta property="og:type" content="website" />
 <meta property="og:title" content="AIVis — See if AI search recommends your business" />
 <meta property="og:description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. AIVis checks whether your business gets mentioned — or a competitor does instead." />
 <meta property="og:url" content="https://aivis-scan.netlify.app/" />
+<meta property="og:image" content="https://aivis-scan.netlify.app/og-image.png" />
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="AIVis — See if AI search recommends your business" />
 <meta name="twitter:description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. AIVis checks whether your business gets mentioned — or a competitor does instead." />
+<meta property="twitter:image" content="https://aivis-scan.netlify.app/og-image.png" />
 
 <!-- Structured data: only the Free tier gets a machine-readable price —
      the Pro price isn't finalized yet (see the pricing section below), and
      shipping a JSON-LD price that doesn't match the real Stripe price
-     later would be worse than omitting it for now. -->
+     later would be worse than omitting it for now. FAQ answers here are
+     kept string-identical to the visible <details> content below (Google's
+     FAQPage guidelines require the two to match) — including the model
+     lineup, which was stale (said 2 models) until this pass corrected it
+     to the real 4-model / 5-prompt / 20-check scan, matching how-it-works.html. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -77,7 +89,7 @@
           "name": "What is AI search visibility?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "It's whether ChatGPT, Gemini, and other AI-powered search tools mention your business when someone asks a question in your category — the same way SEO tracks whether Google ranks you, but for AI-generated answers instead of a list of links."
+            "text": "It's whether ChatGPT, Gemini, and other AI tools mention your business when someone asks a question in your category — the same idea as SEO, but for a single generated answer instead of a page of links you could scan for your name."
           }
         },
         {
@@ -93,7 +105,7 @@
           "name": "Which AI models does it check?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "OpenAI's GPT-5 mini and Google's Gemini 3 Flash, both queried through Perplexity's grounded search API so responses reflect real web results rather than each model's static training data."
+            "text": "OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6 — all four queried through Perplexity's grounded search API so responses reflect real web results, not just each model's static training data."
           }
         },
         {
@@ -113,166 +125,340 @@
 <style>
   :root {
     color-scheme: light;
-    --bg: #f9f9f7;
-    --card: #fcfcfb;
-    --fg: #0b0b0b;
-    --muted: #52514e;
-    --faint: #898781;
-    --border: rgba(11, 11, 11, 0.10);
-    --accent: #2a78d6;
-    --good: #0ca30c;
+    --bg: #f7f6f2;
+    --card: #ffffff;
+    --ink: #16140f;
+    --muted: #55524a;
+    --faint: #8f8b7f;
+    --line: rgba(22, 20, 15, 0.12);
+    --accent: #2f5fff;
+    --accent-ink: #ffffff;
+    --cited: #1c7a3e;
+    --cited-soft: rgba(28, 122, 62, 0.12);
+    --ghost: #b9b4a6;
+    --serp-blue: #1a0dab;
+    --serp-green: #096621;
+    --shadow: 0 1px 2px rgba(22, 20, 15, 0.04), 0 12px 28px -14px rgba(22, 20, 15, 0.18);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       color-scheme: dark;
-      --bg: #0d0d0d;
-      --card: #1a1a19;
-      --fg: #ffffff;
-      --muted: #c3c2b7;
-      --faint: #898781;
-      --border: rgba(255, 255, 255, 0.10);
-      --accent: #3987e5;
-      --good: #0ca30c;
+      --bg: #0c0b09;
+      --card: #18170f;
+      --ink: #f5f3ee;
+      --muted: #c7c2b5;
+      --faint: #938e80;
+      --line: rgba(245, 243, 238, 0.12);
+      --accent: #7c96ff;
+      --accent-ink: #0c0b09;
+      --cited: #3fdc84;
+      --cited-soft: rgba(63, 220, 132, 0.14);
+      --ghost: #55514a;
+      --serp-blue: #8ab4f8;
+      --serp-green: #81c995;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 20px 40px -20px rgba(0, 0, 0, 0.6);
     }
   }
+
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
     background: var(--bg);
-    color: var(--fg);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    line-height: 1.5;
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, .quote, .logo, .plan-card h3 {
+    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    letter-spacing: -0.01em;
+  }
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   }
   a { color: var(--accent); }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  ::selection { background: var(--cited-soft); }
 
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 22px; }
+
+  /* ---------- Nav ---------- */
   nav.top {
+    position: sticky; top: 0; z-index: 20;
     display: flex; justify-content: space-between; align-items: center;
-    padding: 20px 0;
+    padding: 18px 22px;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid transparent;
   }
-  nav.top .logo { font-weight: 800; font-size: 1.1rem; text-decoration: none; color: var(--fg); }
-  nav.top .links { display: flex; gap: 20px; align-items: center; font-size: 0.9rem; }
-  nav.top .links a { text-decoration: none; color: var(--muted); }
+  nav.top.scrolled-look { border-bottom-color: var(--line); }
+  nav.top .logo { font-weight: 700; font-size: 1.2rem; text-decoration: none; color: var(--ink); }
+  nav.top .links { display: flex; gap: 22px; align-items: center; font-size: 0.92rem; }
+  nav.top .links a:not(.cta) { text-decoration: none; color: var(--muted); font-weight: 600; }
   nav.top .links a.cta {
-    color: #fff; background: var(--accent); padding: 8px 16px; border-radius: 8px; font-weight: 600;
+    color: var(--accent-ink); background: var(--accent); padding: 9px 18px; border-radius: 8px; font-weight: 700;
+    text-decoration: none; box-shadow: var(--shadow);
   }
 
-  .hero { display: flex; align-items: center; gap: 48px; padding: 40px 0 70px; flex-wrap: wrap; }
-  .hero-copy { flex: 1 1 380px; min-width: 280px; }
-  .hero-art { flex: 1 1 320px; min-width: 260px; max-width: 420px; }
-  .hero h1 { font-size: 2.2rem; line-height: 1.15; margin: 0 0 18px; }
-  .hero p.lead { color: var(--muted); font-size: 1.1rem; margin: 0 0 28px; max-width: 46ch; }
+  /* ---------- Buttons ---------- */
   .btn-primary {
-    display: inline-block; padding: 14px 24px; font-size: 1rem; font-weight: 700;
-    background: var(--accent); color: #fff; border-radius: 10px; text-decoration: none;
+    display: inline-block; padding: 15px 26px; font-size: 1rem; font-weight: 700;
+    background: var(--accent); color: var(--accent-ink); border-radius: 9px; text-decoration: none;
+    box-shadow: var(--shadow); transition: transform 0.15s ease;
   }
+  .btn-primary:hover { transform: translateY(-1px); }
   .hero-note { margin-top: 14px; font-size: 0.85rem; color: var(--faint); }
 
-  section { padding: 50px 0; border-top: 1px solid var(--border); }
-  section h2 { font-size: 1.5rem; margin: 0 0 8px; text-align: center; }
-  section p.section-sub { color: var(--muted); text-align: center; margin: 0 0 36px; }
+  /* ---------- Hero ---------- */
+  .hero { padding: 56px 0 40px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 20px;
+  }
+  .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--accent); }
+  .hero h1 {
+    font-size: clamp(2.1rem, 1.5rem + 2.6vw, 3.5rem);
+    line-height: 1.12; font-weight: 500; margin: 0 0 22px; max-width: 18ch;
+  }
+  .hero p.lead { color: var(--muted); font-size: clamp(1.05rem, 1rem + 0.3vw, 1.2rem); margin: 0 0 30px; max-width: 52ch; }
 
-  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
-  .step { text-align: center; padding: 0 12px; }
-  .step .icon { width: 52px; height: 52px; margin: 0 auto 16px; color: var(--accent); }
-  .step h3 { font-size: 1.05rem; margin: 0 0 8px; }
-  .step p { color: var(--muted); font-size: 0.92rem; margin: 0; }
+  /* ---------- Dissolve signature visual ---------- */
+  .dissolve { margin: 56px 0 8px; display: grid; gap: 10px; }
+  .dissolve-label {
+    display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--faint); margin-bottom: 10px;
+  }
+  .dissolve-panel.old {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  .serp-row { padding: 10px 0; border-bottom: 1px dashed var(--line); opacity: 0.35; filter: grayscale(0.5); }
+  .serp-row:last-child { border-bottom: none; }
+  .serp-title { color: var(--serp-blue); font-size: 0.98rem; font-weight: 600; text-decoration: line-through; text-decoration-color: var(--ghost); }
+  .serp-url { color: var(--serp-green); font-size: 0.78rem; margin: 2px 0; }
+  .serp-snippet { color: var(--faint); font-size: 0.85rem; }
+  .dissolve-arrow {
+    text-align: center; color: var(--faint); font-size: 1.3rem; line-height: 1; margin: 2px 0;
+  }
+  .dissolve-panel.new {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 22px 24px; box-shadow: var(--shadow); position: relative;
+  }
+  .answer-tag {
+    display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
+    color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-bottom: 14px;
+  }
+  .answer-text { margin: 0; font-size: 1.04rem; color: var(--ink); max-width: 62ch; }
+  mark.cited-name {
+    background: var(--cited-soft); color: var(--cited); font-weight: 700;
+    padding: 1px 5px; border-radius: 4px; font-style: normal;
+  }
+  .cursor {
+    display: inline-block; width: 2px; height: 1em; background: var(--accent);
+    margin-left: 2px; vertical-align: text-bottom;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .serp-row {
+      animation: ghost-out 0.6s ease forwards;
+      animation-delay: calc(var(--d) * 0.1s);
+      opacity: 1; filter: none;
+    }
+    @keyframes ghost-out {
+      from { opacity: 1; filter: grayscale(0); }
+      to { opacity: 0.35; filter: grayscale(0.5); }
+    }
+    .dissolve-panel.new { opacity: 0; animation: rise-in 0.7s ease forwards; animation-delay: 0.55s; }
+    @keyframes rise-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    mark.cited-name { animation: pulse 1.4s ease 1.4s; }
+    @keyframes pulse {
+      0%, 100% { background: var(--cited-soft); }
+      35% { background: color-mix(in srgb, var(--cited) 45%, transparent); }
+    }
+    .cursor { animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+  }
 
+  /* ---------- Sections ---------- */
+  section { padding: 64px 0; border-top: 1px solid var(--line); }
+  section h2 { font-size: clamp(1.4rem, 1.2rem + 0.8vw, 1.9rem); font-weight: 500; margin: 0 0 8px; text-align: center; }
+  section p.section-sub { color: var(--muted); text-align: center; margin: 0 auto 40px; max-width: 44ch; }
+
+  /* ---------- Pull quote ---------- */
+  .quote-band { border-top: 1px solid var(--line); padding: 60px 0; }
+  .quote {
+    max-width: 30ch; margin: 0 auto; text-align: center; font-weight: 500;
+    font-size: clamp(1.3rem, 1.1rem + 1vw, 1.9rem); line-height: 1.35; color: var(--ink);
+  }
+  .quote .accent-run { color: var(--accent); }
+
+  /* ---------- How it works ---------- */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 28px; counter-reset: step; }
+  .step { padding: 0 8px; position: relative; }
+  .step .num {
+    font-family: ui-monospace, monospace; font-size: 0.8rem; font-weight: 700; color: var(--accent);
+    display: block; margin-bottom: 10px;
+  }
+  .step h3 { font-size: 1.05rem; margin: 0 0 8px; font-weight: 700; }
+  .step p { color: var(--muted); font-size: 0.94rem; margin: 0; }
+
+  /* ---------- Cited / invisible demo ---------- */
+  .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; max-width: 900px; margin: 0 auto; }
+  .demo-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 24px; box-shadow: var(--shadow); }
+  .demo-card p { font-size: 0.98rem; color: var(--ink); margin: 0 0 18px; }
+  .demo-verdict { display: flex; align-items: center; gap: 9px; font-size: 0.88rem; font-weight: 700; }
+  .demo-verdict svg { flex: none; width: 18px; height: 18px; }
+  .verdict-good { color: var(--cited); }
+  .verdict-bad { color: var(--faint); }
+  .demo-card.ghosted p { color: var(--muted); }
+
+  /* ---------- Pricing ---------- */
   .pricing { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 760px; margin: 0 auto; }
-  .plan-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
-  .plan-card.pro { border-color: var(--accent); }
-  .plan-card h3 { margin: 0 0 4px; font-size: 1.2rem; }
-  .plan-card .price { font-size: 1.8rem; font-weight: 800; margin: 8px 0 18px; }
+  .plan-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 30px; box-shadow: var(--shadow); }
+  .plan-card.pro { border-color: var(--accent); border-width: 1.5px; }
+  .plan-card h3 { margin: 0 0 4px; font-size: 1.25rem; font-weight: 600; }
+  .plan-card .price { font-family: -apple-system, sans-serif; font-size: 1.8rem; font-weight: 800; margin: 10px 0 20px; }
   .plan-card .price span { font-size: 0.95rem; font-weight: 500; color: var(--muted); }
-  .plan-card ul { list-style: none; margin: 0 0 22px; padding: 0; color: var(--muted); font-size: 0.92rem; }
+  .plan-card ul { list-style: none; margin: 0 0 24px; padding: 0; color: var(--muted); font-size: 0.92rem; }
   .plan-card li { padding: 5px 0; }
-  .plan-card li::before { content: "✓ "; color: var(--good); font-weight: 700; }
+  .plan-card li::before { content: "✓ "; color: var(--cited); font-weight: 700; }
   .plan-card .btn-secondary {
-    display: block; text-align: center; padding: 11px 16px; border-radius: 8px;
-    border: 1px solid var(--border); color: var(--fg); text-decoration: none; font-weight: 600; font-size: 0.92rem;
+    display: block; text-align: center; padding: 12px 16px; border-radius: 8px;
+    border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 0.92rem;
   }
   .plan-card.pro .btn-secondary { border-color: var(--accent); color: var(--accent); }
 
+  /* ---------- FAQ ---------- */
   .faq { max-width: 700px; margin: 0 auto; }
-  .faq details { border-bottom: 1px solid var(--border); padding: 16px 0; }
-  .faq summary { font-weight: 600; cursor: pointer; }
-  .faq p { color: var(--muted); margin: 10px 0 0; }
+  .faq details { border-bottom: 1px solid var(--line); padding: 18px 0; }
+  .faq summary { font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; color: var(--faint); font-weight: 400; }
+  .faq details[open] summary::after { content: "–"; }
+  .faq p { color: var(--muted); margin: 12px 0 0; }
+
+  /* ---------- Final CTA band ---------- */
+  .cta-band {
+    text-align: center; padding: 72px 0; border-top: 1px solid var(--line);
+    background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 6%, transparent));
+  }
+  .cta-band h2 { margin: 0 0 26px; max-width: 20ch; margin-inline: auto; }
 
   footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-size: 0.85rem; }
+
+  @media (max-width: 640px) {
+    .hero { padding: 32px 0 12px; }
+    section { padding: 48px 0; }
+    .dissolve-panel.old, .dissolve-panel.new, .demo-card, .plan-card { padding: 18px; }
+  }
 </style>
 </head>
 <body>
 
+<nav class="top">
+  <a class="logo" href="/">AIVis</a>
+  <div class="links">
+    <a href="/app/login">Log in</a>
+    <a class="cta" href="/app/signup">Sign up free</a>
+  </div>
+</nav>
+
 <div class="wrap">
-  <nav class="top">
-    <span class="logo">AIVis</span>
-    <div class="links">
-      <a href="/app/login">Log in</a>
-      <a class="cta" href="/app/signup">Sign up free</a>
-    </div>
-  </nav>
 
   <section class="hero" style="border-top:none;">
-    <div class="hero-copy">
-      <h1>See if ChatGPT and Gemini recommend your business — or send customers to a competitor instead.</h1>
-      <p class="lead">
-        People ask AI search "who does X near me" instead of typing it into Google.
-        AIVis checks what those AI answers actually say about you, scores it, and
-        tracks it over time.
-      </p>
-      <a class="btn-primary" href="/app/signup">Check your AI visibility — free</a>
-      <div class="hero-note">No credit card required. Takes about a minute.</div>
-    </div>
-    <div class="hero-art" aria-hidden="true">
-      <!-- Hand-drawn illustration: a chat-style answer card next to a score
-           ring, the same ring-drawing approach ScanDetail.vue uses for a
-           real scan result, so the pitch visually matches the product. -->
-      <svg viewBox="0 0 380 300" width="100%" height="100%">
-        <rect x="10" y="20" width="230" height="140" rx="16" fill="var(--card)" stroke="var(--border)" />
-        <circle cx="42" cy="52" r="10" fill="var(--accent)" opacity="0.25" />
-        <rect x="60" y="46" width="150" height="12" rx="6" fill="var(--border)" />
-        <rect x="30" y="80" width="190" height="10" rx="5" fill="var(--border)" />
-        <rect x="30" y="98" width="160" height="10" rx="5" fill="var(--border)" />
-        <rect x="30" y="116" width="130" height="10" rx="5" fill="var(--good)" opacity="0.5" />
-        <rect x="30" y="134" width="90" height="10" rx="5" fill="var(--border)" />
+    <div class="eyebrow">There's no page 1 anymore</div>
+    <h1>AI search doesn't give you a results page. It gives you one paragraph — and your name is either in it, or it isn't.</h1>
+    <p class="lead">
+      ChatGPT and Gemini already answer "who does X near me" for your customers,
+      with no blue links to click. AIVis checks what those answers actually say
+      about you, scores it, and tracks whether that's getting better or worse.
+    </p>
+    <a class="btn-primary" href="/app/signup">Check your AI visibility — free</a>
+    <div class="hero-note">No credit card required. Takes about a minute.</div>
 
-        <g transform="translate(250,120)">
-          <circle r="62" fill="none" stroke="var(--border)" stroke-width="12" />
-          <circle r="62" fill="none" stroke="var(--good)" stroke-width="12"
-                  stroke-dasharray="389.6" stroke-dashoffset="90"
-                  stroke-linecap="round" transform="rotate(-90)" />
-          <text text-anchor="middle" dy="10" font-size="34" font-weight="800" fill="var(--fg)">78</text>
-        </g>
-      </svg>
+    <div class="dissolve" aria-hidden="true">
+      <div class="dissolve-panel old">
+        <span class="dissolve-label mono">How search used to work</span>
+        <div class="serp-row" style="--d:0">
+          <div class="serp-title">Acme Plumbing Rotterdam — Trusted Local Plumber</div>
+          <div class="serp-url mono">acmeplumbing.nl</div>
+          <div class="serp-snippet">24/7 emergency callouts, transparent pricing, 4.8★ average…</div>
+        </div>
+        <div class="serp-row" style="--d:1">
+          <div class="serp-title">Best Plumbers in Rotterdam — Top 10 List</div>
+          <div class="serp-url mono">top10rotterdam.nl › plumbers</div>
+          <div class="serp-snippet">We compared response time, pricing, and reviews across…</div>
+        </div>
+        <div class="serp-row" style="--d:2">
+          <div class="serp-title">Rotterdam Plumbing Directory — Reviews &amp; Pricing</div>
+          <div class="serp-url mono">tradesdirectory.nl</div>
+          <div class="serp-snippet">Browse 40+ local plumbers with verified customer reviews…</div>
+        </div>
+      </div>
+      <div class="dissolve-arrow">↓</div>
+      <div class="dissolve-panel new">
+        <span class="answer-tag mono">Example — "who's a good plumber in Rotterdam?"</span>
+        <p class="answer-text">
+          For plumbing repairs in Rotterdam, <mark class="cited-name">Acme Plumbing</mark>
+          comes up often — known for fast callouts and clear pricing, alongside a
+          couple of larger regional chains.<span class="cursor"></span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="quote-band">
+    <p class="quote">
+      Google gave every business a shot at page 1.
+      An AI answer gives you <span class="accent-run">one sentence — or none.</span>
+    </p>
+  </div>
+
+  <section>
+    <h2>How a scan works</h2>
+    <p class="section-sub">Five prompts, four AI models, twenty checks, one score.</p>
+    <div class="steps">
+      <div class="step">
+        <span class="num">01</span>
+        <h3>Tell us your business</h3>
+        <p>Brand, category, and who you actually compete with.</p>
+      </div>
+      <div class="step">
+        <span class="num">02</span>
+        <h3>We ask AI search</h3>
+        <p>The same questions real customers ask — across GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6, each grounded in live web results via Perplexity.</p>
+      </div>
+      <div class="step">
+        <span class="num">03</span>
+        <h3>See your score</h3>
+        <p>A 0-100 visibility score, who's beating you, and what to fix — tracked over every future scan.</p>
+      </div>
     </div>
   </section>
 
   <section>
-    <h2>How it works</h2>
-    <p class="section-sub">Three prompts, two AI models, one score.</p>
-    <div class="steps">
-      <div class="step">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9s1.3-6.4 3.8-9z" />
-        </svg>
-        <h3>1. Enter your website</h3>
-        <p>Tell us your business, category, and who you compete with.</p>
+    <h2>Cited, or invisible — there's no in between</h2>
+    <p class="section-sub">Two real answer shapes from the same kind of question. AIVis tells you which one you're getting.</p>
+    <div class="demo-grid">
+      <div class="demo-card">
+        <span class="answer-tag mono">Example answer</span>
+        <p>"For plumbing repairs in Rotterdam, <mark class="cited-name">Acme Plumbing</mark> comes up often for fast callouts and clear pricing."</p>
+        <div class="demo-verdict verdict-good">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          Cited — this is a Leading score
+        </div>
       </div>
-      <div class="step">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 5h16v11H8l-4 4V5z" />
-        </svg>
-        <h3>2. We ask AI search</h3>
-        <p>The same "who does X near me" questions real customers ask ChatGPT and Gemini.</p>
-      </div>
-      <div class="step">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 7v5l3.5 2" />
-        </svg>
-        <h3>3. See your score</h3>
-        <p>A 0-100 visibility score, who's beating you, and what to fix — tracked over time.</p>
+      <div class="demo-card ghosted">
+        <span class="answer-tag mono">Example answer</span>
+        <p>"For plumbing repairs in Rotterdam, the top options are generally the larger regional chains with 24/7 dispatch."</p>
+        <div class="demo-verdict verdict-bad">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m5 5 14 14"/></svg>
+          Not mentioned — this is what a 0 looks like
+        </div>
       </div>
     </div>
   </section>
@@ -292,9 +478,9 @@
         <a class="btn-secondary" href="/app/signup">Get started</a>
       </div>
       <!-- Pro price intentionally left unset in copy and in the JSON-LD
-           above — not finalized yet (see plan's Part 2 note). The actual
-           charge is whatever Price is configured in Stripe; update this
-           card's wording once that number is confirmed. -->
+           above — not finalized yet. The actual charge is whatever Price is
+           configured in Stripe; update this card's wording once that
+           number is confirmed. -->
       <div class="plan-card pro">
         <h3>Pro</h3>
         <div class="price">One flat price<span> /month</span></div>
@@ -313,7 +499,7 @@
     <div class="faq">
       <details open>
         <summary>What is AI search visibility?</summary>
-        <p>It's whether ChatGPT, Gemini, and other AI-powered search tools mention your business when someone asks a question in your category — the same way SEO tracks whether Google ranks you, but for AI-generated answers instead of a list of links.</p>
+        <p>It's whether ChatGPT, Gemini, and other AI tools mention your business when someone asks a question in your category — the same idea as SEO, but for a single generated answer instead of a page of links you could scan for your name.</p>
       </details>
       <details>
         <summary>How is the score calculated?</summary>
@@ -321,7 +507,7 @@
       </details>
       <details>
         <summary>Which AI models does it check?</summary>
-        <p>OpenAI's GPT-5 mini and Google's Gemini 3 Flash, both queried through Perplexity's grounded search API so responses reflect real web results rather than each model's static training data.</p>
+        <p>OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6 — all four queried through Perplexity's grounded search API so responses reflect real web results, not just each model's static training data.</p>
       </details>
       <details>
         <summary>What does it cost?</summary>
@@ -330,10 +516,21 @@
     </div>
   </section>
 
+</div>
+
+<div class="cta-band">
+  <div class="wrap">
+    <h2>Find out what AI search is already saying about you.</h2>
+    <a class="btn-primary" href="/app/signup">Check your AI visibility — free</a>
+    <div class="hero-note">No credit card required. Takes about a minute.</div>
+  </div>
+</div>
+
+<div class="wrap">
   <footer>
     &copy; 2026 AIVis. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
-    · <a href="/app/privacy">Privacy</a> · <a href="/app/terms">Terms</a>
-    · <a href="/app/how-it-works">How this works</a>
+    · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+    · <a href="/how-it-works">How this works</a>
     · <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
   </footer>
 </div>

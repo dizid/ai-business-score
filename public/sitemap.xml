@@ -3,20 +3,7 @@
   <url>
     <loc>https://aivis-scan.netlify.app/</loc>
   </url>
-  <!-- These three live inside the app.html SPA, which currently carries a
-       blanket <meta name="robots" content="noindex, nofollow"> (see
-       app.html) applying to every /app/* route, including these. Listed
-       here per Milestone D4 since they're real content now, not stubs, but
-       note the noindex tag means they won't actually get indexed until/
-       unless that per-page robots handling is revisited — flagging rather
-       than silently shipping a sitemap entry that doesn't do anything. -->
-  <url>
-    <loc>https://aivis-scan.netlify.app/app/how-it-works</loc>
-  </url>
-  <url>
-    <loc>https://aivis-scan.netlify.app/app/privacy</loc>
-  </url>
-  <url>
-    <loc>https://aivis-scan.netlify.app/app/terms</loc>
-  </url>
+  <url><loc>https://aivis-scan.netlify.app/how-it-works</loc></url>
+  <url><loc>https://aivis-scan.netlify.app/privacy</loc></url>
+  <url><loc>https://aivis-scan.netlify.app/terms</loc></url>
 </urlset>

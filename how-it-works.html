@@ -1,12 +1,123 @@
-<script setup lang="ts">
-// Static content only — no DB, no API calls. Reachable without auth (see
-// router.ts) so it can be shared/linked to prospects who haven't signed up
-// yet, and read by anyone deciding whether to trust the score.
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How AIVis works — AI search visibility scoring explained</title>
+<meta name="description" content="How AIVis checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<link rel="canonical" href="https://aivis-scan.netlify.app/how-it-works" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<meta name="theme-color" content="#0d0d0d" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="How AIVis works — AI search visibility scoring explained" />
+<meta property="og:description" content="How AIVis checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<meta property="og:url" content="https://aivis-scan.netlify.app/how-it-works" />
+<meta property="og:image" content="https://aivis-scan.netlify.app/og-image.png" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="How AIVis works — AI search visibility scoring explained" />
+<meta name="twitter:description" content="How AIVis checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<meta property="twitter:image" content="https://aivis-scan.netlify.app/og-image.png" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "@id": "https://aivis-scan.netlify.app/how-it-works#webpage",
+  "url": "https://aivis-scan.netlify.app/how-it-works",
+  "name": "How AIVis works — AI search visibility scoring explained",
+  "description": "How AIVis checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated.",
+  "isPartOf": { "@id": "https://aivis-scan.netlify.app/#website" },
+  "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
+}
 </script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f9f9f7;
+    --card: #fcfcfb;
+    --fg: #0b0b0b;
+    --muted: #52514e;
+    --faint: #898781;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --good: #0ca30c;
+    --warning: #b8860b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #0d0d0d;
+      --card: #1a1a19;
+      --fg: #ffffff;
+      --muted: #c3c2b7;
+      --faint: #898781;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+      --good: #0ca30c;
+      --warning: #e8a33d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
 
-<template>
+  nav.top {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 0;
+  }
+  nav.top .logo { font-weight: 800; font-size: 1.1rem; text-decoration: none; color: var(--fg); }
+  nav.top .links { display: flex; gap: 20px; align-items: center; font-size: 0.9rem; }
+  nav.top .links a { text-decoration: none; color: var(--muted); }
+  nav.top .links a.cta {
+    color: #fff; background: var(--accent); padding: 8px 16px; border-radius: 8px; font-weight: 600;
+  }
+
+  footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-size: 0.85rem; }
+
+  .legal { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+  .legal .back { display: inline-block; margin-bottom: 24px; font-size: 0.88rem; color: var(--muted); text-decoration: none; }
+  .legal .back:hover { text-decoration: underline; }
+  .legal h1 { font-size: 1.7rem; margin: 0 0 8px; }
+  .legal .lead { color: var(--muted); font-size: 1.02rem; margin: 0 0 32px; }
+  .legal .draft-note {
+    font-size: 0.88rem; font-weight: 600; color: var(--warning);
+    background: color-mix(in srgb, var(--warning) 14%, transparent);
+    border: 1px solid var(--warning); border-radius: 8px; padding: 10px 14px;
+    margin: 0 0 8px; display: inline-block;
+  }
+  .legal .updated { font-size: 0.82rem; color: var(--faint); margin: 0 0 32px; }
+  .legal section { margin-bottom: 28px; }
+  .legal h2 { font-size: 1.15rem; margin: 0 0 10px; }
+  .legal p { color: var(--muted); margin: 0 0 12px; }
+  .legal ul { color: var(--muted); margin: 0 0 12px; padding-left: 22px; }
+  .legal li { margin-bottom: 10px; }
+  .legal strong { color: var(--fg); }
+  .legal a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="top">
+    <a class="logo" href="/">AIVis</a>
+    <div class="links">
+      <a href="/app/login">Log in</a>
+      <a class="cta" href="/app/signup">Sign up free</a>
+    </div>
+  </nav>
+
   <main class="legal">
-    <router-link class="back" to="/app">&larr; Back to AIVis</router-link>
+    <a class="back" href="/">← Back to AIVis</a>
 
     <h1>How AIVis works</h1>
     <p class="lead">
@@ -151,19 +262,14 @@
       </p>
     </section>
   </main>
-</template>
 
-<style scoped>
-.legal { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
-.back { display: inline-block; margin-bottom: 24px; font-size: 0.88rem; color: var(--muted); text-decoration: none; }
-.back:hover { text-decoration: underline; }
-h1 { font-size: 1.7rem; margin: 0 0 8px; }
-.lead { color: var(--muted); font-size: 1.02rem; margin: 0 0 32px; }
-section { margin-bottom: 28px; }
-h2 { font-size: 1.15rem; margin: 0 0 10px; }
-p { color: var(--muted); margin: 0 0 12px; }
-ul { color: var(--muted); margin: 0 0 12px; padding-left: 22px; }
-li { margin-bottom: 10px; }
-strong { color: var(--fg); }
-a { color: var(--accent); }
-</style>
+  <footer>
+    &copy; 2026 AIVis. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
+    · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+    · <a href="/how-it-works">How this works</a>
+    · <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
+  </footer>
+</div>
+
+</body>
+</html>

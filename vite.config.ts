@@ -19,8 +19,17 @@ import netlifyPlugin from '@netlify/vite-plugin';
 // landing page at `/` — plain static HTML/CSS, not a Vue mount. Several
 // major AI crawlers (GPTBot, PerplexityBot, ClaudeBot) don't execute
 // client-side JS, so the pitch has to exist as real HTML, not something a
-// Vue mount renders after the fact. It's the only page meant to be indexed;
-// app.html/result.html both keep noindex.
+// Vue mount renders after the fact.
+//
+// `how-it-works.html`, `privacy.html`, `terms.html` (converted from
+// app.html SPA routes to static entries here) are the same story: real,
+// valuable content that used to live behind vue-router (`/app/how-it-works`
+// etc.) under app.html's blanket noindex — AI crawlers never saw it since
+// they don't execute the JS that would've rendered it. Now plain static
+// HTML/CSS at clean URLs (`/how-it-works`, `/privacy`, `/terms` via
+// netlify.toml redirects), same non-Vue pattern as index.html, and
+// genuinely indexable. index.html plus these three are the only pages
+// meant to be indexed; app.html/result.html both keep noindex.
 export default defineConfig({
   plugins: [vue(), tailwindcss(), netlifyPlugin()],
   build: {
@@ -29,6 +38,9 @@ export default defineConfig({
         result: 'result.html',
         app: 'app.html',
         marketing: 'index.html',
+        howItWorks: 'how-it-works.html',
+        privacy: 'privacy.html',
+        terms: 'terms.html',
       },
     },
   },

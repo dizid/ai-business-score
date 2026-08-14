@@ -14,6 +14,36 @@
 # built from the repo-root index.html entry in vite.config.ts) — no
 # redirect needed, Netlify serves it directly from the publish directory.
 
+# Clean URLs for the new static content pages — explicit rather than
+# relying solely on Netlify's implicit Pretty-URLs post-processing.
+[[redirects]]
+  from = "/how-it-works"
+  to = "/how-it-works.html"
+  status = 200
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 200
+[[redirects]]
+  from = "/terms"
+  to = "/terms.html"
+  status = 200
+
+# 301s from the old in-app-shell URLs (now retired, see router.ts) so
+# pre-existing links/bookmarks don't break.
+[[redirects]]
+  from = "/app/how-it-works"
+  to = "/how-it-works"
+  status = 301
+[[redirects]]
+  from = "/app/privacy"
+  to = "/privacy"
+  status = 301
+[[redirects]]
+  from = "/app/terms"
+  to = "/terms"
+  status = 301
+
 # The authenticated app shell (Milestone 4 of the SaaS-pivot plan) is a real
 # vue-router SPA — direct navigation/refresh on a nested route like
 # /app/companies/123 must still resolve to app.html so the router can take
