@@ -74,12 +74,21 @@
       <p>
         Across the checks that actually completed (a failed API call isn't
         counted as "invisible" — it's excluded, since we don't have data
-        either way), the score weights being <strong>ranked first</strong>
-        most heavily, with partial credit for being <strong>mentioned but
-        beaten</strong> by a competitor named first — being in the
-        conversation at all is a real signal, just a weaker one than being
-        the top answer. Never being mentioned earns nothing. The bands you'll
-        see on your dashboard:
+        either way), each check earns credit based on exactly
+        <strong>where</strong> your brand appeared relative to competitors in
+        that answer: full credit for being the <strong>first</strong>
+        business mentioned, decaying partial credit for 2nd, 3rd, or further
+        down — being in the conversation at all is a real signal, just a
+        weaker one than being the top answer. Never being mentioned earns
+        nothing.
+      </p>
+      <p>
+        Checks aren't all worth the same, either. A prompt phrased like a
+        real buying decision ("what's the best X for Y?") counts for more
+        than a broad "who are the leaders in this category?" prompt, since
+        the former is closer to how a customer actually decides — so ranking
+        first on a direct-intent question moves your score more than ranking
+        first on a general one. The bands you'll see on your dashboard:
       </p>
       <ul>
         <li><strong>Leading (80-100)</strong> — you're the first answer in most checks.</li>
@@ -88,10 +97,12 @@
         <li><strong>Invisible (0)</strong> — not mentioned in any completed check.</li>
       </ul>
       <p>
-        If every check in a scan fails (a real outage, not a real result),
-        AIVis shows no score at all rather than a misleading 0 — a 0 always
-        means "checked and genuinely not mentioned," never "we couldn't
-        check."
+        If too few checks complete — a real outage, not a real result —
+        AIVis shows no score at all rather than a misleading one computed
+        from too little data. Your dashboard shows exactly how many of the
+        20 checks succeeded, so you can judge how much to trust a given
+        score. A 0 always means "checked and genuinely not mentioned,"
+        never "we couldn't check."
       </p>
     </section>
 

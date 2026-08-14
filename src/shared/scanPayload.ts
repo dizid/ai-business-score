@@ -6,7 +6,11 @@
 // a malformed record degrades the same way — a skipped/blank field, never a
 // thrown error — regardless of which page renders it.
 
-export type Rank = 'ranked-1' | 'beaten' | 'not-mentioned';
+// 'beaten' is a legacy rank value from the pre-positional-ranking scoring
+// model — no longer produced by aggregateProspect, but scans persisted
+// before that change still have it in their stored perPromptRank, so it
+// stays accepted here rather than making old scans fail validation.
+export type Rank = 'ranked-1' | 'ranked-2' | 'ranked-3' | 'mentioned' | 'not-mentioned' | 'beaten';
 export type AdviceId = 'no-data' | 'zero-citations' | 'consistently-beaten' | 'leading' | 'mixed' | 'top-rival';
 export type AdviceTone = 'critical' | 'warning' | 'positive' | 'neutral';
 
@@ -41,7 +45,7 @@ export interface ValidatedPayload {
   deepAdviceGeneratedAtDate: Date | null;
 }
 
-const RANKS = new Set(['ranked-1', 'beaten', 'not-mentioned']);
+const RANKS = new Set(['ranked-1', 'ranked-2', 'ranked-3', 'mentioned', 'not-mentioned', 'beaten']);
 const ADVICE_IDS = new Set(['no-data', 'zero-citations', 'consistently-beaten', 'leading', 'mixed', 'top-rival']);
 const ADVICE_TONES = new Set(['critical', 'warning', 'positive', 'neutral']);
 const DIFFICULTIES = new Set(['Easy', 'Medium', 'Hard']);

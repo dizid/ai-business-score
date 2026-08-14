@@ -1,6 +1,62 @@
 # TODOs
 
-## STATUS 2026-08-13: Model expansion + concurrency fix + Pro fair-use cap (Milestone C1/C2 of `PLAN_NEXT_PHASE.md`) — uncommitted, not yet pushed
+## STATUS 2026-08-14: Live verification of Milestone C1/C2 — confirmed live, but surfaced a new reliability gap (not fixed, logged for later)
+
+**What was done:** the 2026-08-13 entry below shipped `d43ac1a` (Milestone
+C1/C2) but explicitly left "a real end-to-end scan through the actual
+hosted app" unverified. That commit was, by this date, already pushed and
+deployed to production (confirmed via Netlify: current production deploy
+`6a7d8c5567b7ee000839bed9` is built from `d43ac1a`) — the "uncommitted, not
+yet pushed" note on that entry's heading below is stale, corrected here.
+Ran the missing verification: signed up a throwaway test account (`browse`
+skill headless browser), created a company for ASML — the same brand that
+hit Milestone A1's false-zero bug pre-fix — let the app's auto-scan
+trigger, timed it end to end, and cross-checked against two other real
+scans run the same day by someone else on this system (NRC, De Nara Hotel
+— found via their scan-complete emails, then confirmed via a direct Neon
+query against `scans`).
+
+**Confirmed working:** ASML scored 100/100 — Milestone A1's false-zero-brand
+fix holds with the new 4-model mix. The scan-complete email
+(`_shared/email.mts`) fired and arrived within ~1s of the scan finishing.
+Per-call failure detail rendered correctly in `ScanDetail.vue`, exactly as
+Milestone A3 designed it — a specific model/prompt/error per failed check,
+not the old generic "isn't currently recorded" note.
+
+**New problem found — not previously known:** the ASML scan took **9m51s**
+(docs/UI say "~5-8 min") and only **5 of 20 calls completed** — 15 failed,
+almost all `"scan deadline exceeded"` (either "before this check started"
+or "waiting for X"). Root cause, traced through
+`run-scan-background.mts`/`shared/aivis-core.mjs`: two
+`google/gemini-3-flash-preview` calls each hit the full 60s per-attempt
+timeout (`CALL_TIMEOUT_MS`), and `callModelWithRetry`'s 3 attempts (worst
+case ~182s per call: 60s + 1s backoff + 60s + 1s + 60s) ran fully
+serialized under `CONCURRENCY_LIMIT = 1` — those two slow calls alone
+consumed roughly half the 10-minute `SCAN_DEADLINE_MS`, so the 13 calls
+still queued behind them in the strictly-sequential run never got a turn
+before the deadline fired. Same-day comparison, via Neon (`scans.failures`
+array length): NRC lost 4/20, De Nara Hotel lost 3/20 — within the range
+this design already tolerates. ASML's 15/20 is a worse outlier, but it's
+exactly the failure mode `run-scan-background.mts`'s own comment already
+named as a risk ("up to 180s for one bad call") — sequential-only
+execution means a couple of slow/flaky calls to any one model can cascade
+into losing most of a scan, since nothing else can run while one call is
+mid-retry.
+
+**Not fixed — deliberately.** Asked Marc how to handle it; he chose "log
+it, decide later," so no code changed this session. Candidate fixes for
+whoever picks this up next: shorten `CALL_TIMEOUT_MS` so one stuck call
+can't eat ~182s; cap further retries scan-wide once a model has already
+timed out repeatedly in the same scan; or re-test whether
+`CONCURRENCY_LIMIT` needs to be a hard global 1 across every provider — the
+2026-08-13 burst-test that produced that number tested same-provider
+bursts, not whether one in-flight OpenAI call + one in-flight Anthropic
+call hit the same edge limit at Perplexity as two same-provider calls did.
+
+**Immediate next steps:** none scheduled — known, documented gap, not an
+active task, until Marc prioritizes it.
+
+## STATUS 2026-08-13: Model expansion + concurrency fix + Pro fair-use cap (Milestone C1/C2 of `PLAN_NEXT_PHASE.md`) — SHIPPED, deployed to production (see 2026-08-14 entry above for live-scan verification, which found a new gap)
 
 **Trigger:** Marc reviewed annotated screenshots showing a live production
 incident — TSMC/Google LLC/Hotel De Nara scans losing 16-18 of 20 calls to

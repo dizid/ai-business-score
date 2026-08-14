@@ -164,7 +164,7 @@ function formatInternalSummary(agg) {
   lines.push('');
   lines.push('## Breakdown (heuristic — first-mention order, not sentiment-aware; verify by reading raw responses below)');
   const rank1 = agg.perPromptRank.filter((r) => r.rank === 'ranked-1');
-  const beaten = agg.perPromptRank.filter((r) => r.rank === 'beaten');
+  const beaten = agg.perPromptRank.filter((r) => ['ranked-2', 'ranked-3', 'mentioned'].includes(r.rank));
   const notMentioned = agg.perPromptRank.filter((r) => r.rank === 'not-mentioned');
   lines.push(`- Ranked #1 in ${rank1.length} check(s): prompts ${rank1.map((r) => r.promptIndex + 1).join(', ') || '—'}`);
   lines.push(`- Beaten by a competitor in ${beaten.length} check(s): prompts ${beaten.map((r) => r.promptIndex + 1).join(', ') || '—'}`);

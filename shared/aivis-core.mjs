@@ -72,6 +72,20 @@ export const MODELS = [
   'xai/grok-4.6',
 ];
 
+// ---------- NEW: Prompt Categorization for Strategic Weighting ----------
+export const PROMPT_CATEGORIES = [
+  'high-intent',      // 0: Best option for use case
+  'comparison',       // 1: Brand vs competitor
+  'high-intent',      // 2: General recommendation
+  'informational',    // 3: Top companies in region
+  'comparison',       // 4: Good choice + alternatives
+  'comparison',       // 5: What people are saying (reputation)
+  'high-intent',      // 6: Best for customer segment
+  'informational',    // 7: Leaders in category
+  'high-intent',      // 8: Criteria-based choice
+  'high-intent',      // 9: Switching from competitor
+];
+
 // ---------- Common-word stoplist for brand-name ambiguity flag ----------
 // Design doc: "common-word or ambiguous brand names (e.g. a brand literally
 // called 'Best' or 'Prime') get flagged for skip-auto-detection and a manual
@@ -316,47 +330,65 @@ export function aggregateProspect(prospect, callResults) {
   let ambiguousBrandFlag = false;
   const perPromptRank = [];
   const competitorTallies = prospect.competitors.map((name) => ({
-    name, mentionCount: 0, beatBrandCount: 0, ambiguous: false,
+    name,
+    mentionCount: 0,
+    beatBrandCount: 0,
+    ambiguous: false,
   }));
 
   for (const r of completed) {
     const brandMatch = findBrandMention(r.text, prospect);
     if (brandMatch.ambiguous) ambiguousBrandFlag = true;
-    const cited = brandMatch.ambiguous ? false : brandMatch.mentioned;
+    const cited = !brandMatch.ambiguous && brandMatch.mentioned;
     if (cited) citedCount++;
 
-    // Competitor detection runs on EVERY completed response, not just when
-    // the brand itself was cited — a response that mentions a competitor
-    // while the brand is completely absent is the single most useful
-    // scoreboard signal ("competitor cited 4x, you 0x"), and it would be
-    // silently lost if this stayed gated on `cited` like the rank logic.
-    let beatenBy = false;
+    const allMentions = [];
+
+    if (cited) {
+      allMentions.push({ name: prospect.brand, index: brandMatch.firstIndex, isBrand: true });
+    }
+
     prospect.competitors.forEach((c, i) => {
       const m = findMentions(r.text, c);
       if (m.ambiguous) {
-        // Ambiguous means detection was skipped for this check, not that the
-        // competitor was genuinely absent — flag it so the tally doesn't
-        // silently read the same as "never mentioned" (see ScanDetail.vue's
-        // per-competitor ambiguous note).
         competitorTallies[i].ambiguous = true;
         return;
       }
-      if (!m.mentioned) return;
-      competitorTallies[i].mentionCount++;
-      const brandWasFirst = cited && brandMatch.firstIndex < m.firstIndex;
-      if (!brandWasFirst) {
-        competitorTallies[i].beatBrandCount++;
-        beatenBy = true;
+      if (m.mentioned) {
+        allMentions.push({ name: c, index: m.firstIndex, isBrand: false });
+        competitorTallies[i].mentionCount++;
       }
     });
 
-    // Heuristic-only ranking: first-mention order between brand and
-    // competitors. Detection is presence-only (not sentiment-aware) per the
-    // design doc's explicit limitation — this is a starting point for the
-    // mandatory manual skim, not a verified rank. Unchanged from before:
-    // still gated on `cited`, only the tallying above became unconditional.
-    const rank = cited ? (beatenBy ? 'beaten' : 'ranked-1') : 'not-mentioned';
-    perPromptRank.push({ promptIndex: r.promptIndex, rank });
+    allMentions.sort((a, b) => a.index - b.index);
+
+    let rankValue;
+    const brandPosition = allMentions.findIndex((m) => m.isBrand);
+
+    if (brandPosition === -1) {
+      rankValue = 'not-mentioned';
+    } else {
+      for (let i = 0; i < brandPosition; i++) {
+        const competitorName = allMentions[i].name;
+        const competitorIndex = prospect.competitors.indexOf(competitorName);
+        if (competitorIndex !== -1) {
+          competitorTallies[competitorIndex].beatBrandCount++;
+        }
+      }
+
+      const rankNumber = brandPosition + 1;
+      if (rankNumber === 1) {
+        rankValue = 'ranked-1';
+      } else if (rankNumber === 2) {
+        rankValue = 'ranked-2';
+      } else if (rankNumber === 3) {
+        rankValue = 'ranked-3';
+      } else {
+        rankValue = 'mentioned';
+      }
+    }
+
+    perPromptRank.push({ promptIndex: r.promptIndex, rank: rankValue });
   }
 
   return {
@@ -379,19 +411,62 @@ export function aggregateProspect(prospect, callResults) {
 }
 
 // ---------- Score ----------
-// 0-100, weighted toward being the FIRST mention, not just any mention.
-// "Beaten" (cited but a competitor was mentioned first) earns partial credit
-// — it's a real signal (you're in the AI's consideration set) but should
-// land well below a brand that's often mentioned first. completedCalls===0
-// returns null (never a fake 0) — a 0 must mean "genuinely invisible across
-// N real checks," not "the API failed and we have no data."
-const SCORE_BEATEN_WEIGHT = 0.4;
+// 0-100, based on positional rank. Being mentioned 1st gets full credit;
+// 2nd/3rd get partial, decaying credit. Being mentioned but not in the top 3
+// still provides a small signal. A score of 0 means "genuinely invisible
+// across N real checks," while a null score means "the API failed and we
+// have no data."
+const RANK_WEIGHTS = {
+  'ranked-1': 1.0,
+  'ranked-2': 0.6,
+  'ranked-3': 0.3,
+  mentioned: 0.1,
+};
 
-export function computeScore(perPromptRank, completedCalls) {
-  if (completedCalls === 0) return null;
-  const ranked1Count = perPromptRank.filter((r) => r.rank === 'ranked-1').length;
-  const beatenCount = perPromptRank.filter((r) => r.rank === 'beaten').length;
-  return Math.round(100 * (ranked1Count + SCORE_BEATEN_WEIGHT * beatenCount) / completedCalls);
+// A scan is only valid enough to score if at least this many checks succeeded.
+// This prevents a single lucky roll on a mostly-failed scan from producing a
+// deceptively high score.
+const MIN_COMPLETED_CALLS_FOR_SCORE = 4;
+
+// Default weights if none are provided by the user.
+export const DEFAULT_QUERY_WEIGHTS = {
+  'high-intent': 3,
+  comparison: 2,
+  informational: 1,
+};
+
+export function computeScore(perPromptRank, completedCalls, queryWeights = DEFAULT_QUERY_WEIGHTS) {
+  if (completedCalls < MIN_COMPLETED_CALLS_FOR_SCORE) return null;
+
+  let totalWeightedScore = 0;
+  let totalMaximumScore = 0;
+
+  // Group ranks by prompt index to know how many models ran for each prompt.
+  const completedPrompts = new Map();
+  for (const r of perPromptRank) {
+    if (!completedPrompts.has(r.promptIndex)) {
+      completedPrompts.set(r.promptIndex, []);
+    }
+    completedPrompts.get(r.promptIndex).push(r.rank);
+  }
+
+  completedPrompts.forEach((ranks, promptIndex) => {
+    const category = PROMPT_CATEGORIES[promptIndex] || 'informational';
+    const queryWeight = queryWeights[category] || 1;
+
+    const promptWeightedScore = ranks.reduce((sum, rank) => {
+      return sum + (RANK_WEIGHTS[rank] || 0);
+    }, 0);
+
+    totalWeightedScore += promptWeightedScore * queryWeight;
+
+    // The max possible score for this prompt is 1.0 (ranked-1) * number of models * queryWeight
+    totalMaximumScore += ranks.length * queryWeight;
+  });
+
+  if (totalMaximumScore === 0) return 0;
+
+  return Math.round(100 * (totalWeightedScore / totalMaximumScore));
 }
 
 // Presentation band for a score — used to pick color/label, kept as a pure
@@ -422,7 +497,9 @@ export function selectAdvice(agg) {
   }
 
   const ranked1 = agg.perPromptRank.filter((r) => r.rank === 'ranked-1').length;
-  const beaten = agg.perPromptRank.filter((r) => r.rank === 'beaten').length;
+  const beaten = agg.perPromptRank.filter((r) =>
+    ['ranked-2', 'ranked-3', 'mentioned'].includes(r.rank)
+  ).length;
   const cards = [];
 
   if (agg.citedCount === 0) {
@@ -444,7 +521,12 @@ export function selectAdvice(agg) {
     cards.push({
       id: 'mixed',
       tone: 'neutral',
-      params: { ranked1, beaten, notMentioned: agg.completedCalls - ranked1 - beaten, completedCalls: agg.completedCalls },
+      params: {
+        ranked1,
+        beaten,
+        notMentioned: agg.completedCalls - ranked1 - beaten,
+        completedCalls: agg.completedCalls,
+      },
     });
   }
 
@@ -533,16 +615,37 @@ function summarizePerPromptRank(perPromptRank) {
   const byPrompt = new Map();
   for (const r of perPromptRank || []) {
     if (!byPrompt.has(r.promptIndex)) {
-      byPrompt.set(r.promptIndex, { 'ranked-1': 0, beaten: 0, 'not-mentioned': 0 });
+      byPrompt.set(r.promptIndex, {
+        'ranked-1': 0,
+        'ranked-2': 0,
+        'ranked-3': 0,
+        mentioned: 0,
+        'not-mentioned': 0,
+      });
     }
-    byPrompt.get(r.promptIndex)[r.rank]++;
+    const counts = byPrompt.get(r.promptIndex);
+    if (counts[r.rank] !== undefined) {
+      counts[r.rank]++;
+    }
   }
   return [...byPrompt.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([promptIndex, counts]) => {
-      const total = counts['ranked-1'] + counts.beaten + counts['not-mentioned'];
+      const total = Object.values(counts).reduce((s, v) => s + v, 0);
       const label = PROMPT_LABELS[promptIndex] || `prompt ${promptIndex}`;
-      return `- ${label}: ranked first in ${counts['ranked-1']}, beaten by a competitor in ${counts.beaten}, not mentioned in ${counts['not-mentioned']} (of ${total} checks)`;
+
+      const parts = [];
+      if (counts['ranked-1'] > 0) parts.push(`ranked first in ${counts['ranked-1']}`);
+      if (counts['ranked-2'] > 0) parts.push(`ranked 2nd in ${counts['ranked-2']}`);
+      if (counts['ranked-3'] > 0) parts.push(`ranked 3rd in ${counts['ranked-3']}`);
+      const otherMentions = counts.mentioned;
+      if (otherMentions > 0) parts.push(`mentioned (but not top 3) in ${otherMentions}`);
+      if (counts['not-mentioned'] > 0) parts.push(`not mentioned in ${counts['not-mentioned']}`);
+
+      if (parts.length === 0) {
+        return `- ${label}: no data (of ${total} checks)`;
+      }
+      return `- ${label}: ${parts.join(', ')} (of ${total} checks)`;
     })
     .join('\n');
 }

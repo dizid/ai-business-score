@@ -6,7 +6,7 @@
 |---|---|
 | A — Correctness & trust | **Shipped**, pushed to `master` (`8af2803`). Live scan not yet re-verified due to a sandbox network limitation during testing — see `TODOS.md`'s 2026-08-12 entry. |
 | B — Remove leaderboard + multi-URL | **Shipped**, pushed to `master`. |
-| C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13** (model count, concurrency/deadline retune — see Milestone C below for what actually happened, which differs from this section's original plan). C3 (locale-aware prompts) not started. |
+| C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13**, confirmed live in production 2026-08-14 via a real end-to-end scan — but that same live scan found a new cascading-timeout reliability gap (15/20 calls lost on one scan), not yet fixed. See `TODOS.md`'s 2026-08-14 entry and Milestone C below. C3 (locale-aware prompts) not started. |
 | D — Product depth & trust surfaces | **D3 (footer/legal) and D4 (technical SEO) shipped.** D1 (raw data — likely already satisfied by A3, needs Marc's confirmation) and D2 (competitor click-through) not started. |
 | F — Differentiation | Not started — deliberately deferred this round (needs live API exploration + calibration, shouldn't be rushed). |
 | E — Monetization | Not started. E0 (manual sales test) is Marc's task, not engineering — see "The assignment" below. |
@@ -226,7 +226,20 @@ full cleanup.
 3. Update CLAUDE.md's Database schema section so it doesn't re-drift once
    these features are gone from the UI but their columns remain.
 
-### Milestone C — More models, speed, locale-aware prompts — C1/C2 ✅ SHIPPED 2026-08-13, C3 not started
+### Milestone C — More models, speed, locale-aware prompts — C1/C2 ✅ SHIPPED 2026-08-13, verified live 2026-08-14 (found a new gap, unfixed), C3 not started
+
+**2026-08-14 live verification:** a real end-to-end scan (ASML, via a
+throwaway test account) confirmed the score/detection/email pieces below
+all work correctly in production, but also lost 15 of 20 calls to a
+cascading "scan deadline exceeded" — two `google/gemini-3-flash-preview`
+calls each burned their full retry budget (~182s worst case each) under
+`CONCURRENCY_LIMIT=1`, leaving no time for the 13 calls still queued
+behind them. Two other same-day scans (NRC, De Nara Hotel) lost only 3-4/20
+each, so this is a worse-than-typical outlier, not the norm — but it's a
+real, reproducible failure mode inherent to fully-sequential execution
+with per-call retries this expensive. Full root-cause writeup and fix
+candidates: `TODOS.md`'s 2026-08-14 entry. Deliberately not fixed yet —
+Marc's call, logged for later prioritization rather than fixed inline.
 
 1. **✅ Shipped.** Grew `MODELS` from 2 to 4, one candidate at a time, each
    live-smoke-tested against a real Perplexity call before being trusted —

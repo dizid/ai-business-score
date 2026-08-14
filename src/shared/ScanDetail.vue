@@ -30,7 +30,7 @@ const BAND_EXPLAIN: Record<string, string> = {
   visible: 'AI knows this brand, but doesn’t always lead with it.',
   weak: 'Rarely comes up — mostly beaten or skipped.',
   invisible: 'Never came up in any completed check.',
-  unavailable: 'No checks completed — try running the scan again.',
+  unavailable: 'Not enough checks completed to give a reliable score. This is likely a temporary issue with the AI providers. Please try again.',
 };
 // Milestone A6: was keyed by `tone`, which collapsed multiple distinct
 // insights onto one shared label — 'mixed' and 'top-rival' both use
@@ -49,8 +49,12 @@ const ADVICE_HEADING: Record<AdviceId, string> = {
 };
 const CHECK_BADGE_LABEL: Record<Rank, string> = {
   'ranked-1': 'Mentioned first',
-  beaten: 'Mentioned, but beaten',
+  'ranked-2': 'Mentioned 2nd',
+  'ranked-3': 'Mentioned 3rd',
+  mentioned: 'Mentioned, not top 3',
   'not-mentioned': 'Not mentioned',
+  // legacy value, see the Rank type comment in scanPayload.ts
+  beaten: 'Mentioned, but beaten',
 };
 
 const band = computed(() => scoreBand(props.payload.score));
@@ -63,7 +67,9 @@ const ringOffset = computed(() =>
 );
 
 const rank1Count = computed(() => props.payload.perPromptRank.filter((r) => r.rank === 'ranked-1').length);
-const beatenCount = computed(() => props.payload.perPromptRank.filter((r) => r.rank === 'beaten').length);
+const beatenCount = computed(() =>
+  props.payload.perPromptRank.filter((r) => ['ranked-2', 'ranked-3', 'mentioned', 'beaten'].includes(r.rank)).length
+);
 
 const headlineKind = computed<'none' | 'zero' | 'beaten' | 'good'>(() => {
   if (props.payload.completedCalls === 0) return 'none';
@@ -166,6 +172,7 @@ const visibleAdvice = computed(() =>
       <div class="score-side">
         <div class="score-band-label">{{ BAND_LABEL[band] }}</div>
         <div class="score-explain">{{ BAND_EXPLAIN[band] }} AI Visibility Score — weighted for being mentioned first, not just mentioned.</div>
+        <div class="confidence-note">Based on {{ payload.completedCalls }} / {{ payload.completedCalls + payload.failedCalls }} successful checks.</div>
       </div>
     </div>
 
@@ -321,6 +328,11 @@ h1 { font-size: 1.5rem; margin: 0 0 2px; }
 .score-side { flex: 1; min-width: 180px; }
 .score-band-label { font-size: 1.05rem; font-weight: 600; margin-bottom: 4px; }
 .score-explain { color: var(--muted); font-size: 0.88rem; }
+.confidence-note {
+  font-size: 0.8rem;
+  color: var(--faint);
+  margin-top: 8px;
+}
 .band-leading .score-ring-fill { stroke: var(--good); }
 .band-leading .score-band-label { color: var(--success-text); }
 .band-visible .score-ring-fill { stroke: var(--warning); }
@@ -428,7 +440,7 @@ h2:first-of-type { margin-top: 0; }
   padding: 2px 9px; border-radius: 999px; flex: none; white-space: nowrap;
 }
 .badge-ranked-1 { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--success-text); }
-.badge-beaten { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
+.badge-ranked-2, .badge-ranked-3, .badge-mentioned, .badge-beaten { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
 .badge-not-mentioned { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
 .check-text {
   font-size: 0.85rem; color: var(--muted);
