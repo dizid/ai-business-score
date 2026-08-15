@@ -61,12 +61,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-main { max-width: 480px; margin: 0 auto; padding: 80px 20px; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 32px; text-align: center; }
-h1 { font-size: 1.3rem; margin: 0 0 8px; }
-.sub { color: var(--muted); margin: 0 0 20px; }
-.cta {
-  display: inline-block; padding: 10px 20px; font-size: 0.9rem; font-weight: 600;
-  border-radius: 8px; background: var(--accent); color: var(--accent-ink); text-decoration: none;
+main { max-width: 480px; margin: 0 auto; padding: 96px 20px; }
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 36px 32px; text-align: center; box-shadow: var(--shadow);
 }
+h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 10px; }
+.sub { color: var(--muted); margin: 0 0 24px; line-height: 1.55; }
+.cta {
+  display: inline-block; padding: 11px 22px; font-size: 0.9rem; font-weight: 600;
+  border-radius: 8px; background: var(--accent); color: var(--accent-ink); text-decoration: none;
+  box-shadow: var(--shadow); transition: transform 0.15s ease;
+}
+.cta:hover { transform: translateY(-1px); }
 </style>

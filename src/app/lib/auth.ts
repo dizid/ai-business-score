@@ -49,6 +49,13 @@ async function restoreSession() {
       user.value = { id: data.user.id, email: data.user.email, name: data.user.name };
       jwt.value = await mintJwt();
     }
+  } catch {
+    // A failed session check (network blip, Neon Auth briefly unreachable)
+    // must not be fatal — router.beforeEach awaits this directly, so an
+    // uncaught rejection here used to abort the whole navigation and leave
+    // the app rendering blank. Falling through leaves user/jwt unset, i.e.
+    // "not logged in," which is the correct safe default and lets
+    // requiresAuth routes redirect to login normally instead of white-screening.
   } finally {
     initializing.value = false;
   }

@@ -51,8 +51,26 @@ const segments = computed(() => {
   return segs;
 });
 
+// Smoothed via successive quadratic Béziers whose on-curve anchors are the
+// midpoints between consecutive data points and whose control point is the
+// data point itself — a standard lightweight "smooth freehand line"
+// technique that needs no curve-fitting library. Degrades gracefully to a
+// near-straight segment for 2-point segments.
 const linePaths = computed(() =>
-  segments.value.map((seg) => seg.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`).join(' '))
+  segments.value.map((seg) => {
+    if (seg.length < 2) return `M ${seg[0].x} ${seg[0].y}`;
+    let d = `M ${seg[0].x} ${seg[0].y}`;
+    for (let i = 0; i < seg.length - 1; i++) {
+      const curr = seg[i];
+      const next = seg[i + 1];
+      const midX = (curr.x + next.x) / 2;
+      const midY = (curr.y + next.y) / 2;
+      d += ` Q ${curr.x} ${curr.y} ${midX} ${midY}`;
+    }
+    const last = seg[seg.length - 1];
+    d += ` L ${last.x} ${last.y}`;
+    return d;
+  })
 );
 
 const gridlines = [0, 50, 100];
@@ -130,13 +148,14 @@ const hovered = computed(() => (hoveredIndex.value === null ? null : points.valu
 <style scoped>
 .progress-chart { margin-bottom: 8px; }
 h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 0 0 10px; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); }
 svg { width: 100%; height: auto; display: block; }
 .gridline { stroke: var(--gridline); stroke-width: 1; }
-.axis-label { fill: var(--faint); font-size: 10px; }
-.score-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.score-marker { fill: var(--accent); stroke: var(--card); stroke-width: 2; cursor: pointer; }
+.axis-label { fill: var(--faint); font-size: 10px; font-weight: 500; }
+.score-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.score-marker { fill: var(--accent); stroke: var(--card); stroke-width: 2; cursor: pointer; transition: r 0.15s ease; }
 .score-marker.hovered { r: 7; }
+@media (prefers-reduced-motion: reduce) { .score-marker { transition: none; } }
 .tooltip { margin-top: 10px; font-size: 0.85rem; color: var(--muted); text-align: center; min-height: 1.2em; }
 .tooltip strong { color: var(--fg); }
 </style>

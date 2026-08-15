@@ -213,6 +213,15 @@ onMounted(loadCompanies);
     <p class="status error" v-if="upgradeError">{{ upgradeError }}</p>
 
     <form class="card create-card" v-if="showCreate" @submit.prevent="onSubmit">
+      <div class="step-indicator" aria-hidden="true">
+        <span class="step-dot" :class="{ active: !detailsRevealed, done: detailsRevealed }">1</span>
+        <span class="step-line" :class="{ done: detailsRevealed }"></span>
+        <span class="step-dot" :class="{ active: detailsRevealed }">2</span>
+      </div>
+      <div class="step-labels">
+        <span :class="{ active: !detailsRevealed }">Website</span>
+        <span :class="{ active: detailsRevealed }">Review details</span>
+      </div>
       <template v-if="!detailsRevealed">
         <label>Website</label>
         <input type="text" v-model="form.website" required placeholder="acmeplumbing.com" autofocus />
@@ -258,10 +267,21 @@ onMounted(loadCompanies);
     </form>
 
     <p class="status error" v-if="loadError">{{ loadError }}</p>
-    <p class="empty" v-else-if="loading">Loading…</p>
-    <p class="empty" v-else-if="companies.length === 0">No companies yet — add one to run your first scan.</p>
+    <p class="loading-text" v-else-if="loading">Loading…</p>
 
-    <div class="list" v-else>
+    <div class="empty-state" v-else-if="companies.length === 0 && !showCreate">
+      <div class="empty-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.6"></circle>
+          <path d="M6.5 10.5l2.3 2.3L13.5 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"></path>
+        </svg>
+      </div>
+      <h2>No companies yet</h2>
+      <p>Add a business to see whether it shows up when AI search engines are asked about its category.</p>
+      <button type="button" class="empty-cta" @click="toggleCreate">+ Add your first company</button>
+    </div>
+
+    <div class="list" v-else-if="companies.length > 0">
       <router-link
         v-for="company in companies"
         :key="company.id"
@@ -275,8 +295,14 @@ onMounted(loadCompanies);
           </div>
           <div class="meta">{{ company.category }} · {{ company.website }} · {{ company.scan_count }} scan(s)</div>
         </div>
-        <span v-if="typeof company.latest_score !== 'number'" class="score na">no data</span>
-        <span v-else class="score" :style="{ color: scoreColor(company.latest_score) }">{{ company.latest_score }}</span>
+        <div class="score-wrap">
+          <span v-if="typeof company.latest_score !== 'number'" class="score na">no data</span>
+          <template v-else>
+            <span class="score-dot" :style="{ background: scoreColor(company.latest_score) }"></span>
+            <span class="score" :style="{ color: scoreColor(company.latest_score) }">{{ company.latest_score }}</span>
+          </template>
+          <span class="chevron" aria-hidden="true">&rsaquo;</span>
+        </div>
       </router-link>
     </div>
   </main>
@@ -284,62 +310,109 @@ onMounted(loadCompanies);
 
 <style scoped>
 main { max-width: 800px; margin: 0 auto; padding: 48px 20px 80px; }
-.head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
-h1 { font-size: 1.5rem; margin: 0 0 4px; }
+.head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 28px; }
+h1 { font-size: 1.65rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 4px; }
 p.sub { color: var(--muted); margin: 0; }
 .head-actions { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .head-row button {
   flex: none; padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
   border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  box-shadow: var(--shadow); transition: transform 0.15s ease, opacity 0.15s ease;
 }
-.head-row button:disabled { opacity: 0.6; cursor: wait; }
+.head-row button:hover:not(:disabled) { transform: translateY(-1px); }
+.head-row button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .plan-badge {
   font-size: 0.78rem; font-weight: 600; color: var(--muted);
-  border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
+  border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; box-shadow: none;
 }
-.plan-badge.pro { color: var(--good); border-color: var(--good); }
-.upgrade-btn { background: transparent !important; border: 1px solid var(--accent) !important; color: var(--accent) !important; }
+.plan-badge.pro { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: color-mix(in srgb, var(--good) 10%, transparent); }
+.upgrade-btn { background: transparent !important; border: 1px solid var(--accent) !important; color: var(--accent) !important; box-shadow: none !important; }
+.upgrade-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 10%, transparent) !important; }
 .inline-upgrade {
   margin-left: 10px; padding: 4px 10px; font-size: 0.82rem; font-weight: 600;
   border: 1px solid var(--critical); border-radius: 999px; background: transparent; color: var(--critical); cursor: pointer;
 }
 .inline-upgrade:disabled { opacity: 0.6; cursor: wait; }
 
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 8px 20px 20px; margin-bottom: 24px; }
-.card label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 18px; margin-bottom: 6px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px 24px 26px; margin-bottom: 28px; box-shadow: var(--shadow); }
+.card label { display: block; font-size: 0.83rem; font-weight: 600; color: var(--muted); margin-top: 18px; margin-bottom: 6px; }
 .card label .hint { font-weight: 400; color: var(--muted); }
 .hint-text { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
 .back-link {
-  display: block; margin: 18px 0 4px; padding: 0; border: none; background: none;
+  display: block; margin: 0 0 4px; padding: 0; border: none; background: none;
   color: var(--muted); font-size: 0.85rem; text-decoration: underline; cursor: pointer;
 }
 .card input {
-  width: 100%; padding: 10px 12px; font-size: 1rem;
+  width: 100%; padding: 11px 13px; font-size: 1rem;
   border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.card input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.card input:hover { border-color: color-mix(in srgb, var(--fg) 25%, var(--border)); }
+.card input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .card button[type="submit"] {
   margin-top: 24px; width: 100%; padding: 12px 16px; font-size: 1rem; font-weight: 600;
   border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  box-shadow: var(--shadow); transition: transform 0.15s ease, opacity 0.15s ease;
 }
-.card button:disabled { opacity: 0.6; cursor: wait; }
+.card button[type="submit"]:hover:not(:disabled) { transform: translateY(-1px); }
+.card button:disabled { opacity: 0.6; cursor: wait; transform: none; }
+
+/* Step indicator for the two-step create-company flow */
+.step-indicator { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.step-dot {
+  flex: none; width: 22px; height: 22px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700; color: var(--faint); border: 1.5px solid var(--border);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.step-dot.active { color: var(--accent-ink); border-color: var(--accent); background: var(--accent); }
+.step-dot.done { color: var(--accent); border-color: var(--accent); background: transparent; }
+.step-line { flex: 1; height: 1.5px; background: var(--border); }
+.step-line.done { background: var(--accent); }
+.step-labels {
+  display: flex; justify-content: space-between; font-size: 0.72rem; font-weight: 600;
+  color: var(--faint); text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 4px;
+}
+.step-labels span.active { color: var(--accent); }
 
 .status.error { margin-top: 12px; font-size: 0.9rem; color: var(--critical); }
-.empty { color: var(--muted); font-size: 0.9rem; }
+.loading-text { color: var(--muted); font-size: 0.9rem; padding: 20px 0; }
+
+.empty-state {
+  text-align: center; background: var(--card); border: 1px dashed var(--border); border-radius: 12px;
+  padding: 48px 24px; color: var(--muted);
+}
+.empty-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px;
+  border-radius: 999px; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent);
+  margin-bottom: 16px;
+}
+.empty-state h2 { font-size: 1.1rem; font-weight: 600; color: var(--fg); margin: 0 0 6px; }
+.empty-state p { margin: 0 auto 22px; max-width: 40ch; font-size: 0.92rem; }
+.empty-cta {
+  padding: 10px 18px; font-size: 0.9rem; font-weight: 600; border: none; border-radius: 8px;
+  background: var(--accent); color: var(--accent-ink); cursor: pointer; box-shadow: var(--shadow);
+  transition: transform 0.15s ease;
+}
+.empty-cta:hover { transform: translateY(-1px); }
 
 .list { display: flex; flex-direction: column; gap: 10px; }
 .company-card {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
   background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-  padding: 14px 16px; text-decoration: none; color: var(--fg);
+  padding: 15px 18px; text-decoration: none; color: var(--fg);
+  box-shadow: var(--shadow); transition: transform 0.15s ease, border-color 0.15s ease;
 }
-.company-card:hover { border-color: var(--accent); }
+.company-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.company-card:hover .chevron { transform: translateX(2px); color: var(--accent); }
 .brand { font-weight: 600; }
 .legacy-tag {
   font-size: 0.7rem; font-weight: 600; color: var(--muted);
   border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; margin-left: 8px;
 }
 .meta { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
-.score { flex: none; font-weight: 700; font-size: 1.1rem; font-variant-numeric: proportional-nums; }
+.score-wrap { flex: none; display: flex; align-items: center; gap: 8px; }
+.score-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+.score { font-weight: 700; font-size: 1.1rem; font-variant-numeric: proportional-nums; }
 .score.na { color: var(--faint); font-weight: 500; font-size: 0.85rem; }
+.chevron { color: var(--faint); font-size: 1.3rem; line-height: 1; transition: transform 0.15s ease, color 0.15s ease; }
 </style>

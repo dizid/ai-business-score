@@ -408,7 +408,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 48px 20px 80px; }
 .back-link { font-size: 0.85rem; color: var(--muted); text-decoration: underline; }
 .head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-top: 12px; margin-bottom: 24px; }
 .head-row > div:first-child { min-width: 0; }
-h1 { font-size: 1.5rem; margin: 0 0 4px; }
+h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 4px; }
 .legacy-tag {
   font-size: 0.7rem; font-weight: 600; color: var(--muted);
   border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: middle;
@@ -418,8 +418,10 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .scan-trigger button {
   padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
   border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  box-shadow: var(--shadow); transition: transform 0.15s ease;
 }
-.scan-trigger button:disabled { opacity: 0.6; cursor: wait; }
+.scan-trigger button:hover:not(:disabled) { transform: translateY(-1px); }
+.scan-trigger button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 220px; }
 .scan-status.error { color: var(--critical); }
 .inline-upgrade {
@@ -433,8 +435,12 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 
 .public-share {
   background: var(--card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;
+  border-radius: 12px; padding: 16px 20px 18px; margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  border-top: 3px solid var(--faint);
+  transition: border-top-color 0.2s ease;
 }
+.public-share:has(.public-toggle.on) { border-top-color: var(--accent); }
 .public-share-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .public-share-head > div:first-child { min-width: 0; flex: 1; }
 .public-share-desc { color: var(--muted); font-size: 0.85rem; margin: 4px 0 0; max-width: 480px; }
@@ -474,12 +480,16 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 
 .scan-card {
   display: block; width: 100%; text-align: left;
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+  background: var(--card); border: 1px solid var(--border); border-left: 3px solid transparent;
+  border-radius: 10px; padding: 14px 16px 14px 14px; margin-bottom: 10px;
   color: var(--fg); font: inherit; cursor: pointer;
+  box-shadow: var(--shadow); transition: border-color 0.15s ease, background 0.15s ease;
 }
 .scan-card:hover { border-color: var(--accent); }
-.scan-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.scan-card.active {
+  border-color: var(--accent); border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--card));
+}
 .scan-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .scan-meta { color: var(--muted); font-size: 0.85rem; }
 .scan-score { flex: none; font-weight: 700; font-size: 1.1rem; font-variant-numeric: proportional-nums; }
@@ -488,7 +498,8 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .detail-pane {
   display: none;
   background: var(--card); border: 1px solid var(--border);
-  border-radius: 14px; padding: 20px; margin-top: 20px;
+  border-radius: 12px; padding: 20px; margin-top: 20px;
+  box-shadow: var(--shadow);
 }
 .detail-pane .placeholder { padding: 20px 0; text-align: center; }
 .back {
