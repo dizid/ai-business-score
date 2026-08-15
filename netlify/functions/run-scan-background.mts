@@ -98,10 +98,24 @@ export default async (req: Request) => {
   }
   const company = companies[0];
 
-  const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');
-  if (!apiKey) {
+  // 2026-08-15 direct-provider migration (see aivis-core.mjs's callModel
+  // comment for the full story): anthropic/google/xai models now call each
+  // provider's own API directly instead of all going through one Perplexity
+  // gateway key. openai/gpt-5-mini has no direct key available anywhere and
+  // stays on the Perplexity gateway. A single missing key no longer fails
+  // the whole scan — it fails only the calls for that one provider's model
+  // (callModel throws a clear per-model error), same "skip and count
+  // separately" shape as any other call failure. The scan only refuses to
+  // start if literally none of the 4 keys are configured.
+  const apiKeys = {
+    perplexity: Netlify.env.get('PERPLEXITY_API_KEY'),
+    anthropic: Netlify.env.get('ANTHROPIC_API_KEY'),
+    google: Netlify.env.get('GOOGLE_API_KEY'),
+    xai: Netlify.env.get('XAI_API_KEY'),
+  };
+  if (!apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai) {
     await db`
-      UPDATE public.scans SET status = 'failed', error_message = 'Server misconfigured: PERPLEXITY_API_KEY not set'
+      UPDATE public.scans SET status = 'failed', error_message = 'Server misconfigured: no model API keys set'
       WHERE id = ${scanId}
     `;
     return;
@@ -184,7 +198,7 @@ export default async (req: Request) => {
         // maxAttempts 2 -> 3: gives a call that hits a rate limit twice one
         // more shot after the longer rate-limit backoff (aivis-core.mjs),
         // instead of giving up right as the limit window is clearing.
-        const result = await callModelWithRetry(apiKey, task.model, task.prompt, CALL_TIMEOUT_MS, 3, deadline.signal);
+        const result = await callModelWithRetry(apiKeys, task.model, task.prompt, CALL_TIMEOUT_MS, 3, deadline.signal);
         return { ok: true, ...result, model: task.model, promptIndex: task.promptIndex };
       } catch (err) {
         const message = (err as Error).message;

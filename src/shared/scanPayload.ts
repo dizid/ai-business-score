@@ -22,6 +22,8 @@ export interface AdviceCard { id: AdviceId; tone: AdviceTone; params: Record<str
 export interface Citation { url: string; title: string; }
 export interface RawResponse { promptIndex: number; model: string; text: string; citations: Citation[]; }
 export interface OwnSiteCitation { promptIndex: number; model: string; url: string; title: string; }
+export type SentimentClassification = 'recommended' | 'neutral' | 'negative' | 'comparison-only';
+export interface SentimentJudgment { promptIndex: number; model: string; classification: SentimentClassification; reasoning: string; }
 export interface FailureItem { model: string; promptIndex: number; error: string; }
 export interface DeepAdviceStep { title: string; reasoning: string; difficulty: Difficulty; }
 export interface DeepAdvice { steps: DeepAdviceStep[]; }
@@ -42,6 +44,7 @@ export interface ValidatedPayload {
   advice: AdviceCard[];
   rawResponses: RawResponse[];
   ownSiteCitations: OwnSiteCitation[];
+  sentimentJudgments: SentimentJudgment[];
   failures: FailureItem[];
   generatedAtDate: Date;
   deepAdvice: DeepAdvice | null;
@@ -62,6 +65,9 @@ const MAX_ERROR_LEN = 300;
 const MAX_CITATIONS_PER_RESPONSE = 20;
 const MAX_OWN_SITE_CITATIONS = 60;
 const MAX_URL_LEN = 2000;
+const SENTIMENT_CLASSIFICATIONS = new Set(['recommended', 'neutral', 'negative', 'comparison-only']);
+const MAX_SENTIMENT_JUDGMENTS = 20;
+const MAX_REASONING_LEN = 300;
 
 // href-safety, same rule as the website link below: only http(s) survives,
 // anything else (javascript:, data:, etc.) is dropped rather than escaped.
@@ -201,6 +207,24 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     }
   }
 
+  // sentimentJudgments is new (Milestone F) — same lenient degrade-to-[]
+  // treatment as ownSiteCitations/failures above; empty until a user has
+  // judged at least one check.
+  const sentimentJudgments: SentimentJudgment[] = [];
+  if (Array.isArray(raw.sentimentJudgments)) {
+    for (const j of raw.sentimentJudgments.slice(0, MAX_SENTIMENT_JUDGMENTS)) {
+      const promptIndex = asNonNegativeInt(j && j.promptIndex);
+      if (promptIndex === null || typeof (j && j.model) !== 'string' || !SENTIMENT_CLASSIFICATIONS.has(j.classification)) continue;
+      const reasoning = typeof j.reasoning === 'string' ? j.reasoning.slice(0, MAX_REASONING_LEN) : '';
+      sentimentJudgments.push({
+        promptIndex,
+        model: j.model.slice(0, MAX_NAME_LEN),
+        classification: j.classification,
+        reasoning,
+      });
+    }
+  }
+
   const generatedAtDate = new Date(raw.generatedAt);
   if (Number.isNaN(generatedAtDate.getTime())) return null;
 
@@ -248,6 +272,7 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     advice,
     rawResponses,
     ownSiteCitations,
+    sentimentJudgments,
     failures,
     generatedAtDate,
     deepAdvice,

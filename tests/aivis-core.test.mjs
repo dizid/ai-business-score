@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggregateProspect,
+  buildSentimentJudgePrompt,
   computeScore,
   extractCitations,
   findBrandMention,
   findMentions,
   isAmbiguousBrandName,
+  parseAnthropicResponse,
+  parseGoogleResponse,
+  parseSentimentJudgeResponse,
   scoreBand,
   selectAdvice,
 } from '../shared/aivis-core.mjs';
@@ -126,6 +130,84 @@ describe('extractCitations', () => {
     expect(extractCitations({ output: [{ content: [{ annotations: [{ type: 'other' }] }] }] })).toEqual([]);
     expect(extractCitations({ output: [{ content: [{ text: 'no annotations field' }] }] })).toEqual([]);
     expect(extractCitations({})).toEqual([]);
+  });
+});
+
+// Fixtures shaped from real live responses captured 2026-08-15 during the
+// direct-provider migration's live verification (see aivis-core.mjs's
+// callModel comment) — not hand-guessed shapes.
+describe('parseAnthropicResponse', () => {
+  it('joins text blocks and dedupes citations across them, from a real captured response shape', () => {
+    const json = {
+      content: [
+        { type: 'text', text: "I'll search for emergency plumber options in Rotterdam." },
+        { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'plumber Rotterdam' } },
+        { type: 'web_search_tool_result', tool_use_id: 'srvtoolu_1', content: [] },
+        {
+          type: 'text',
+          text: 'For a burst pipe in Rotterdam, Loodgieters Kwartier offers 24/7 emergency service.',
+          citations: [
+            {
+              type: 'web_search_result_location',
+              url: 'https://loodgieterskwartier.nl/en/plumber-Rotterdam/',
+              title: 'Plumber Rotterdam',
+              cited_text: 'Our emergency service is available 24 hours a day.',
+              encrypted_index: 'abc',
+            },
+            {
+              type: 'web_search_result_location',
+              url: 'https://loodgieterskwartier.nl/en/plumber-Rotterdam/',
+              title: 'Plumber Rotterdam',
+              cited_text: 'On-site within 30 to 60 minutes.',
+              encrypted_index: 'def',
+            },
+          ],
+        },
+      ],
+      usage: { input_tokens: 10309, output_tokens: 132 },
+    };
+    const result = parseAnthropicResponse(json);
+    expect(result.text).toBe(
+      "I'll search for emergency plumber options in Rotterdam.\nFor a burst pipe in Rotterdam, Loodgieters Kwartier offers 24/7 emergency service."
+    );
+    expect(result.citations).toEqual([
+      { url: 'https://loodgieterskwartier.nl/en/plumber-Rotterdam/', title: 'Plumber Rotterdam' },
+    ]);
+    expect(result.usage).toEqual({ total_tokens: 10441 });
+  });
+
+  it('returns empty text/citations and null usage for a response with no text blocks', () => {
+    expect(parseAnthropicResponse({ content: [] })).toEqual({ text: '', usage: null, citations: [] });
+  });
+});
+
+describe('parseGoogleResponse', () => {
+  it('joins parts and extracts grounding-chunk citations, from a real captured response shape', () => {
+    const json = {
+      candidates: [
+        {
+          content: {
+            parts: [{ text: 'For a burst pipe in Rotterdam, Loodgieter Rotterdam is a top-rated 24/7 option.' }],
+          },
+          groundingMetadata: {
+            groundingChunks: [
+              { web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc123', title: 'loodgieterrotter-dam.nl' } },
+            ],
+          },
+        },
+      ],
+      usageMetadata: { promptTokenCount: 70, candidatesTokenCount: 55, totalTokenCount: 615 },
+    };
+    const result = parseGoogleResponse(json);
+    expect(result.text).toBe('For a burst pipe in Rotterdam, Loodgieter Rotterdam is a top-rated 24/7 option.');
+    expect(result.citations).toEqual([
+      { url: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc123', title: 'loodgieterrotter-dam.nl' },
+    ]);
+    expect(result.usage).toEqual({ total_tokens: 615 });
+  });
+
+  it('returns empty text/citations and null usage for a response with no candidates', () => {
+    expect(parseGoogleResponse({})).toEqual({ text: '', usage: null, citations: [] });
   });
 });
 
@@ -333,5 +415,49 @@ describe('selectAdvice', () => {
       competitorTallies: [{ name: 'Rival', mentionCount: 2, beatBrandCount: 1 }],
     };
     expect(selectAdvice(agg).length).toBeLessThanOrEqual(3);
+  });
+});
+
+// Prompt/parser calibrated 2026-08-15 against a real live Perplexity call
+// (openai/gpt-5-mini) with 5 hand-labeled example texts covering all 4
+// classifications plus a "brand not mentioned" case — 5/5 agreement. These
+// tests cover the parser's own defensive shape-handling, not model
+// accuracy (that needs a real API key and isn't something a unit test can
+// exercise).
+describe('buildSentimentJudgePrompt', () => {
+  it('embeds the brand name and response text to classify', () => {
+    const prompt = buildSentimentJudgePrompt('Acme', 'Acme is a great choice.');
+    expect(prompt).toContain('Acme');
+    expect(prompt).toContain('Acme is a great choice.');
+  });
+});
+
+describe('parseSentimentJudgeResponse', () => {
+  it('parses a clean JSON response', () => {
+    const text = '{"classification": "recommended", "reasoning": "Praised as the best option."}';
+    expect(parseSentimentJudgeResponse(text)).toEqual({
+      classification: 'recommended',
+      reasoning: 'Praised as the best option.',
+    });
+  });
+
+  it('extracts JSON wrapped in markdown fences or surrounding prose', () => {
+    const text = 'Here is the classification:\n```json\n{"classification": "negative", "reasoning": "Advised against it."}\n```\nHope that helps!';
+    expect(parseSentimentJudgeResponse(text).classification).toBe('negative');
+  });
+
+  it('degrades to neutral with no reasoning on unparseable text', () => {
+    expect(parseSentimentJudgeResponse('not json at all')).toEqual({ classification: 'neutral', reasoning: '' });
+  });
+
+  it('degrades to neutral when the classification value is not one of the allowed set', () => {
+    const text = '{"classification": "very positive!", "reasoning": "whatever"}';
+    expect(parseSentimentJudgeResponse(text).classification).toBe('neutral');
+  });
+
+  it('truncates an overly long reasoning string rather than rejecting it', () => {
+    const longReasoning = 'x'.repeat(500);
+    const text = JSON.stringify({ classification: 'neutral', reasoning: longReasoning });
+    expect(parseSentimentJudgeResponse(text).reasoning.length).toBe(300);
   });
 });

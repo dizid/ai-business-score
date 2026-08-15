@@ -150,12 +150,145 @@ export function findBrandMention(text, prospect) {
   return primary; // both ambiguous — genuinely needs manual read
 }
 
-// ---------- Perplexity Agent API client ----------
-// Endpoint + provider/model-name addressing verified against live docs AND a
-// live smoke-test call during /plan-eng-review, 2026-07-28. Uses the
-// /v1/responses OpenAI-SDK-compatible alias — response shape confirmed live:
-// output[].content[].text.
+// ---------- Multi-provider model client ----------
+// Until 2026-08-15, every model (regardless of `provider/model` prefix) was
+// routed through Perplexity's Agent API gateway — one key, one endpoint,
+// one response shape, but meaning every result reflected "what Perplexity
+// says GPT-5/Gemini/Claude/Grok would answer," not each provider's own
+// product (see how-it-works.html's methodology-disclosure section, added
+// the same day this changed). At the CEO's explicit direction, `anthropic/*`,
+// `google/*`, and `xai/*` now call each provider's own API directly —
+// verified live (not guessed) against each provider's current docs and a
+// real smoke-test call with a working key, the same day this shipped:
+//   - Anthropic: POST /v1/messages, `web_search_20250305` tool. Response
+//     text/citations live on `content[]` entries of type "text"
+//     (`text`, `citations[].{url,title}`); usage is `input_tokens +
+//     output_tokens` (no single `total_tokens` field like the others).
+//   - Google (Gemini): POST /v1beta/models/{model}:generateContent, a
+//     `google_search` tool. Response text is `candidates[0].content.
+//     parts[].text`; citations come from `candidates[0].groundingMetadata.
+//     groundingChunks[].web.{uri,title}` — **these URLs are Google
+//     grounding-redirect links (vertexaisearch.cloud.google.com/...), not
+//     the actual source URL**, confirmed live — so Gemini-sourced citations
+//     will not hostname-match a company's own domain the way Perplexity/
+//     Anthropic/xAI citations do (see aggregateProspect's ownSiteCitations
+//     matching). A real, documented limitation, not a bug to silently
+//     paper over.
+//   - xAI (Grok): POST /v1/responses — confirmed live to be the *same*
+//     OpenAI-Responses-API-compatible shape Perplexity already used
+//     (`output[].content[].{text,annotations}`), so extractText/
+//     extractCitations below are reused unchanged for it.
+// `openai/*` (gpt-5-mini) has **no direct key available** — nothing named
+// OPENAI_API_KEY exists anywhere this migration could find — so it's the
+// one model still routed through the Perplexity gateway rather than left
+// broken; see callModel's dispatch below.
+//
+// apiKeys is `{ perplexity, anthropic, google, xai }` — any entry can be
+// undefined; a model whose provider has no key throws a clear, attributable
+// error (the same "skip and count separately" failure shape every other
+// call failure already produces) rather than a confusing generic one.
 const PPLX_URL = 'https://api.perplexity.ai/v1/responses';
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const XAI_URL = 'https://api.x.ai/v1/responses';
+
+function providerModelId(model) {
+  const i = model.indexOf('/');
+  return i === -1 ? model : model.slice(i + 1);
+}
+
+async function parseErrorResponse(res, model) {
+  const body = await res.text().catch(() => '');
+  const err = new Error(`HTTP ${res.status} from ${model}: ${body.slice(0, 300)}`);
+  // Attached so callModelWithRetry can back off harder specifically on 429
+  // (rate limit) instead of treating it the same as any other failure.
+  err.status = res.status;
+  return err;
+}
+
+async function callPerplexityOrXai(url, apiKey, model, prompt, signal, extraBody) {
+  const requestBody = { model, input: prompt, tools: [{ type: 'web_search' }], ...extraBody };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+    signal,
+  });
+  if (!res.ok) throw await parseErrorResponse(res, model);
+  const json = await res.json();
+  return { text: extractText(json), usage: json.usage ?? null, citations: extractCitations(json) };
+}
+
+// Pure — no fetch, easy to unit-test against a canned JSON fixture built
+// from a real captured response (2026-08-15 live verification), unlike the
+// async wrapper below which actually hits the network.
+export function parseAnthropicResponse(json) {
+  const textBlocks = (json.content || []).filter((b) => b.type === 'text');
+  const text = textBlocks.map((b) => b.text).join('\n');
+  const citations = [];
+  const seen = new Set();
+  for (const b of textBlocks) {
+    for (const c of b.citations || []) {
+      if (c?.type !== 'web_search_result_location' || !c.url || seen.has(c.url)) continue;
+      seen.add(c.url);
+      citations.push({ url: c.url, title: c.title || '' });
+    }
+  }
+  // Anthropic has no single total_tokens field like Perplexity/xAI/Google —
+  // input_tokens + output_tokens is the live-confirmed equivalent.
+  const usage = json.usage
+    ? { total_tokens: (json.usage.input_tokens ?? 0) + (json.usage.output_tokens ?? 0) }
+    : null;
+  return { text, usage, citations };
+}
+
+async function callAnthropicDirect(apiKey, modelId, prompt, signal) {
+  const res = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: modelId,
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+    }),
+    signal,
+  });
+  if (!res.ok) throw await parseErrorResponse(res, `anthropic/${modelId}`);
+  return parseAnthropicResponse(await res.json());
+}
+
+// Pure — see parseAnthropicResponse's comment above. Citation URLs here are
+// Google's grounding-redirect links (vertexaisearch.cloud.google.com/...),
+// not the real source URL — confirmed live, documented on callModel above.
+export function parseGoogleResponse(json) {
+  const parts = json.candidates?.[0]?.content?.parts || [];
+  const text = parts.map((p) => p.text || '').join('\n');
+  const chunks = json.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+  const citations = chunks
+    .filter((c) => c?.web?.uri)
+    .map((c) => ({ url: c.web.uri, title: c.web.title || '' }));
+  const usage = json.usageMetadata ? { total_tokens: json.usageMetadata.totalTokenCount ?? 0 } : null;
+  return { text, usage, citations };
+}
+
+async function callGoogleDirect(apiKey, modelId, prompt, signal) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      tools: [{ google_search: {} }],
+    }),
+    signal,
+  });
+  if (!res.ok) throw await parseErrorResponse(res, `google/${modelId}`);
+  return parseGoogleResponse(await res.json());
+}
 
 // timeoutMs is optional — the local proof-script can wait as long as it
 // wants, but the hosted scan function (Netlify, hard wall-clock limit) needs
@@ -171,46 +304,41 @@ const PPLX_URL = 'https://api.perplexity.ai/v1/responses';
 // timeoutMs budget regardless of how long the batch has already been
 // running). AbortSignal.any (Node 20+) combines both — either one aborting
 // aborts the fetch.
-export async function callModel(apiKey, model, prompt, timeoutMs, externalSignal) {
+export async function callModel(apiKeys, model, prompt, timeoutMs, externalSignal) {
   const controller = timeoutMs ? new AbortController() : undefined;
   const timer = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
   const signals = [controller?.signal, externalSignal].filter(Boolean);
   const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
+  const provider = model.split('/')[0];
+  const modelId = providerModelId(model);
   try {
-    const requestBody = {
-      model,
-      input: prompt,
-      tools: [{ type: 'web_search' }],
-    };
-    // Anthropic models reject the request outright without this (confirmed
-    // live, 2026-08-13: HTTP 400 "max_output_tokens is required when using
-    // Anthropic models") — the other providers don't need it and default
-    // sensibly, so it's only added for that one provider rather than always.
-    if (model.startsWith('anthropic/')) {
-      requestBody.max_output_tokens = 2048;
+    switch (provider) {
+      case 'anthropic':
+        if (!apiKeys.anthropic) throw new Error(`No ANTHROPIC_API_KEY configured for direct call to ${model}`);
+        return await callAnthropicDirect(apiKeys.anthropic, modelId, prompt, signal);
+      case 'google':
+        if (!apiKeys.google) throw new Error(`No GOOGLE_API_KEY configured for direct call to ${model}`);
+        return await callGoogleDirect(apiKeys.google, modelId, prompt, signal);
+      case 'xai':
+        if (!apiKeys.xai) throw new Error(`No XAI_API_KEY configured for direct call to ${model}`);
+        return await callPerplexityOrXai(XAI_URL, apiKeys.xai, modelId, prompt, signal);
+      default:
+        // openai/* (and anything else) — no direct key exists for these,
+        // stays on the Perplexity gateway. Anthropic models called THROUGH
+        // Perplexity (legacy path, not used by the switch above anymore)
+        // needed an explicit max_output_tokens; kept here only in case a
+        // caller ever passes an anthropic/* model without an apiKeys.anthropic
+        // entry and this default branch is reached as a fallback.
+        if (!apiKeys.perplexity) throw new Error(`No PERPLEXITY_API_KEY configured for gateway call to ${model}`);
+        return await callPerplexityOrXai(
+          PPLX_URL,
+          apiKeys.perplexity,
+          model,
+          prompt,
+          signal,
+          model.startsWith('anthropic/') ? { max_output_tokens: 2048 } : undefined
+        );
     }
-    const res = await fetch(PPLX_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-      signal,
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      const err = new Error(`HTTP ${res.status} from ${model}: ${body.slice(0, 300)}`);
-      // Attached so callModelWithRetry can back off harder specifically on
-      // 429 (rate limit) instead of treating it the same as any other
-      // failure — see that function's comment.
-      err.status = res.status;
-      throw err;
-    }
-
-    const json = await res.json();
-    return { text: extractText(json), usage: json.usage ?? null, citations: extractCitations(json) };
   } catch (err) {
     if (err.name === 'AbortError') {
       throw new Error(
@@ -259,11 +387,14 @@ function sleep(ms) {
 const RETRY_BACKOFF_MS = 1000;
 const RATE_LIMIT_BACKOFF_MS = 5000;
 
-export async function callModelWithRetry(apiKey, model, prompt, timeoutMs, maxAttempts = 2, externalSignal) {
+// apiKeys: same `{ perplexity, anthropic, google, xai }` shape callModel
+// takes — named apiKeys (not apiKey) throughout since 2026-08-15's
+// direct-provider migration, see callModel's own comment for the full story.
+export async function callModelWithRetry(apiKeys, model, prompt, timeoutMs, maxAttempts = 2, externalSignal) {
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await callModel(apiKey, model, prompt, timeoutMs, externalSignal);
+      return await callModel(apiKeys, model, prompt, timeoutMs, externalSignal);
     } catch (err) {
       lastErr = err;
       if (externalSignal?.aborted) break;
@@ -780,6 +911,60 @@ export function parseDeepAdviceResponse(text) {
           difficulty: validDifficulties.has(s.difficulty) ? s.difficulty : 'Medium',
         })),
     };
+  } catch {
+    return empty;
+  }
+}
+
+// ---------- Sentiment judge (on-demand, live LLM call) ----------
+// PLAN_NEXT_PHASE.md Milestone F item 2: replace the whole-word regex
+// presence check with a second LLM pass classifying HOW a brand was
+// portrayed in one specific completed check's response text — not just
+// whether it was mentioned. Same on-demand shape as buildDeepAdvicePrompt
+// above and for the same reason: a second LLM call per judged check is
+// real added cost/latency, and this repo's own history (the 2026-08-09
+// model-count revert, the 2026-08-13 concurrency incidents) is two
+// separate real production incidents that both trace back to adding more
+// calls to the automatic scan pipeline without checking capacity first.
+// Deliberately scoped to judge ONE check at a time, triggered by the user
+// (a button per check in ScanDetail.vue's check-by-check breakdown), never
+// automatically as part of every scan — this keeps cost opt-in and keeps
+// the already-tight SCAN_DEADLINE_MS budget (see run-scan-background.mts)
+// untouched.
+const SENTIMENT_CLASSIFICATIONS = new Set(['recommended', 'neutral', 'negative', 'comparison-only']);
+
+export function buildSentimentJudgePrompt(brand, responseText) {
+  return `You are classifying how a brand was portrayed in a piece of AI-generated text. The brand is "${brand}". Here is the full text:
+"""
+${responseText}
+"""
+Classify how "${brand}" is portrayed in this text specifically. Respond with ONLY a JSON object (no markdown fences, no commentary before or after):
+{
+  "classification": "recommended" | "neutral" | "negative" | "comparison-only",
+  "reasoning": "one sentence explaining the classification"
+}
+Classification guide:
+- "recommended": the text actively recommends or praises "${brand}" as a good or leading option.
+- "neutral": "${brand}" is mentioned factually, without a clear endorsement or criticism.
+- "negative": the text criticizes "${brand}" or advises against it.
+- "comparison-only": "${brand}" is only listed among several options being compared, with no clear recommendation either way.
+If "${brand}" is not actually mentioned anywhere in the text, respond with "classification": "neutral" and say so in "reasoning".`;
+}
+
+// Same lenient-extraction, always-safe-shape pattern as
+// parseDeepAdviceResponse/parseEnrichmentResponse — an unparseable or
+// malformed response degrades to a neutral classification with no
+// reasoning rather than throwing, since a failed judge call should read as
+// "couldn't determine," not crash the check it was asked about.
+export function parseSentimentJudgeResponse(text) {
+  const empty = { classification: 'neutral', reasoning: '' };
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return empty;
+  try {
+    const parsed = JSON.parse(match[0]);
+    const classification = SENTIMENT_CLASSIFICATIONS.has(parsed.classification) ? parsed.classification : 'neutral';
+    const reasoning = typeof parsed.reasoning === 'string' ? parsed.reasoning.trim().slice(0, 300) : '';
+    return { classification, reasoning };
   } catch {
     return empty;
   }

@@ -156,7 +156,13 @@ account created for AIVis specifically.
   2026-08-13, scan-complete email, sending domain DNS-verified same day —
   see "Update 2026-08-13" note above). `SCAN_PASSPHRASE` was removed
   2026-08-03 (Milestone 8 cleanup) once nothing in code referenced it
-  anymore.
+  anymore. `ANTHROPIC_API_KEY`/`GOOGLE_API_KEY`/`XAI_API_KEY` added
+  2026-08-15 for the direct-provider migration (see "Multi-provider model
+  client" under `shared/aivis-core.mjs` below) — all three are personal
+  keys reused from other Dizid projects (found under `/home/marc/DEV`),
+  same reuse pattern already established for `RESEND_API_KEY`, not new
+  accounts created for AIVis specifically. No `OPENAI_API_KEY` exists
+  anywhere — `openai/gpt-5-mini` stays on the Perplexity gateway.
 
 ## Commands
 
@@ -240,6 +246,10 @@ wasn't revisited by it.
   "Your site, cited" section. Each `raw_responses` entry also gained a
   `citations` array (all citations for that check, not just own-domain
   matches) — no new column needed, additive key inside the existing jsonb.
+  Also added 2026-08-15 (Milestone F, sentiment judge): `sentiment_judgments
+  jsonb` — `[{promptIndex, model, classification, reasoning}]`, populated
+  one check at a time via `judge-sentiment.mts`, nullable/additive, empty
+  until a user judges at least one check.
 - **`company_urls`** — an **unused, present-but-dead table**. It backed
   multi-URL-per-company tracking (shipped, then deleted per Milestone B of
   `PLAN_NEXT_PHASE.md`): every company got a primary row equal to its
@@ -349,10 +359,72 @@ The single source of truth, imported by every consumer:
   2026-08-13" note above for why (concurrency dropped to 1, so more calls
   means direct wall-clock cost with no parallelism to hide it behind).
   `proof-script` still runs the full 10.
-- **Perplexity Agent API client** (`callModel`) — `POST
-  https://api.perplexity.ai/v1/responses`, routing both OpenAI- and
-  Google-branded models through one Perplexity key via `provider/model-name`
-  addressing. Optional `timeoutMs` (via `AbortController`).
+- **Multi-provider model client** (`callModel`) — **rewritten 2026-08-15,
+  direct-provider migration.** Until this date every model, regardless of
+  its `provider/model-name` string, was routed through Perplexity's Agent
+  API gateway (`POST /v1/responses`) — one key, one shape, but meaning every
+  result reflected "what Perplexity says GPT-5/Gemini/Claude/Grok would
+  answer," not each provider's own product (the exact gap
+  `how-it-works.html`'s methodology-disclosure section, added the same day,
+  called out). At the CEO's explicit direction, `callModel` now dispatches
+  by provider prefix — verified live against each provider's own current
+  docs and a real smoke-test call with a working key (found by searching
+  other Dizid projects under `/home/marc/DEV` for reusable personal API
+  keys — same reuse-across-projects pattern already established for
+  `RESEND_API_KEY`), not guessed:
+  - **`anthropic/*`** — direct `POST https://api.anthropic.com/v1/messages`,
+    `web_search_20250305` tool. `ANTHROPIC_API_KEY`.
+  - **`google/*`** — direct `POST .../v1beta/models/{model}:generateContent`
+    (Gemini), `google_search` tool. `GOOGLE_API_KEY`. **Citations are
+    Google grounding-redirect URLs
+    (`vertexaisearch.cloud.google.com/grounding-api-redirect/...`), not the
+    real source URL** — confirmed live, a real limitation: Gemini-sourced
+    citations will never hostname-match a company's own domain the way
+    Perplexity/Anthropic/xAI citations do (`aggregateProspect`'s
+    `ownSiteCitations`).
+  - **`xai/*`** — direct `POST https://api.x.ai/v1/responses`. `XAI_API_KEY`.
+    Confirmed live to be the *same* OpenAI-Responses-API-compatible shape
+    Perplexity already used, so `extractText`/`extractCitations` are reused
+    unchanged. **Noticeably slower than the other three in live testing —
+    30-50s+ per call observed** (Grok's agentic multi-round web search),
+    versus single-digit-to-teens seconds for Anthropic/Google. Not yet
+    reflected in any timeout/deadline tuning (`CALL_TIMEOUT_MS`/
+    `SCAN_DEADLINE_MS` in `run-scan-background.mts` are unchanged by this
+    migration, deliberately — see below) — a real risk worth watching once
+    this runs against production scan volume.
+  - **`openai/*`** (`gpt-5-mini`) — **no direct key exists anywhere** (this
+    migration searched; genuinely absent). Still routed through the
+    Perplexity gateway (`PPLX_URL`), unchanged from before. Deep advice,
+    the sentiment judge, and `enrich.mts` all hardcode this exact model, so
+    they're unaffected by everything above.
+  - `apiKeys` is now always an object (`{ perplexity, anthropic, google,
+    xai }`, any entry optional) rather than a single string — every caller
+    (`run-scan-background.mts`, `generate-deep-advice.mts`,
+    `judge-sentiment.mts`, `enrich.mts`, `proof-script/index.mjs`) was
+    updated. A model whose provider has no configured key throws a clear,
+    attributable per-model error rather than a confusing generic one — same
+    "skip and count separately" failure shape every other call failure
+    already used, so a single missing key degrades that one provider's
+    calls to failures instead of failing the whole scan.
+  - **Deliberately NOT changed by this migration**: `CONCURRENCY_LIMIT`
+    (still 1) and `SCAN_DEADLINE_MS` (still 600000) in
+    `run-scan-background.mts` — those were tuned specifically against
+    Perplexity's own real per-key rate limit (~1 concurrent), which no
+    longer gates 3 of the 4 models now that they call separate independent
+    services. Revisiting concurrency now that most calls don't share one
+    rate limit is a real, plausible follow-up, but retuning it blind in the
+    same change as the provider migration would make it impossible to tell
+    which change caused which effect if something broke — this file's own
+    history (three separate concurrency-tuning incidents: 2026-08-09's
+    10→4 revert, 2026-08-13's 4→1 finding, 2026-08-14's cascading-timeout
+    gap) is the reason for that caution, not theoretical.
+  - **Not yet live-verified**: an actual full 20-call scan through
+    `run-scan-background.mts` with real production traffic — the
+    per-provider smoke tests above each confirmed one call succeeds with
+    real output, not that the full concurrency/deadline/retry machinery
+    behaves correctly across a real scan's mix of all 4 providers. Do that
+    once, timed, before fully trusting this the way past model/concurrency
+    changes in this file were each verified live before being trusted.
 - **Detection** (`findBrandMention`, `findMentions`) — whole-word,
   case-insensitive regex match on the brand name and a domain-derived alias.
   Presence-only, not sentiment-aware. Common-word brand names (from a
@@ -384,14 +456,32 @@ The single source of truth, imported by every consumer:
   Perplexity calls — pure post-processing of data the app was already
   fetching and discarding. Surfaced in `ScanDetail.vue` as a "Your site,
   cited" section plus a per-check "Sources:" line in the check-by-check
-  breakdown. The semantic/sentiment-aware citation judge that was scoped
-  alongside this in `PLAN_NEXT_PHASE.md`'s Milestone F is deliberately
-  **not** built yet — it needs a live second LLM call per brand mention
-  (a real cost/latency multiplier on an already-tight 5-8 min, 20-call
-  sequential scan) plus the calibration pass the plan doc itself calls for;
-  building it blind risked repeating the exact kind of unverified-assumption
-  incident this file's own history (2026-08-09 model revert, 2026-08-13
-  concurrency incidents) already got burned by once.
+  breakdown.
+- **Sentiment judge** (`buildSentimentJudgePrompt`,
+  `parseSentimentJudgeResponse`, `netlify/functions/judge-sentiment.mts`) —
+  the other half of Milestone F: a second live grounded Perplexity call
+  (`openai/gpt-5-mini`) that classifies how a brand was portrayed in one
+  specific completed check's response text — `recommended`/`neutral`/
+  `negative`/`comparison-only` — replacing presence-only detection's
+  boolean with an actual read of tone. **Calibrated before shipping**: a
+  throwaway script (deleted after use, same discipline as smoke-testing a
+  new model) ran the real prompt against 5 hand-labeled example texts
+  covering all 4 classifications plus a "brand not mentioned" case, via a
+  live call with the production `PERPLEXITY_API_KEY` — 5/5 agreement.
+  Deliberately **on-demand and per-check**, same shape as deep advice and
+  for the same reason, taken further: a "Judge sentiment" button appears
+  per check in `ScanDetail.vue`'s check-by-check breakdown (only when that
+  check actually mentioned the brand), POSTs `{promptIndex, model}` to
+  `/scans/:id/judge-sentiment`, and the result is upserted into a new
+  `sentiment_judgments jsonb` column on `scans` (additive, nullable) keyed
+  by `(promptIndex, model)` so re-judging replaces rather than duplicates.
+  **Never runs automatically as part of a scan** — a second LLM call per
+  judged check would be a real cost/latency multiplier on an already-tight
+  5-8 min, 20-call sequential scan, and this file's own history
+  (2026-08-09 model revert, 2026-08-13 concurrency incidents) is two
+  separate real production incidents that both trace back to adding more
+  calls to the automatic scan pipeline without checking capacity first —
+  opt-in per-check avoids repeating that.
 - **Score** (`computeScore`, `scoreBand`) — 0-100 (or `null` if
   `completedCalls < 4` — never a fake 0 from too little data). **Updated**:
   no longer the simple `ranked1Count + 0.4*beatenCount` formula this doc
@@ -595,6 +685,8 @@ motivated the change.
   through `companies`), polled by the frontend.
 - **`generate-deep-advice.mts`** — POST `/scans/:id/deep-advice`, see
   "Deep advice" above.
+- **`judge-sentiment.mts`** — POST `/scans/:id/judge-sentiment`, body
+  `{promptIndex, model}`, see "Sentiment judge" above.
 - **`companies.mts`** — GET (list, with per-company `scan_count`/
   `latest_score`) and POST (create) `/companies`, auth-scoped.
 - **`company.mts`** — GET `/companies/:id` (via Netlify's URLPattern path

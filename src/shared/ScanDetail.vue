@@ -9,17 +9,46 @@ import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceId, 
 // never drift out of sync the way two hand-copied templates eventually
 // would.
 //
-// allowDeepAdvice/deepAdviceLoading + the generate-deep-advice emit are the
-// one deliberate exception to "purely presentational, no other props, no
-// emits" (Milestone 6): result/App.vue has no auth system at all (old
-// shareable links are static, decode-only), so it never sets
-// allowDeepAdvice — only CompanyDetailView.vue does, and it owns the actual
-// authenticated fetch call, keeping this component itself auth-agnostic.
+// allowDeepAdvice/deepAdviceLoading + the generate-deep-advice emit (and,
+// same reasoning, allowSentimentJudge/sentimentJudgeLoadingKey + the
+// judge-sentiment emit) are the deliberate exceptions to "purely
+// presentational, no other props, no emits" (Milestone 6, extended for the
+// Milestone F sentiment judge): result/App.vue has no auth system at all
+// (old shareable links are static, decode-only), so it never sets either
+// allow* prop — only CompanyDetailView.vue does, and it owns the actual
+// authenticated fetch calls, keeping this component itself auth-agnostic.
 const props = withDefaults(
-  defineProps<{ payload: ValidatedPayload; allowDeepAdvice?: boolean; deepAdviceLoading?: boolean }>(),
-  { allowDeepAdvice: false, deepAdviceLoading: false }
+  defineProps<{
+    payload: ValidatedPayload;
+    allowDeepAdvice?: boolean;
+    deepAdviceLoading?: boolean;
+    allowSentimentJudge?: boolean;
+    // Key of the check currently being judged (`${promptIndex}:${model}`),
+    // or null — a per-check loading state rather than one global boolean,
+    // since a user could plausibly have two checks expanded at once.
+    sentimentJudgeLoadingKey?: string | null;
+  }>(),
+  { allowDeepAdvice: false, deepAdviceLoading: false, allowSentimentJudge: false, sentimentJudgeLoadingKey: null }
 );
-defineEmits<{ 'generate-deep-advice': [] }>();
+defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string] }>();
+
+const SENTIMENT_LABEL: Record<string, string> = {
+  recommended: 'Recommended',
+  neutral: 'Neutral',
+  negative: 'Negative',
+  'comparison-only': 'Comparison only',
+};
+
+function sentimentKey(promptIndex: number, model: string) {
+  return `${promptIndex}:${model}`;
+}
+const sentimentByKey = computed(() => {
+  const map = new Map<string, { classification: string; reasoning: string }>();
+  for (const j of props.payload.sentimentJudgments) {
+    map.set(sentimentKey(j.promptIndex, j.model), { classification: j.classification, reasoning: j.reasoning });
+  }
+  return map;
+});
 
 const BAND_LABEL: Record<string, string> = {
   leading: 'Leading', visible: 'Visible, often beaten',
@@ -295,7 +324,14 @@ const visibleAdvice = computed(() =>
           <details class="check-row" v-for="(c, i) in group.checks" :key="i">
             <summary>
               <span class="check-model">{{ c.model }}</span>
-              <span class="check-badge" :class="`badge-${c.rank}`">{{ CHECK_BADGE_LABEL[c.rank] }}</span>
+              <span class="check-badges">
+                <span class="check-badge" :class="`badge-${c.rank}`">{{ CHECK_BADGE_LABEL[c.rank] }}</span>
+                <span
+                  v-if="sentimentByKey.get(sentimentKey(group.promptIndex, c.model))"
+                  class="sentiment-badge"
+                  :class="`sentiment-${sentimentByKey.get(sentimentKey(group.promptIndex, c.model))!.classification}`"
+                >{{ SENTIMENT_LABEL[sentimentByKey.get(sentimentKey(group.promptIndex, c.model))!.classification] }}</span>
+              </span>
             </summary>
             <div class="check-body">
               <div class="check-text">{{ c.text }}</div>
@@ -303,6 +339,18 @@ const visibleAdvice = computed(() =>
                 Sources:
                 <a v-for="(cit, j) in c.citations" :key="j" :href="cit.url" target="_blank" rel="noopener">{{ cit.title || cit.url }}</a>
               </div>
+              <div class="check-sentiment" v-if="sentimentByKey.get(sentimentKey(group.promptIndex, c.model))">
+                {{ sentimentByKey.get(sentimentKey(group.promptIndex, c.model))!.reasoning }}
+              </div>
+              <button
+                v-else-if="allowSentimentJudge && c.rank !== 'not-mentioned'"
+                type="button"
+                class="judge-sentiment-button"
+                :disabled="sentimentJudgeLoadingKey === sentimentKey(group.promptIndex, c.model)"
+                @click="$emit('judge-sentiment', group.promptIndex, c.model)"
+              >
+                {{ sentimentJudgeLoadingKey === sentimentKey(group.promptIndex, c.model) ? 'Judging…' : 'Judge sentiment' }}
+              </button>
             </div>
           </details>
         </div>
@@ -534,6 +582,27 @@ h2:first-of-type { margin-top: 0; }
 .badge-ranked-1 { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--success-text); }
 .badge-ranked-2, .badge-ranked-3, .badge-mentioned, .badge-beaten { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
 .badge-not-mentioned { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+.check-badges { display: flex; align-items: center; gap: 6px; flex: none; }
+.sentiment-badge {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 2px 9px; border-radius: 999px; flex: none; white-space: nowrap;
+}
+.sentiment-recommended { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--success-text); }
+.sentiment-neutral { background: color-mix(in srgb, var(--faint) 20%, transparent); color: var(--muted); }
+.sentiment-negative { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+.sentiment-comparison-only { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
+.check-sentiment {
+  font-size: 0.82rem; color: var(--muted); font-style: italic;
+  padding: 0 10px 10px;
+}
+.judge-sentiment-button {
+  margin: 0 10px 10px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: transparent; color: var(--fg); cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.judge-sentiment-button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.judge-sentiment-button:disabled { opacity: 0.6; cursor: wait; }
 .check-body {
   border: 1px solid var(--border); border-top: none;
   border-radius: 0 0 8px 8px;

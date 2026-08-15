@@ -24,6 +24,9 @@ export function toScanPayload(row: Record<string, any>) {
     // own_site_citations is new (Milestone F citation attribution) — same
     // null-to-[] default for pre-migration rows.
     ownSiteCitations: row.own_site_citations ?? [],
+    // sentiment_judgments is new (Milestone F sentiment judge) — same
+    // null-to-[] default; empty until a user judges at least one check.
+    sentimentJudgments: row.sentiment_judgments ?? [],
     generatedAt: row.generated_at,
     deepAdvice: row.deep_advice ?? null,
     deepAdviceGeneratedAt: row.deep_advice_generated_at ?? null,

@@ -106,10 +106,10 @@ class FailFastTracker {
   }
 }
 
-async function callWithRetry(apiKey, model, prompt, failFast) {
+async function callWithRetry(apiKeys, model, prompt, failFast) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const result = await callModel(apiKey, model, prompt);
+      const result = await callModel(apiKeys, model, prompt);
       failFast.recordSuccess();
       return { ok: true, ...result };
     } catch (err) {
@@ -216,8 +216,21 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   loadEnv(path.join(__dirname, '.env'));
 
-  if (!args.dryRun && !process.env.PERPLEXITY_API_KEY) {
-    console.error('PERPLEXITY_API_KEY not set. Copy .env.example to .env and fill it in, or use --dry-run.');
+  // 2026-08-15 direct-provider migration (see aivis-core.mjs's callModel
+  // comment): anthropic/google/xai models now call each provider's own API
+  // directly; only openai/gpt-5-mini still needs PERPLEXITY_API_KEY. At
+  // least one key must be set to do any real work.
+  const apiKeys = {
+    perplexity: process.env.PERPLEXITY_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY,
+    google: process.env.GOOGLE_API_KEY,
+    xai: process.env.XAI_API_KEY,
+  };
+  if (!args.dryRun && !apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai) {
+    console.error(
+      'No model API keys set (PERPLEXITY_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY / XAI_API_KEY). ' +
+      'Copy .env.example to .env and fill in at least one, or use --dry-run.'
+    );
     process.exit(1);
   }
 
@@ -276,7 +289,7 @@ async function main() {
         const { text, usage } = mockCall(task.prompt, prospect);
         return { ok: true, text, usage, model: task.model, promptIndex: task.promptIndex };
       }
-      const result = await callWithRetry(process.env.PERPLEXITY_API_KEY, task.model, task.prompt, failFast);
+      const result = await callWithRetry(apiKeys, task.model, task.prompt, failFast);
       return { ...result, model: task.model, promptIndex: task.promptIndex };
     });
 

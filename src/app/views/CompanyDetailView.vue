@@ -38,6 +38,7 @@ const upgrading = ref(false);
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
 const deepAdviceLoading = ref(false);
+const sentimentJudgeLoadingKey = ref<string | null>(null);
 
 const isPublic = computed(() => company.value?.is_public === true);
 // scans.value entries come from toScanPayload (scanRow.mts), which doesn't
@@ -263,6 +264,30 @@ async function runDeepAdvice() {
   }
 }
 
+async function runSentimentJudge(promptIndex: number, model: string) {
+  if (selectedIndex.value === null || !selectedPayload.value) return;
+  sentimentJudgeLoadingKey.value = `${promptIndex}:${model}`;
+  try {
+    const res = await authFetch(`/scans/${selectedPayload.value.id}/judge-sentiment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promptIndex, model }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      scanError.value = data.error || 'Failed to judge sentiment.';
+      return;
+    }
+    // Same replace-by-id reasoning as runDeepAdvice above.
+    const idx = scans.value.findIndex((s) => s.id === data.scan.id);
+    if (idx !== -1) scans.value[idx] = data.scan;
+  } catch (err) {
+    scanError.value = (err as Error).message;
+  } finally {
+    sentimentJudgeLoadingKey.value = null;
+  }
+}
+
 function selectScan(index: number) {
   selectedIndex.value = index;
 }
@@ -416,7 +441,10 @@ watch(() => route.params.id, load);
               :payload="selectedPayload"
               :allow-deep-advice="true"
               :deep-advice-loading="deepAdviceLoading"
+              :allow-sentiment-judge="true"
+              :sentiment-judge-loading-key="sentimentJudgeLoadingKey"
               @generate-deep-advice="runDeepAdvice"
+              @judge-sentiment="runSentimentJudge"
             />
             <p class="empty" v-else>This record couldn't be rendered — its stored data doesn't match the expected format.</p>
           </template>
