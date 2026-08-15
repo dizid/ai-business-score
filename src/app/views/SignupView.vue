@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { signUp } from '../lib/auth';
+import Icon from '../../shared/Icon.vue';
 
 const router = useRouter();
 
@@ -28,10 +29,7 @@ async function onSubmit() {
 <template>
   <main>
     <div class="brand-mark" aria-hidden="true">
-      <svg width="26" height="26" viewBox="0 0 20 20" fill="none">
-        <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="2"></circle>
-        <path d="M10 5.5v5l3.2 1.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-      </svg>
+      <Icon name="logo" />
     </div>
     <h1>Create your account</h1>
     <form class="card" @submit.prevent="onSubmit">
@@ -52,11 +50,12 @@ async function onSubmit() {
 </template>
 
 <style scoped>
-main { max-width: 420px; margin: 0 auto; padding: 64px 20px 96px; }
+main { max-width: 420px; margin: 0 auto; padding: var(--space-2xl) var(--space-md) 96px; }
 .brand-mark {
-  display: flex; justify-content: center; margin-bottom: 16px; color: var(--accent);
+  display: flex; justify-content: center; margin-bottom: var(--space-md); color: var(--accent);
 }
-h1 { font-size: 1.6rem; font-weight: 600; letter-spacing: -0.01em; text-align: center; margin: 0 0 28px; }
+.brand-mark :deep(.icon) { width: 26px; height: 26px; }
+h1 { font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.01em; text-align: center; margin: 0 0 28px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 30px 28px; box-shadow: var(--shadow); }
 label { display: block; font-size: 0.83rem; font-weight: 600; color: var(--muted); margin-top: 18px; margin-bottom: 6px; }
 label:first-child { margin-top: 0; }

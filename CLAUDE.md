@@ -233,7 +233,13 @@ wasn't revisited by it.
   (Milestone A of `PLAN_NEXT_PHASE.md`): `failures jsonb` (per-failed-call
   `{model, promptIndex, error}` detail, nullable — old rows have `null`,
   rendered as `[]`) and `total_tokens integer` (DB-only, for cost queries,
-  never surfaced in the UI).
+  never surfaced in the UI). Added 2026-08-15 (Milestone F, citation-URL
+  attribution): `own_site_citations jsonb` — citation URLs from completed
+  checks matching the scanned company's own domain, `[{promptIndex, model,
+  url, title}]`, nullable/additive, surfaced in `ScanDetail.vue`'s new
+  "Your site, cited" section. Each `raw_responses` entry also gained a
+  `citations` array (all citations for that check, not just own-domain
+  matches) — no new column needed, additive key inside the existing jsonb.
 - **`company_urls`** — an **unused, present-but-dead table**. It backed
   multi-URL-per-company tracking (shipped, then deleted per Milestone B of
   `PLAN_NEXT_PHASE.md`): every company got a primary row equal to its
@@ -241,6 +247,15 @@ wasn't revisited by it.
   in the app reads, writes, or joins against this table anymore — `scan.mts`
   always uses `companies.website` directly. Left in place rather than
   dropped, same reasoning as `is_public` above.
+- **`company_members`** — added 2026-08-15, a **schema-only scaffold, not
+  yet read or written anywhere**. `company_id` FK to `companies`,
+  `member_user_id` FK to `user_profiles(user_id)` (same FK target
+  `companies.owner_user_id` uses, for consistency), `role text default
+  'viewer'`, unique on `(company_id, member_user_id)`. Exists ahead of the
+  actual team/agency-access feature (invite flow, permission checks) since
+  it's a pure additive migration — the opposite case from `is_public`/
+  `company_urls` above, which are dead columns from a *removed* feature;
+  this one is prep for a feature that hasn't been built yet.
 
 Schema and Neon Auth were provisioned via the Neon MCP tools
 (`create_project`, `provision_neon_auth`, `prepare_database_migration` →
@@ -354,10 +369,41 @@ The single source of truth, imported by every consumer:
 - **Aggregation** (`aggregateProspect`) — cited count, completed vs. failed
   call counts, heuristic first-mention-order ranking, and
   `competitorTallies` (computed unconditionally per completed response, not
-  gated on the brand itself being cited).
+  gated on the brand itself being cited). Also returns `ownSiteCitations`
+  (added 2026-08-15, Milestone F) — see "Citation-URL attribution" below.
+- **Citation-URL attribution** (`extractCitations`, in `aggregateProspect`'s
+  `ownSiteCitations`/per-response `citations`) — Perplexity's `/v1/responses`
+  payload carries `url_citation` annotations on each message's content parts
+  (confirmed against the live OpenAPI schema at
+  `docs.perplexity.ai/api-reference/agent-post`, not guessed). `callModel`
+  now also returns `citations: extractCitations(json)` alongside `text`;
+  `aggregateProspect` matches each completed call's citations against the
+  scanned company's own hostname (subdomain-tolerant) and collects matches
+  into `ownSiteCitations`, while every citation (own-domain or not) rides
+  along on that call's `rawResponses[i].citations` entry. Zero extra
+  Perplexity calls — pure post-processing of data the app was already
+  fetching and discarding. Surfaced in `ScanDetail.vue` as a "Your site,
+  cited" section plus a per-check "Sources:" line in the check-by-check
+  breakdown. The semantic/sentiment-aware citation judge that was scoped
+  alongside this in `PLAN_NEXT_PHASE.md`'s Milestone F is deliberately
+  **not** built yet — it needs a live second LLM call per brand mention
+  (a real cost/latency multiplier on an already-tight 5-8 min, 20-call
+  sequential scan) plus the calibration pass the plan doc itself calls for;
+  building it blind risked repeating the exact kind of unverified-assumption
+  incident this file's own history (2026-08-09 model revert, 2026-08-13
+  concurrency incidents) already got burned by once.
 - **Score** (`computeScore`, `scoreBand`) — 0-100 (or `null` if
-  `completedCalls === 0` — never a fake 0). Formula: `round(100 *
-  (ranked1Count + 0.4 * beatenCount) / completedCalls)`.
+  `completedCalls < 4` — never a fake 0 from too little data). **Updated**:
+  no longer the simple `ranked1Count + 0.4*beatenCount` formula this doc
+  previously described (that was stale, predating the "Overhaul scoring:
+  positional ranking + strategic query weighting" commit) — `computeScore`
+  now weights each completed call by rank (`RANK_WEIGHTS`: ranked-1 1.0,
+  ranked-2 0.6, ranked-3 0.3, mentioned 0.1) multiplied by that prompt's
+  query-category weight (`DEFAULT_QUERY_WEIGHTS`: high-intent 3, comparison
+  2, informational 1, via `PROMPT_CATEGORIES`), then
+  `round(100 * totalWeightedScore / totalMaximumScore)` — so ranking first
+  on a direct-buying-intent prompt moves the score more than ranking first
+  on a broad informational one.
 - **Advice** (`selectAdvice`) — rule-based/templated, not a live LLM call,
   always computed synchronously right after a scan completes. Copy lives in
   `src/shared/ScanDetail.vue`'s template branches.

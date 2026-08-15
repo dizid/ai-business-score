@@ -7,8 +7,13 @@ import { computed, ref } from 'vue';
 // score ring/scoreboard approach; reuses the same theme.css tokens (already
 // validated dataviz-skill palette) rather than introducing new colors.
 const props = defineProps<{
-  scans: { generatedAt: string; score: number | null }[];
+  scans: { id: string; generatedAt: string; score: number | null }[];
 }>();
+
+// Clicking a marker re-selects that scan in CompanyDetailView's list —
+// turns the trend line into a second way to reach a specific scan, not
+// just a hover-only summary.
+const emit = defineEmits<{ (e: 'select-point', id: string): void }>();
 
 // API returns newest-first; chart reads chronologically left-to-right.
 const points = computed(() =>
@@ -134,12 +139,14 @@ const hovered = computed(() => (hoveredIndex.value === null ? null : points.valu
             :cx="xFor(i)" :cy="yFor(p.score)" r="5"
             @mouseenter="hoveredIndex = i"
             @mouseleave="hoveredIndex = null"
+            @click="emit('select-point', p.id)"
           />
         </template>
       </svg>
 
       <div class="tooltip" v-if="hovered && hovered.score !== null">
         {{ formatDate(hovered.generatedAt) }}: <strong>{{ hovered.score }}</strong> / 100
+        <span class="tooltip-hint">· click to view</span>
       </div>
     </div>
   </div>
@@ -158,4 +165,5 @@ svg { width: 100%; height: auto; display: block; }
 @media (prefers-reduced-motion: reduce) { .score-marker { transition: none; } }
 .tooltip { margin-top: 10px; font-size: 0.85rem; color: var(--muted); text-align: center; min-height: 1.2em; }
 .tooltip strong { color: var(--fg); }
+.tooltip-hint { color: var(--faint); }
 </style>

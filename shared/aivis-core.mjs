@@ -210,7 +210,7 @@ export async function callModel(apiKey, model, prompt, timeoutMs, externalSignal
     }
 
     const json = await res.json();
-    return { text: extractText(json), usage: json.usage ?? null };
+    return { text: extractText(json), usage: json.usage ?? null, citations: extractCitations(json) };
   } catch (err) {
     if (err.name === 'AbortError') {
       throw new Error(
@@ -318,6 +318,34 @@ export function extractText(json) {
   throw new Error(`Could not extract text from response — unexpected shape: ${JSON.stringify(json).slice(0, 300)}`);
 }
 
+// Citation-URL attribution (PLAN_NEXT_PHASE.md Milestone F). Perplexity's
+// `/v1/responses` payload carries source citations as `url_citation`
+// annotations on each MessageOutputItem's content parts — confirmed against
+// the live OpenAPI schema at https://docs.perplexity.ai/api-reference/agent-post
+// (ContentPart.annotations[], Annotation.type === 'url_citation', with
+// `url`/`title`), not guessed. Same traversal shape extractText already
+// walks (json.output[].content[]), just reading `annotations` instead of
+// `text`. Unlike extractText, a response with no citations is normal (not
+// every grounded answer cites a source) — returns [] rather than throwing.
+export function extractCitations(json) {
+  if (!Array.isArray(json.output)) return [];
+  const seen = new Set();
+  const citations = [];
+  for (const item of json.output) {
+    if (!Array.isArray(item.content)) continue;
+    for (const c of item.content) {
+      if (!Array.isArray(c.annotations)) continue;
+      for (const a of c.annotations) {
+        if (a?.type !== 'url_citation' || typeof a.url !== 'string' || !a.url) continue;
+        if (seen.has(a.url)) continue;
+        seen.add(a.url);
+        citations.push({ url: a.url, title: typeof a.title === 'string' ? a.title : '' });
+      }
+    }
+  }
+  return citations;
+}
+
 // ---------- Aggregation ----------
 // Shared by both callers: takes prospect + array of { ok, text?, usage?,
 // error?, model, promptIndex } and produces cited counts, heuristic ranking,
@@ -336,11 +364,38 @@ export function aggregateProspect(prospect, callResults) {
     ambiguous: false,
   }));
 
+  // Citation-URL attribution: which of the company's own pages an AI model
+  // actually drew its answer from, across every completed check — not
+  // gated on whether the brand name itself was textually detected in that
+  // response, since a model can ground an answer in a company's page
+  // without the response prose repeating the exact brand string. Matches
+  // by hostname (subdomain-tolerant: a citation from "www.acme.com" or
+  // "blog.acme.com" both count as "acme.com"'s own site).
+  const ownHostname = hostnameOf(prospect.website);
+  const ownSiteCitations = [];
+
   for (const r of completed) {
     const brandMatch = findBrandMention(r.text, prospect);
     if (brandMatch.ambiguous) ambiguousBrandFlag = true;
     const cited = !brandMatch.ambiguous && brandMatch.mentioned;
     if (cited) citedCount++;
+
+    for (const citation of r.citations || []) {
+      let citedHostname;
+      try {
+        citedHostname = hostnameOf(citation.url);
+      } catch {
+        continue; // malformed citation URL — skip rather than crash aggregation over it
+      }
+      if (citedHostname === ownHostname || citedHostname.endsWith(`.${ownHostname}`)) {
+        ownSiteCitations.push({
+          promptIndex: r.promptIndex,
+          model: r.model,
+          url: citation.url,
+          title: citation.title,
+        });
+      }
+    }
 
     const allMentions = [];
 
@@ -400,7 +455,18 @@ export function aggregateProspect(prospect, callResults) {
     ambiguousBrandFlag,
     perPromptRank,
     competitorTallies,
-    rawResponses: completed.map((r) => ({ model: r.model, promptIndex: r.promptIndex, text: r.text })),
+    rawResponses: completed.map((r) => ({
+      model: r.model,
+      promptIndex: r.promptIndex,
+      text: r.text,
+      citations: r.citations || [],
+    })),
+    // Citations whose hostname matches the company's own website, across
+    // every completed check — lets advice point at the exact page an AI
+    // model actually drew from, instead of generic "improve your SEO"
+    // guidance. Empty for scans run before this field existed or where no
+    // completed call happened to cite the company's own site.
+    ownSiteCitations,
     // Per-call failure detail (model/prompt/why) — restores what commit
     // 522eb63 shipped and 74afa41 accidentally deleted the next day during
     // an unrelated "flatten repo" refactor. Truncated to 300 chars: error

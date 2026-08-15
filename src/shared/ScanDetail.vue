@@ -102,14 +102,14 @@ function rowPct(row: ScoreboardRow) {
 // shows its 2 model outcomes together, answering "which prompt, which
 // model, did it show up" directly instead of leaving it to a flat raw-text
 // dump the reader has to cross-reference by hand.
-interface CheckRow { model: string; rank: Rank; text: string; }
+interface CheckRow { model: string; rank: Rank; text: string; citations: { url: string; title: string }[]; }
 interface CheckGroup { promptIndex: number; label: string; checks: CheckRow[]; }
 const checkBreakdown = computed<CheckGroup[]>(() => {
   const byPrompt = new Map<number, CheckRow[]>();
   props.payload.rawResponses.forEach((r, i) => {
     const rank = props.payload.perPromptRank[i]?.rank ?? 'not-mentioned';
     if (!byPrompt.has(r.promptIndex)) byPrompt.set(r.promptIndex, []);
-    byPrompt.get(r.promptIndex)!.push({ model: r.model, rank, text: r.text });
+    byPrompt.get(r.promptIndex)!.push({ model: r.model, rank, text: r.text, citations: r.citations || [] });
   });
   return [...byPrompt.entries()]
     .sort((a, b) => a[0] - b[0])
@@ -130,6 +130,19 @@ const failureRows = computed<FailureRow[]>(() =>
     model: f.model,
     promptLabel: PROMPT_LABELS[f.promptIndex] || `Prompt ${f.promptIndex + 1}`,
     error: f.error,
+  }))
+);
+
+// Citation-URL attribution (Milestone F): which of the company's own pages
+// an AI model actually cited, grouped by prompt so "which check drew from
+// which page" reads directly instead of a flat unlabeled URL list.
+interface OwnCitationRow { url: string; title: string; model: string; promptLabel: string; }
+const ownSiteCitationRows = computed<OwnCitationRow[]>(() =>
+  props.payload.ownSiteCitations.map((c) => ({
+    url: c.url,
+    title: c.title || c.url,
+    model: c.model,
+    promptLabel: PROMPT_LABELS[c.promptIndex] || `Prompt ${c.promptIndex + 1}`,
   }))
 );
 
@@ -173,6 +186,7 @@ const visibleAdvice = computed(() =>
         <div class="score-band-label">{{ BAND_LABEL[band] }}</div>
         <div class="score-explain">{{ BAND_EXPLAIN[band] }} AI Visibility Score — weighted for being mentioned first, not just mentioned.</div>
         <div class="confidence-note">Based on {{ payload.completedCalls }} / {{ payload.completedCalls + payload.failedCalls }} successful checks.</div>
+        <a class="methodology-link" href="/how-it-works#methodology" target="_blank" rel="noopener">How this is measured &rarr;</a>
       </div>
     </div>
 
@@ -253,6 +267,22 @@ const visibleAdvice = computed(() =>
       </button>
     </template>
 
+    <!-- citation-URL attribution (Milestone F): the exact pages on the
+         company's own site an AI model actually drew its answer from,
+         instead of only generic "improve your content" advice above. -->
+    <template v-if="ownSiteCitationRows.length">
+      <h2>Your site, cited</h2>
+      <div class="card citations-card">
+        <p class="citations-intro">AI models cited these pages from your own site while answering:</p>
+        <ul class="citation-list">
+          <li v-for="(c, i) in ownSiteCitationRows" :key="i">
+            <a :href="c.url" target="_blank" rel="noopener">{{ c.title }}</a>
+            <span class="citation-meta">{{ c.model }} &middot; {{ c.promptLabel }}</span>
+          </li>
+        </ul>
+      </div>
+    </template>
+
     <!-- check-by-check breakdown: every completed call, grouped by which
          prompt produced it, with each model's outcome shown next to
          its own raw response text (expand per-check rather than one long
@@ -267,7 +297,13 @@ const visibleAdvice = computed(() =>
               <span class="check-model">{{ c.model }}</span>
               <span class="check-badge" :class="`badge-${c.rank}`">{{ CHECK_BADGE_LABEL[c.rank] }}</span>
             </summary>
-            <div class="check-text">{{ c.text }}</div>
+            <div class="check-body">
+              <div class="check-text">{{ c.text }}</div>
+              <div class="check-sources" v-if="c.citations.length">
+                Sources:
+                <a v-for="(cit, j) in c.citations" :key="j" :href="cit.url" target="_blank" rel="noopener">{{ cit.title || cit.url }}</a>
+              </div>
+            </div>
           </details>
         </div>
         <!-- Milestone A3: rendered per-call failure detail when available. -->
@@ -334,6 +370,14 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
   color: var(--faint);
   margin-top: 8px;
 }
+.methodology-link {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: var(--accent);
+  margin-top: 4px;
+  text-decoration: none;
+}
+.methodology-link:hover { text-decoration: underline; }
 .band-leading.score-card { background: color-mix(in srgb, var(--good) 6%, var(--card)); border-color: color-mix(in srgb, var(--good) 28%, var(--border)); }
 .band-leading .score-ring-fill { stroke: var(--good); }
 .band-leading .score-band-label { color: var(--success-text); }
@@ -441,6 +485,18 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 28px 0 10px; }
 h2:first-of-type { margin-top: 0; }
 
+/* ---- citation-URL attribution ---- */
+.citations-card { padding: 16px 20px; }
+.citations-intro { margin: 0 0 10px; font-size: 0.85rem; color: var(--muted); }
+.citation-list { list-style: none; margin: 0; padding: 0; }
+.citation-list li {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  padding: 8px 0; border-top: 1px solid var(--border);
+}
+.citation-list li:first-child { border-top: none; padding-top: 0; }
+.citation-list a { color: var(--accent); font-size: 0.9rem; }
+.citation-meta { font-size: 0.78rem; color: var(--faint); }
+
 /* ---- check-by-check breakdown ---- */
 .checks-card { padding: 8px 20px; }
 .check-group { padding: 12px 0; border-top: 1px solid var(--border); }
@@ -478,13 +534,22 @@ h2:first-of-type { margin-top: 0; }
 .badge-ranked-1 { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--success-text); }
 .badge-ranked-2, .badge-ranked-3, .badge-mentioned, .badge-beaten { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
 .badge-not-mentioned { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+.check-body {
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
 .check-text {
   font-size: 0.85rem; color: var(--muted);
   padding: 10px 10px 4px;
-  border: 1px solid var(--border); border-top: none;
-  border-radius: 0 0 8px 8px;
   white-space: pre-wrap;
 }
+.check-sources {
+  font-size: 0.78rem; color: var(--muted);
+  padding: 6px 10px 10px;
+  display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
+}
+.check-sources a { color: var(--accent); }
 .check-failed-note {
   margin-top: 4px; padding: 10px 0;
   font-size: 0.82rem; color: var(--muted);

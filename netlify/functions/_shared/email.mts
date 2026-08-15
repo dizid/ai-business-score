@@ -19,6 +19,13 @@ export async function sendScanCompleteEmail(params: {
   companyUrl: string;
   status: 'completed' | 'failed';
   score: number | null;
+  // Score of the company's most recent PRIOR completed scan, if one exists
+  // — turns the notification from a one-off result into a trend signal
+  // ("your score changed from X to Y") instead of requiring a visit to the
+  // dashboard's progress chart to notice movement. null when there's no
+  // prior completed scan to compare against (first scan for this company),
+  // not when the current scan itself has no score.
+  previousScore?: number | null;
 }): Promise<{ ok: boolean; error?: string }> {
   const apiKey = Netlify.env.get('RESEND_API_KEY');
   const fromEmail = Netlify.env.get('RESEND_FROM_EMAIL');
@@ -27,11 +34,25 @@ export async function sendScanCompleteEmail(params: {
     return { ok: false, error: 'Email not configured' };
   }
 
+  // Only meaningful when both this scan and the prior one produced a real
+  // number — a null on either side (failed/too-few-calls scan) has nothing
+  // to compare, so the change line is omitted rather than guessed at.
+  const hasChangeSignal =
+    params.status === 'completed' && params.score !== null && params.previousScore != null;
+  const delta = hasChangeSignal ? (params.score as number) - (params.previousScore as number) : 0;
+  const changeLine = hasChangeSignal
+    ? delta === 0
+      ? `Your score is unchanged at ${params.score}/100 since your last scan.\n\n`
+      : `Your score changed from ${params.previousScore} to ${params.score} (${delta > 0 ? '+' : ''}${delta}) since your last scan.\n\n`
+    : '';
+
   const subject = params.status === 'failed'
     ? `Scan failed: ${params.brand}`
     : params.score === null
       ? `Scan complete: ${params.brand} (no data)`
-      : `Scan complete: ${params.brand} scored ${params.score}/100`;
+      : hasChangeSignal && delta !== 0
+        ? `${params.brand} score ${delta > 0 ? 'up' : 'down'} to ${params.score}/100`
+        : `Scan complete: ${params.brand} scored ${params.score}/100`;
 
   const bodyText = params.status === 'failed'
     ? `Your AI visibility scan for ${params.brand} failed to complete.\n\nView details: ${params.companyUrl}`
@@ -39,6 +60,7 @@ export async function sendScanCompleteEmail(params: {
       (params.score === null
         ? `No usable data came back from this scan — see the raw check details for why.\n\n`
         : `Score: ${params.score}/100\n\n`) +
+      changeLine +
       `View the full result: ${params.companyUrl}`;
 
   try {

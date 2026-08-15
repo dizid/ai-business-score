@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { user, signOut } from './lib/auth';
+import Icon from '../shared/Icon.vue';
+import AccountMenu from './components/AccountMenu.vue';
 
 const router = useRouter();
 
@@ -14,16 +16,10 @@ async function handleSignOut() {
   <div class="shell">
     <header class="topbar">
       <router-link class="wordmark" to="/app">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="2"></circle>
-          <path d="M10 5.5v5l3.2 1.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-        </svg>
+        <Icon name="logo" />
         AIVis
       </router-link>
-      <div v-if="user" class="user-row">
-        <span class="user-email">{{ user.email }}</span>
-        <button type="button" class="link" @click="handleSignOut">Sign out</button>
-      </div>
+      <AccountMenu v-if="user" :email="user.email" @sign-out="handleSignOut" />
     </header>
     <div class="page">
       <router-view />
@@ -53,7 +49,7 @@ async function handleSignOut() {
 .topbar {
   position: sticky; top: 0; z-index: 20;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 24px;
+  padding: var(--space-md) var(--space-lg);
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -64,15 +60,7 @@ async function handleSignOut() {
   font-weight: 700; font-size: 1rem; letter-spacing: -0.005em; color: var(--fg);
   text-decoration: none;
 }
-.wordmark svg { flex: none; color: var(--accent); }
-.user-row { display: flex; align-items: center; gap: 14px; font-size: 0.85rem; color: var(--muted); }
-.user-email { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.user-row button.link {
-  background: none; border: none; padding: 2px 0; color: var(--muted);
-  text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: 0.85rem;
-  transition: color 0.15s ease;
-}
-.user-row button.link:hover { color: var(--fg); }
+.wordmark :deep(.icon) { color: var(--accent); }
 
 .app-footer {
   border-top: 1px solid var(--border);

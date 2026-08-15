@@ -21,6 +21,9 @@ export function toScanPayload(row: Record<string, any>) {
     // back as null, default to [] so scanPayload.ts never has to special-
     // case null vs. a genuinely empty list.
     failures: row.failures ?? [],
+    // own_site_citations is new (Milestone F citation attribution) — same
+    // null-to-[] default for pre-migration rows.
+    ownSiteCitations: row.own_site_citations ?? [],
     generatedAt: row.generated_at,
     deepAdvice: row.deep_advice ?? null,
     deepAdviceGeneratedAt: row.deep_advice_generated_at ?? null,

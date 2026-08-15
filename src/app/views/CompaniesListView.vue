@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { scoreBand } from '../../../shared/aivis-core.mjs';
 import { authFetch } from '../lib/auth';
+import Icon from '../../shared/Icon.vue';
 
 const router = useRouter();
 
@@ -267,7 +268,9 @@ onMounted(loadCompanies);
     </form>
 
     <p class="status error" v-if="loadError">{{ loadError }}</p>
-    <p class="loading-text" v-else-if="loading">Loading…</p>
+    <div class="skeleton" v-else-if="loading" aria-hidden="true">
+      <div class="skeleton-card" v-for="n in 3" :key="n"></div>
+    </div>
 
     <div class="empty-state" v-else-if="companies.length === 0 && !showCreate">
       <div class="empty-icon" aria-hidden="true">
@@ -301,7 +304,7 @@ onMounted(loadCompanies);
             <span class="score-dot" :style="{ background: scoreColor(company.latest_score) }"></span>
             <span class="score" :style="{ color: scoreColor(company.latest_score) }">{{ company.latest_score }}</span>
           </template>
-          <span class="chevron" aria-hidden="true">&rsaquo;</span>
+          <Icon name="chevron" class="chevron" />
         </div>
       </router-link>
     </div>
@@ -309,9 +312,9 @@ onMounted(loadCompanies);
 </template>
 
 <style scoped>
-main { max-width: 800px; margin: 0 auto; padding: 48px 20px 80px; }
-.head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 28px; }
-h1 { font-size: 1.65rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 4px; }
+main { max-width: var(--page-max); margin: 0 auto; padding: var(--space-2xl) var(--space-md) var(--space-xl); }
+.head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--space-md); margin-bottom: 28px; }
+h1 { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.01em; margin: 0 0 4px; }
 p.sub { color: var(--muted); margin: 0; }
 .head-actions { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .head-row button {
@@ -375,7 +378,21 @@ p.sub { color: var(--muted); margin: 0; }
 .step-labels span.active { color: var(--accent); }
 
 .status.error { margin-top: 12px; font-size: 0.9rem; color: var(--critical); }
-.loading-text { color: var(--muted); font-size: 0.9rem; padding: 20px 0; }
+
+.skeleton { padding-top: 4px; }
+.skeleton-card {
+  height: 62px; margin-bottom: 10px; border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--card) 25%, var(--gridline) 50%, var(--card) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-card { animation: none; background: var(--gridline); }
+}
 
 .empty-state {
   text-align: center; background: var(--card); border: 1px dashed var(--border); border-radius: 12px;
@@ -414,5 +431,5 @@ p.sub { color: var(--muted); margin: 0; }
 .score-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
 .score { font-weight: 700; font-size: 1.1rem; font-variant-numeric: proportional-nums; }
 .score.na { color: var(--faint); font-weight: 500; font-size: 0.85rem; }
-.chevron { color: var(--faint); font-size: 1.3rem; line-height: 1; transition: transform 0.15s ease, color 0.15s ease; }
+.chevron { width: 18px; height: 18px; color: var(--faint); transition: transform 0.15s ease, color 0.15s ease; }
 </style>

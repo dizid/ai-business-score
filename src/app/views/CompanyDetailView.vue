@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { validatePayload } from '../../shared/scanPayload';
 import ScanDetail from '../../shared/ScanDetail.vue';
 import CompanyProgressChart from './CompanyProgressChart.vue';
+import Icon from '../../shared/Icon.vue';
+import Breadcrumb from '../components/Breadcrumb.vue';
 import { authFetch } from '../lib/auth';
 
 const route = useRoute();
@@ -101,7 +103,6 @@ function formatDate(generatedAt: unknown) {
 async function load() {
   loading.value = true;
   loadError.value = '';
-  selectedIndex.value = null;
   try {
     const res = await authFetch(`/companies/${route.params.id}`);
     const data = await res.json();
@@ -111,6 +112,11 @@ async function load() {
     }
     company.value = data.company;
     scans.value = data.scans;
+    // Scans come back newest-first (see CompanyProgressChart's own sort
+    // comment) — auto-selecting index 0 shows the latest report immediately
+    // instead of a blank "select a scan" placeholder, so the detail pane
+    // never opens empty when there's already a result to show.
+    selectedIndex.value = scans.value.length ? 0 : null;
     if (company.value) {
       document.title = `${company.value.brand} — AIVis`;
     }
@@ -217,11 +223,17 @@ async function startCheckout() {
 }
 
 const scanTrend = computed(() =>
-  scans.value.map((s) => ({
+  scans.value.map((s, index) => ({
+    id: keyOf(s, index),
     generatedAt: typeof s.generatedAt === 'string' ? s.generatedAt : '',
     score: typeof s.score === 'number' ? s.score : null,
   }))
 );
+
+function selectScanById(id: string) {
+  const idx = scans.value.findIndex((s, i) => keyOf(s, i) === id);
+  if (idx !== -1) selectScan(idx);
+}
 
 const selectedScan = computed(() =>
   selectedIndex.value === null ? null : scans.value[selectedIndex.value] ?? null
@@ -279,10 +291,14 @@ watch(() => route.params.id, load);
 <template>
   <main>
     <p class="status error" v-if="loadError">{{ loadError }}</p>
-    <p class="empty" v-else-if="loading">Loading…</p>
+    <div class="skeleton" v-else-if="loading" aria-hidden="true">
+      <div class="skeleton-bar skeleton-crumb"></div>
+      <div class="skeleton-bar skeleton-title"></div>
+      <div class="skeleton-card" v-for="n in 3" :key="n"></div>
+    </div>
 
     <template v-else-if="company">
-      <router-link class="back-link" to="/app">&larr; All companies</router-link>
+      <Breadcrumb :crumbs="[{ label: 'Companies', to: '/app' }, { label: company.brand }]" />
       <div class="head-row">
         <div>
           <h1>
@@ -362,10 +378,11 @@ watch(() => route.params.id, load);
         No scans yet for this company — click "Run new scan" to check its AI search visibility.
       </p>
 
-      <CompanyProgressChart v-if="scans.length >= 2" :scans="scanTrend" />
+      <CompanyProgressChart v-if="scans.length >= 2" :scans="scanTrend" @select-point="selectScanById" />
 
       <div class="dashboard" v-if="scans.length" :class="{ 'has-selection': selectedIndex !== null }">
         <div class="list-pane">
+          <h2 class="list-heading">Scan history</h2>
           <button
             v-for="(scan, index) in scans"
             :key="keyOf(scan, index)"
@@ -375,9 +392,15 @@ watch(() => route.params.id, load);
             @click="selectScan(index)"
           >
             <div class="scan-row">
-              <div class="scan-meta">{{ formatDate(scan.generatedAt) }}</div>
-              <span v-if="typeof scan.score !== 'number'" class="scan-score na">no data</span>
-              <span v-else class="scan-score">{{ scan.score }}</span>
+              <div class="scan-meta">
+                {{ formatDate(scan.generatedAt) }}
+                <span v-if="index === 0" class="latest-tag">Latest</span>
+              </div>
+              <div class="scan-row-right">
+                <span v-if="typeof scan.score !== 'number'" class="scan-score na">no data</span>
+                <span v-else class="scan-score">{{ scan.score }}</span>
+                <Icon name="chevron" class="chevron" />
+              </div>
             </div>
           </button>
         </div>
@@ -404,11 +427,10 @@ watch(() => route.params.id, load);
 </template>
 
 <style scoped>
-main { max-width: 1100px; margin: 0 auto; padding: 48px 20px 80px; }
-.back-link { font-size: 0.85rem; color: var(--muted); text-decoration: underline; }
-.head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-top: 12px; margin-bottom: 24px; }
+main { max-width: var(--page-max-wide); margin: 0 auto; padding: var(--space-2xl) var(--space-md) var(--space-xl); }
+.head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--space-md); margin-bottom: 24px; }
 .head-row > div:first-child { min-width: 0; }
-h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 4px; }
+h1 { font-size: var(--text-xl); font-weight: 700; margin: 0 0 4px; }
 .legacy-tag {
   font-size: 0.7rem; font-weight: 600; color: var(--muted);
   border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: middle;
@@ -432,6 +454,23 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 
 .status.error { font-size: 0.9rem; color: var(--critical); }
 .empty { color: var(--muted); font-size: 0.9rem; }
+
+.skeleton { padding-top: 4px; }
+.skeleton-bar, .skeleton-card {
+  background: linear-gradient(90deg, var(--card) 25%, var(--gridline) 50%, var(--card) 75%);
+  background-size: 200% 100%; border-radius: var(--radius);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-crumb { width: 140px; height: 14px; margin-bottom: 16px; }
+.skeleton-title { width: 40%; height: 26px; margin-bottom: 24px; }
+.skeleton-card { height: 54px; margin-bottom: 10px; }
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-bar, .skeleton-card { animation: none; background: var(--gridline); }
+}
 
 .public-share {
   background: var(--card); border: 1px solid var(--border);
@@ -477,23 +516,36 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 
 .dashboard { margin-top: 24px; display: block; }
 .list-pane { display: block; }
+.list-heading {
+  font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--muted); margin: 0 0 10px; padding: 0 2px;
+}
 
 .scan-card {
   display: block; width: 100%; text-align: left;
   background: var(--card); border: 1px solid var(--border); border-left: 3px solid transparent;
   border-radius: 10px; padding: 14px 16px 14px 14px; margin-bottom: 10px;
   color: var(--fg); font: inherit; cursor: pointer;
-  box-shadow: var(--shadow); transition: border-color 0.15s ease, background 0.15s ease;
+  box-shadow: var(--shadow); transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
-.scan-card:hover { border-color: var(--accent); }
+.scan-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.scan-card:hover .chevron { transform: translateX(2px); color: var(--accent); }
 .scan-card.active {
   border-color: var(--accent); border-left-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 7%, var(--card));
 }
+.scan-card.active .chevron { color: var(--accent); }
 .scan-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.scan-row-right { flex: none; display: flex; align-items: center; gap: 6px; }
 .scan-meta { color: var(--muted); font-size: 0.85rem; }
-.scan-score { flex: none; font-weight: 700; font-size: 1.1rem; font-variant-numeric: proportional-nums; }
+.latest-tag {
+  display: inline-block; margin-left: 8px; padding: 1px 8px; font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.02em; color: var(--accent-ink); background: var(--accent);
+  border-radius: 999px; vertical-align: middle;
+}
+.scan-score { font-weight: 700; font-size: 1.1rem; font-variant-numeric: proportional-nums; }
 .scan-score.na { color: var(--faint); font-weight: 500; font-size: 0.85rem; }
+.chevron { width: 18px; height: 18px; color: var(--faint); transition: transform 0.15s ease, color 0.15s ease; }
 
 .detail-pane {
   display: none;

@@ -249,7 +249,7 @@
       </ul>
     </section>
 
-    <section>
+    <section id="methodology">
       <h2>Limitations, honestly stated</h2>
       <p>
         AI model outputs aren't fully deterministic or fully within anyone's
@@ -259,6 +259,21 @@
         even with nothing changed on your end. Treat it the way you'd treat
         any single analytics snapshot: useful, worth tracking over time, and
         not the whole picture on its own.
+      </p>
+      <p>
+        <strong>On the "4 AI models" claim, specifically:</strong> every
+        check is routed through Perplexity's API, addressing each underlying
+        model (GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6)
+        <em>through that one gateway</em> — not by calling OpenAI, Google,
+        Anthropic, or xAI's own consumer products directly. In practice this
+        measures how each model answers when Perplexity is the one asking and
+        grounding the response in its own web search, which is usually close
+        to, but not guaranteed identical to, what you'd see typing the same
+        question into chatgpt.com, gemini.google.com, or claude.ai yourself.
+        AIVis also doesn't currently check Google's AI Overviews/AI Mode or
+        Microsoft Copilot, two AI-answer surfaces this scan doesn't cover.
+        We'd rather state that plainly than let "4 models" imply broader or
+        more direct coverage than what's actually being measured.
       </p>
     </section>
   </main>

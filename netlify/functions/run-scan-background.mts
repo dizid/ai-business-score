@@ -218,6 +218,7 @@ export default async (req: Request) => {
         raw_responses = ${JSON.stringify(agg.rawResponses)},
         failures = ${JSON.stringify(agg.failures)},
         total_tokens = ${agg.totalTokens},
+        own_site_citations = ${JSON.stringify(agg.ownSiteCitations)},
         score = ${score},
         advice = ${JSON.stringify(advice)},
         generated_at = now()
@@ -245,6 +246,20 @@ export default async (req: Request) => {
       WHERE c.id = ${scanRow.company_id}
     `;
     if (owners.length > 0) {
+      // Most recent PRIOR completed scan's score, for the "your score
+      // changed" line in the email — excludes this scan itself so a
+      // company's very first scan correctly has nothing to compare against.
+      let previousScore: number | null = null;
+      if (finalStatus === 'completed') {
+        const prevRows = await db`
+          SELECT score FROM public.scans
+          WHERE company_id = ${scanRow.company_id} AND id != ${scanId} AND status = 'completed'
+          ORDER BY generated_at DESC
+          LIMIT 1
+        `;
+        if (prevRows.length > 0) previousScore = prevRows[0].score;
+      }
+
       const origin = new URL(req.url).origin;
       const result = await sendScanCompleteEmail({
         to: owners[0].email,
@@ -252,6 +267,7 @@ export default async (req: Request) => {
         companyUrl: `${origin}/app/companies/${scanRow.company_id}`,
         status: finalStatus,
         score: finalScore,
+        previousScore,
       });
       if (!result.ok) {
         console.error(`run-scan-background: scan-complete email failed for scan ${scanId}: ${result.error}`);

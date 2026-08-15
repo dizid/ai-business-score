@@ -19,7 +19,9 @@ export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 export interface PerPromptRank { promptIndex: number; rank: Rank; }
 export interface CompetitorTally { name: string; mentionCount: number; beatBrandCount: number; ambiguous: boolean; }
 export interface AdviceCard { id: AdviceId; tone: AdviceTone; params: Record<string, unknown>; }
-export interface RawResponse { promptIndex: number; model: string; text: string; }
+export interface Citation { url: string; title: string; }
+export interface RawResponse { promptIndex: number; model: string; text: string; citations: Citation[]; }
+export interface OwnSiteCitation { promptIndex: number; model: string; url: string; title: string; }
 export interface FailureItem { model: string; promptIndex: number; error: string; }
 export interface DeepAdviceStep { title: string; reasoning: string; difficulty: Difficulty; }
 export interface DeepAdvice { steps: DeepAdviceStep[]; }
@@ -39,6 +41,7 @@ export interface ValidatedPayload {
   score: number | null;
   advice: AdviceCard[];
   rawResponses: RawResponse[];
+  ownSiteCitations: OwnSiteCitation[];
   failures: FailureItem[];
   generatedAtDate: Date;
   deepAdvice: DeepAdvice | null;
@@ -56,6 +59,27 @@ const MAX_NAME_LEN = 120;
 const MAX_TEXT_LEN = 600;
 const MAX_FAILURES = 40;
 const MAX_ERROR_LEN = 300;
+const MAX_CITATIONS_PER_RESPONSE = 20;
+const MAX_OWN_SITE_CITATIONS = 60;
+const MAX_URL_LEN = 2000;
+
+// href-safety, same rule as the website link below: only http(s) survives,
+// anything else (javascript:, data:, etc.) is dropped rather than escaped.
+function asSafeUrl(v: unknown): string | null {
+  return typeof v === 'string' && v.length <= MAX_URL_LEN && /^https?:\/\//i.test(v) ? v : null;
+}
+
+function asCitations(raw: unknown): Citation[] {
+  if (!Array.isArray(raw)) return [];
+  const citations: Citation[] = [];
+  for (const c of raw.slice(0, MAX_CITATIONS_PER_RESPONSE)) {
+    const url = asSafeUrl(c && c.url);
+    if (!url) continue;
+    const title = typeof (c && c.title) === 'string' ? c.title.slice(0, MAX_NAME_LEN * 2) : '';
+    citations.push({ url, title });
+  }
+  return citations;
+}
 
 export function asNonNegativeInt(v: unknown): number | null {
   const n = Number(v);
@@ -143,7 +167,22 @@ export function validatePayload(raw: any): ValidatedPayload | null {
   for (const r of raw.rawResponses) {
     const promptIndex = asNonNegativeInt(r && r.promptIndex);
     if (promptIndex === null || typeof r.model !== 'string' || typeof r.text !== 'string') return null;
-    rawResponses.push({ promptIndex, model: r.model, text: r.text });
+    rawResponses.push({ promptIndex, model: r.model, text: r.text, citations: asCitations(r.citations) });
+  }
+
+  // ownSiteCitations is new (Milestone F) — missing/malformed degrades to
+  // [] rather than rejecting the whole payload, same lenient treatment as
+  // failures/competitorTallies' ambiguous flag above (diagnostic/bonus
+  // detail, not something the rest of the UI depends on for correctness).
+  const ownSiteCitations: OwnSiteCitation[] = [];
+  if (Array.isArray(raw.ownSiteCitations)) {
+    for (const c of raw.ownSiteCitations.slice(0, MAX_OWN_SITE_CITATIONS)) {
+      const promptIndex = asNonNegativeInt(c && c.promptIndex);
+      const url = asSafeUrl(c && c.url);
+      if (promptIndex === null || url === null || typeof (c && c.model) !== 'string') continue;
+      const title = typeof c.title === 'string' ? c.title.slice(0, MAX_NAME_LEN * 2) : '';
+      ownSiteCitations.push({ promptIndex, model: c.model.slice(0, MAX_NAME_LEN), url, title });
+    }
   }
 
   // failures: optional diagnostic list (why calls failed) — new in
@@ -208,6 +247,7 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     score,
     advice,
     rawResponses,
+    ownSiteCitations,
     failures,
     generatedAtDate,
     deepAdvice,
