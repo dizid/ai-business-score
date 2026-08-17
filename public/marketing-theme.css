@@ -1,0 +1,342 @@
+/* ==========================================================================
+   AIVis marketing theme — "Spotlight"
+   ==========================================================================
+   Shared stylesheet for the four static marketing entry points: index.html,
+   how-it-works.html, privacy.html, terms.html. Linked via
+   <link rel="stylesheet" href="/marketing-theme.css"> rather than inlined,
+   so all four pages share one source of truth for tokens and base styles —
+   see brand/BRAND.md for why (a real drift bug: three of these pages had
+   been stuck on an already-retired blue palette while index.html moved on
+   without them). Does NOT govern src/app/**, result.html, or
+   src/shared/theme.css — those are a deliberately separate, calm/muted
+   palette for the authenticated product (see brand/BRAND.md's "critical
+   boundary" note).
+
+   Dark-first by design: color-scheme is set to dark outright below, not
+   toggled via prefers-color-scheme — the spotlight metaphor needs real
+   darkness to read, so every visitor sees the same theme regardless of OS
+   setting. See brand/BRAND.md's palette table for the full rationale.
+
+   Display font is Space Grotesk (loaded via a Google Fonts <link> in each
+   page's <head> — not @import'd here, so the font request can start in
+   parallel with this stylesheet rather than after it). Body font is
+   unchanged: the existing system-ui stack.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- Spotlight design tokens (brand/BRAND.md's palette table) ---- */
+  --stage-black: #0a0a0d;       /* base background */
+  --surface: #17171b;           /* cards, panels */
+  --ink: #f5f4f0;                /* primary text */
+  --muted: #a8a6a0;              /* secondary text */
+  --spotlight-gold: #ffb830;    /* the light itself — used sparingly, see --gold below */
+  --signal-blue: #4da3ff;       /* secondary/workhorse accent */
+  --offstage: #3a3a40;          /* the "unlit"/not-mentioned state */
+
+  /* ---- Semantic aliases used throughout the rules below ---- */
+  --bg: var(--stage-black);
+  --card: var(--surface);
+  --faint: #86837a;
+  --line: rgba(245, 244, 240, 0.10);
+  --line-bright: rgba(245, 244, 240, 0.22);
+
+  /* Two distinct accents, deliberately not interchangeable:
+     --accent (signal blue) is the workhorse — links, focus rings, icons,
+     secondary numerals. --gold (spotlight gold) marks a "you're chosen"
+     moment only — CTAs, the cited-name highlight, the Pro plan's border,
+     the score-ring. Never default a new element to --gold out of
+     convenience; see brand/BRAND.md's color palette section. */
+  --accent: var(--signal-blue);
+  --accent-ink: var(--stage-black); /* text color placed on a filled gold/blue surface */
+  --gold: var(--spotlight-gold);
+
+  --cited: var(--gold);
+  --cited-soft: rgba(255, 184, 48, 0.14);
+  --ghost: var(--offstage);
+
+  /* Old-school SERP colors in the "how search used to work" demo panel —
+     deliberately NOT brand tokens. These recreate real Google search
+     result coloring (blue title, green URL) so the "before" panel reads
+     as an authentic screenshot, independent of the Spotlight palette. */
+  --serp-blue: #8ab4f8;
+  --serp-green: #81c995;
+
+  --good: var(--gold);
+  --warning: #e8a33d;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 20px 40px -20px rgba(0, 0, 0, 0.75);
+
+  --font-display: "Space Grotesk", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --font-body: -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, .quote, .logo, .plan-card h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+.mono {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+::selection { background: var(--cited-soft); }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 22px; }
+
+/* ---------- Nav ---------- */
+nav.top {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 22px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid transparent;
+}
+nav.top.scrolled-look { border-bottom-color: var(--line); }
+nav.top .logo { font-weight: 700; font-size: 1.25rem; text-decoration: none; color: var(--ink); }
+nav.top .links { display: flex; gap: 22px; align-items: center; font-size: 0.92rem; }
+nav.top .links a:not(.cta) { text-decoration: none; color: var(--muted); font-weight: 600; }
+nav.top .links a.cta {
+  color: var(--accent-ink); background: var(--gold); padding: 9px 18px; border-radius: 8px; font-weight: 700;
+  text-decoration: none; box-shadow: var(--shadow);
+}
+
+/* ---------- Buttons ---------- */
+.btn-primary {
+  display: inline-block; padding: 15px 26px; font-size: 1rem; font-weight: 700;
+  background: var(--gold); color: var(--accent-ink); border-radius: 9px; text-decoration: none;
+  box-shadow: var(--shadow); transition: transform 0.15s ease;
+}
+.btn-primary:hover { transform: translateY(-1px); }
+.hero-note { margin-top: 14px; font-size: 0.85rem; color: var(--faint); }
+
+/* ---------- Hero ---------- */
+.hero {
+  padding: 56px 0 40px;
+  /* Motif: radial spotlight glow behind the headline — a CSS background
+     layer, not a separate illustrated asset. */
+  background-image: radial-gradient(ellipse 900px 480px at 20% 0%, color-mix(in srgb, var(--gold) 13%, transparent), transparent 65%);
+  background-repeat: no-repeat;
+}
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--gold); margin: 0 0 20px;
+}
+.eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--gold); }
+.hero h1 {
+  font-size: clamp(2.1rem, 1.5rem + 2.6vw, 3.5rem);
+  line-height: 1.12; font-weight: 500; margin: 0 0 22px; max-width: 18ch;
+}
+.hero p.lead { color: var(--muted); font-size: clamp(1.05rem, 1rem + 0.3vw, 1.2rem); margin: 0 0 30px; max-width: 52ch; }
+
+/* ---------- Dissolve signature visual ---------- */
+.dissolve { margin: 56px 0 8px; display: grid; gap: 10px; }
+.dissolve-label {
+  display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--faint); margin-bottom: 10px;
+}
+.dissolve-panel.old {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 20px 22px; box-shadow: var(--shadow);
+}
+.serp-row { padding: 10px 0; border-bottom: 1px dashed var(--line); opacity: 0.35; filter: grayscale(0.5); }
+.serp-row:last-child { border-bottom: none; }
+.serp-title { color: var(--serp-blue); font-size: 0.98rem; font-weight: 600; text-decoration: line-through; text-decoration-color: var(--ghost); }
+.serp-url { color: var(--serp-green); font-size: 0.78rem; margin: 2px 0; }
+.serp-snippet { color: var(--faint); font-size: 0.85rem; }
+.dissolve-arrow {
+  text-align: center; color: var(--faint); font-size: 1.3rem; line-height: 1; margin: 2px 0;
+}
+.dissolve-panel.new {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 22px 24px; box-shadow: var(--shadow); position: relative;
+  overflow: hidden;
+}
+/* Motif: score-ring dial (gold arc over graphite track), reused as a small
+   decorative badge — here, and again on .plan-card.pro below. CSS
+   conic-gradient + mask, no SVG file. */
+.dissolve-panel.new::after {
+  content: "";
+  position: absolute; top: 16px; right: 16px;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: conic-gradient(var(--gold) 0deg 252deg, var(--offstage) 252deg 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+}
+.answer-tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
+  color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-bottom: 14px;
+}
+.answer-text { margin: 0; font-size: 1.04rem; color: var(--ink); max-width: 62ch; }
+mark.cited-name {
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--gold) 26%, transparent), transparent 72%);
+  color: var(--gold); font-weight: 700;
+  padding: 1px 6px; border-radius: 4px; font-style: normal;
+  text-shadow: 0 0 16px color-mix(in srgb, var(--gold) 45%, transparent);
+}
+.cursor {
+  display: inline-block; width: 2px; height: 1em; background: var(--accent);
+  margin-left: 2px; vertical-align: text-bottom;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .serp-row {
+    animation: ghost-out 0.6s ease forwards;
+    animation-delay: calc(var(--d) * 0.1s);
+    opacity: 1; filter: none;
+  }
+  @keyframes ghost-out {
+    from { opacity: 1; filter: grayscale(0); }
+    to { opacity: 0.35; filter: grayscale(0.5); }
+  }
+  .dissolve-panel.new { opacity: 0; animation: rise-in 0.7s ease forwards; animation-delay: 0.55s; }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  mark.cited-name { animation: pulse 1.4s ease 1.4s; }
+  @keyframes pulse {
+    0%, 100% { background: radial-gradient(ellipse at center, color-mix(in srgb, var(--gold) 26%, transparent), transparent 72%); }
+    35% { background: radial-gradient(ellipse at center, color-mix(in srgb, var(--gold) 55%, transparent), transparent 72%); }
+  }
+  .cursor { animation: blink 1s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+}
+
+/* ---------- Sections ---------- */
+/* Motif: "stage line" dividers — a thin horizontal gradient painted as a
+   1px background layer, replacing a flat border-top. Deliberately
+   restrained (no glow, no gold) per the brief's "keep it simple, don't
+   overdo it." .hero also matches `section` below but its own
+   background-image (the spotlight glow above) wins on specificity, so the
+   first section on the page correctly gets no divider above it. */
+section {
+  padding: 64px 0;
+  background-image: linear-gradient(90deg, transparent, var(--line-bright) 15%, var(--line-bright) 85%, transparent);
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  background-position: top center;
+}
+section h2 { font-size: clamp(1.4rem, 1.2rem + 0.8vw, 1.9rem); font-weight: 500; margin: 0 0 8px; text-align: center; }
+section p.section-sub { color: var(--muted); text-align: center; margin: 0 auto 40px; max-width: 44ch; }
+
+/* ---------- Pull quote ---------- */
+.quote-band {
+  padding: 60px 0;
+  background-image: linear-gradient(90deg, transparent, var(--line-bright) 15%, var(--line-bright) 85%, transparent);
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  background-position: top center;
+}
+.quote {
+  max-width: 30ch; margin: 0 auto; text-align: center; font-weight: 500;
+  font-size: clamp(1.3rem, 1.1rem + 1vw, 1.9rem); line-height: 1.35; color: var(--ink);
+}
+.quote .accent-run { color: var(--gold); }
+
+/* ---------- How it works ---------- */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 28px; counter-reset: step; }
+.step { padding: 0 8px; position: relative; }
+.step .num {
+  font-family: ui-monospace, monospace; font-size: 0.8rem; font-weight: 700; color: var(--accent);
+  display: block; margin-bottom: 10px;
+}
+.step h3 { font-size: 1.05rem; margin: 0 0 8px; font-weight: 700; }
+.step p { color: var(--muted); font-size: 0.94rem; margin: 0; }
+
+/* ---------- Cited / invisible demo ---------- */
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; max-width: 900px; margin: 0 auto; }
+.demo-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 24px; box-shadow: var(--shadow); }
+.demo-card p { font-size: 0.98rem; color: var(--ink); margin: 0 0 18px; }
+.demo-verdict { display: flex; align-items: center; gap: 9px; font-size: 0.88rem; font-weight: 700; }
+.demo-verdict svg { flex: none; width: 18px; height: 18px; }
+.verdict-good { color: var(--gold); }
+.verdict-bad { color: var(--muted); }
+.demo-card.ghosted { background: color-mix(in srgb, var(--offstage) 22%, var(--card)); }
+.demo-card.ghosted p { color: var(--muted); }
+
+/* ---------- Pricing ---------- */
+.pricing { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 760px; margin: 0 auto; }
+.plan-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 30px; box-shadow: var(--shadow); position: relative; }
+.plan-card.pro { border-color: var(--gold); border-width: 1.5px; }
+/* Motif: score-ring badge reused here — the Pro plan is the "chosen" tier. */
+.plan-card.pro::before {
+  content: "";
+  position: absolute; top: 22px; right: 22px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: conic-gradient(var(--gold) 0deg 252deg, var(--offstage) 252deg 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+}
+.plan-card h3 { margin: 0 0 4px; font-size: 1.25rem; font-weight: 600; }
+.plan-card .price { font-family: var(--font-body); font-size: 1.8rem; font-weight: 800; margin: 10px 0 20px; }
+.plan-card .price span { font-size: 0.95rem; font-weight: 500; color: var(--muted); }
+.plan-card ul { list-style: none; margin: 0 0 24px; padding: 0; color: var(--muted); font-size: 0.92rem; }
+.plan-card li { padding: 5px 0; }
+.plan-card li::before { content: "✓ "; color: var(--cited); font-weight: 700; }
+.plan-card .btn-secondary {
+  display: block; text-align: center; padding: 12px 16px; border-radius: 8px;
+  border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 0.92rem;
+}
+.plan-card.pro .btn-secondary { border-color: var(--gold); color: var(--gold); }
+
+/* ---------- FAQ ---------- */
+.faq { max-width: 700px; margin: 0 auto; }
+.faq details { border-bottom: 1px solid var(--line); padding: 18px 0; }
+.faq summary { font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--faint); font-weight: 400; }
+.faq details[open] summary::after { content: "–"; }
+.faq p { color: var(--muted); margin: 12px 0 0; }
+
+/* ---------- Final CTA band ---------- */
+.cta-band {
+  text-align: center; padding: 72px 0;
+  background-image:
+    linear-gradient(90deg, transparent, var(--line-bright) 15%, var(--line-bright) 85%, transparent),
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--gold) 6%, transparent));
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 1px, 100% 100%;
+  background-position: top center, top center;
+}
+.cta-band h2 { margin: 0 0 26px; max-width: 20ch; margin-inline: auto; }
+
+footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-size: 0.85rem; }
+
+/* ---------- Legal pages (how-it-works, privacy, terms) ---------- */
+.legal { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+.legal .back { display: inline-block; margin-bottom: 24px; font-size: 0.88rem; color: var(--muted); text-decoration: none; }
+.legal .back:hover { text-decoration: underline; }
+.legal h1 { font-size: 1.7rem; margin: 0 0 8px; }
+.legal .lead { color: var(--muted); font-size: 1.02rem; margin: 0 0 32px; }
+.legal .draft-note {
+  font-size: 0.88rem; font-weight: 600; color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  border: 1px solid var(--warning); border-radius: 8px; padding: 10px 14px;
+  margin: 0 0 8px; display: inline-block;
+}
+.legal .updated { font-size: 0.82rem; color: var(--faint); margin: 0 0 32px; }
+.legal section { margin-bottom: 28px; background: none; padding: 0; }
+.legal h2 { font-size: 1.15rem; margin: 0 0 10px; }
+.legal p { color: var(--muted); margin: 0 0 12px; }
+.legal ul { color: var(--muted); margin: 0 0 12px; padding-left: 22px; }
+.legal li { margin-bottom: 10px; }
+.legal strong { color: var(--ink); }
+
+@media (max-width: 640px) {
+  .hero { padding: 32px 0 12px; }
+  section { padding: 48px 0; }
+  .dissolve-panel.old, .dissolve-panel.new, .demo-card, .plan-card { padding: 18px; }
+}

@@ -7,27 +7,35 @@
 <meta name="description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. AIVis checks whether your business gets mentioned — or a competitor does instead — and tracks it over time." />
 <link rel="canonical" href="https://aivis-scan.netlify.app/" />
 
-<!-- Favicon: inline mark reusing the same circle+pointer glyph as the app
-     shell's wordmark (src/app/App.vue), so the browser tab matches the
-     in-app logo. SVG is the primary modern-browser icon; the PNG sizes and
-     apple-touch-icon below are rasterized fallbacks generated via the
-     `browse` skill (headless-browser screenshot of the SVG at each target
-     pixel size) — added once that conversion path became available. -->
+<!-- Favicon: the Spotlight score-ring glyph (gold arc over a graphite
+     track, echoing public/marketing-theme.css's score-ring motif) —
+     restyled 2026-08-17 from the earlier blue circle+pointer mark as part
+     of the Top-Banana-to-Spotlight brand pivot (brand/BRAND.md). This is a
+     shared static asset also linked from app.html/result.html, so the
+     in-app tab icon picks up the new mark too even though those pages'
+     own markup is otherwise out of scope for this pass — src/app/App.vue's
+     own in-app wordmark is untouched. SVG is the primary modern-browser
+     icon; the PNG sizes and apple-touch-icon below are rasterized
+     fallbacks generated via the `browse` skill (headless-browser
+     screenshot of the SVG at each target pixel size). -->
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 <link rel="manifest" href="/site.webmanifest" />
 
-<!-- Matches --bg's dark-mode value in src/shared/theme.css, so the browser
-     chrome (mobile address bar, etc.) matches the app's dark theme. -->
-<meta name="theme-color" content="#0c0b09" />
+<!-- Matches --stage-black in public/marketing-theme.css (the Spotlight
+     identity's base background), so the browser chrome (mobile address
+     bar, etc.) matches the page's dark theme. -->
+<meta name="theme-color" content="#0a0a0d" />
 
 <!-- Open Graph / Twitter Card. og:image/twitter:image point at a shared
-     1200x630 card (public/og-image.png) — dark background matching --bg,
-     the circle+pointer glyph, and the tagline — generated the same way as
-     the favicon PNGs above (an HTML card rendered and screenshotted via
-     the `browse` skill). -->
+     1200x630 card (public/og-image.png) — stage-black background, the
+     score-ring glyph, and the "Get in the spotlight." short-form tagline
+     (brand/voice.md) — generated the same way as the favicon PNGs above
+     (an HTML card rendered and screenshotted via the `browse` skill).
+     Regenerated 2026-08-17 for the Spotlight identity; same method as the
+     blue-palette version it replaced. -->
 <meta property="og:type" content="website" />
 <meta property="og:title" content="AIVis — See if AI search recommends your business" />
 <meta property="og:description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. AIVis checks whether your business gets mentioned — or a competitor does instead." />
@@ -61,7 +69,8 @@
       "@type": "Organization",
       "@id": "https://aivis-scan.netlify.app/#organization",
       "name": "AIVis",
-      "url": "https://aivis-scan.netlify.app/"
+      "url": "https://aivis-scan.netlify.app/",
+      "logo": "https://aivis-scan.netlify.app/og-image.png"
     },
     {
       "@type": "SoftwareApplication",
@@ -113,7 +122,7 @@
           "name": "What does it cost?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Free to try — one company and three scans, no credit card required. A paid plan unlocks unlimited companies and scans for a single flat monthly price."
+            "text": "Free to try — one company and three scans, no credit card required. Upgrade for unlimited companies and scans at one flat monthly price."
           }
         }
       ]
@@ -122,240 +131,17 @@
 }
 </script>
 
-<style>
-  :root {
-    color-scheme: light;
-    --bg: #f7f6f2;
-    --card: #ffffff;
-    --ink: #16140f;
-    --muted: #55524a;
-    --faint: #8f8b7f;
-    --line: rgba(22, 20, 15, 0.12);
-    --accent: #2f5fff;
-    --accent-ink: #ffffff;
-    --cited: #1c7a3e;
-    --cited-soft: rgba(28, 122, 62, 0.12);
-    --ghost: #b9b4a6;
-    --serp-blue: #1a0dab;
-    --serp-green: #096621;
-    --shadow: 0 1px 2px rgba(22, 20, 15, 0.04), 0 12px 28px -14px rgba(22, 20, 15, 0.18);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --bg: #0c0b09;
-      --card: #18170f;
-      --ink: #f5f3ee;
-      --muted: #c7c2b5;
-      --faint: #938e80;
-      --line: rgba(245, 243, 238, 0.12);
-      --accent: #7c96ff;
-      --accent-ink: #0c0b09;
-      --cited: #3fdc84;
-      --cited-soft: rgba(63, 220, 132, 0.14);
-      --ghost: #55514a;
-      --serp-blue: #8ab4f8;
-      --serp-green: #81c995;
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 20px 40px -20px rgba(0, 0, 0, 0.6);
-    }
-  }
+<!-- Display font (Space Grotesk) — see public/marketing-theme.css for why
+     it's loaded here rather than @import'd from the stylesheet, and
+     brand/BRAND.md for the full Spotlight typography rationale. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
-  * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
-    line-height: 1.55;
-    -webkit-font-smoothing: antialiased;
-  }
-  h1, h2, .quote, .logo, .plan-card h3 {
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
-    letter-spacing: -0.01em;
-  }
-  .mono {
-    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
-  }
-  a { color: var(--accent); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
-  ::selection { background: var(--cited-soft); }
-
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 22px; }
-
-  /* ---------- Nav ---------- */
-  nav.top {
-    position: sticky; top: 0; z-index: 20;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 18px 22px;
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid transparent;
-  }
-  nav.top.scrolled-look { border-bottom-color: var(--line); }
-  nav.top .logo { font-weight: 700; font-size: 1.2rem; text-decoration: none; color: var(--ink); }
-  nav.top .links { display: flex; gap: 22px; align-items: center; font-size: 0.92rem; }
-  nav.top .links a:not(.cta) { text-decoration: none; color: var(--muted); font-weight: 600; }
-  nav.top .links a.cta {
-    color: var(--accent-ink); background: var(--accent); padding: 9px 18px; border-radius: 8px; font-weight: 700;
-    text-decoration: none; box-shadow: var(--shadow);
-  }
-
-  /* ---------- Buttons ---------- */
-  .btn-primary {
-    display: inline-block; padding: 15px 26px; font-size: 1rem; font-weight: 700;
-    background: var(--accent); color: var(--accent-ink); border-radius: 9px; text-decoration: none;
-    box-shadow: var(--shadow); transition: transform 0.15s ease;
-  }
-  .btn-primary:hover { transform: translateY(-1px); }
-  .hero-note { margin-top: 14px; font-size: 0.85rem; color: var(--faint); }
-
-  /* ---------- Hero ---------- */
-  .hero { padding: 56px 0 40px; }
-  .eyebrow {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--accent); margin: 0 0 20px;
-  }
-  .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--accent); }
-  .hero h1 {
-    font-size: clamp(2.1rem, 1.5rem + 2.6vw, 3.5rem);
-    line-height: 1.12; font-weight: 500; margin: 0 0 22px; max-width: 18ch;
-  }
-  .hero p.lead { color: var(--muted); font-size: clamp(1.05rem, 1rem + 0.3vw, 1.2rem); margin: 0 0 30px; max-width: 52ch; }
-
-  /* ---------- Dissolve signature visual ---------- */
-  .dissolve { margin: 56px 0 8px; display: grid; gap: 10px; }
-  .dissolve-label {
-    display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--faint); margin-bottom: 10px;
-  }
-  .dissolve-panel.old {
-    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-    padding: 20px 22px; box-shadow: var(--shadow);
-  }
-  .serp-row { padding: 10px 0; border-bottom: 1px dashed var(--line); opacity: 0.35; filter: grayscale(0.5); }
-  .serp-row:last-child { border-bottom: none; }
-  .serp-title { color: var(--serp-blue); font-size: 0.98rem; font-weight: 600; text-decoration: line-through; text-decoration-color: var(--ghost); }
-  .serp-url { color: var(--serp-green); font-size: 0.78rem; margin: 2px 0; }
-  .serp-snippet { color: var(--faint); font-size: 0.85rem; }
-  .dissolve-arrow {
-    text-align: center; color: var(--faint); font-size: 1.3rem; line-height: 1; margin: 2px 0;
-  }
-  .dissolve-panel.new {
-    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-    padding: 22px 24px; box-shadow: var(--shadow); position: relative;
-  }
-  .answer-tag {
-    display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
-    color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-bottom: 14px;
-  }
-  .answer-text { margin: 0; font-size: 1.04rem; color: var(--ink); max-width: 62ch; }
-  mark.cited-name {
-    background: var(--cited-soft); color: var(--cited); font-weight: 700;
-    padding: 1px 5px; border-radius: 4px; font-style: normal;
-  }
-  .cursor {
-    display: inline-block; width: 2px; height: 1em; background: var(--accent);
-    margin-left: 2px; vertical-align: text-bottom;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .serp-row {
-      animation: ghost-out 0.6s ease forwards;
-      animation-delay: calc(var(--d) * 0.1s);
-      opacity: 1; filter: none;
-    }
-    @keyframes ghost-out {
-      from { opacity: 1; filter: grayscale(0); }
-      to { opacity: 0.35; filter: grayscale(0.5); }
-    }
-    .dissolve-panel.new { opacity: 0; animation: rise-in 0.7s ease forwards; animation-delay: 0.55s; }
-    @keyframes rise-in {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    mark.cited-name { animation: pulse 1.4s ease 1.4s; }
-    @keyframes pulse {
-      0%, 100% { background: var(--cited-soft); }
-      35% { background: color-mix(in srgb, var(--cited) 45%, transparent); }
-    }
-    .cursor { animation: blink 1s step-end infinite; }
-    @keyframes blink { 50% { opacity: 0; } }
-  }
-
-  /* ---------- Sections ---------- */
-  section { padding: 64px 0; border-top: 1px solid var(--line); }
-  section h2 { font-size: clamp(1.4rem, 1.2rem + 0.8vw, 1.9rem); font-weight: 500; margin: 0 0 8px; text-align: center; }
-  section p.section-sub { color: var(--muted); text-align: center; margin: 0 auto 40px; max-width: 44ch; }
-
-  /* ---------- Pull quote ---------- */
-  .quote-band { border-top: 1px solid var(--line); padding: 60px 0; }
-  .quote {
-    max-width: 30ch; margin: 0 auto; text-align: center; font-weight: 500;
-    font-size: clamp(1.3rem, 1.1rem + 1vw, 1.9rem); line-height: 1.35; color: var(--ink);
-  }
-  .quote .accent-run { color: var(--accent); }
-
-  /* ---------- How it works ---------- */
-  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 28px; counter-reset: step; }
-  .step { padding: 0 8px; position: relative; }
-  .step .num {
-    font-family: ui-monospace, monospace; font-size: 0.8rem; font-weight: 700; color: var(--accent);
-    display: block; margin-bottom: 10px;
-  }
-  .step h3 { font-size: 1.05rem; margin: 0 0 8px; font-weight: 700; }
-  .step p { color: var(--muted); font-size: 0.94rem; margin: 0; }
-
-  /* ---------- Cited / invisible demo ---------- */
-  .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; max-width: 900px; margin: 0 auto; }
-  .demo-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 24px; box-shadow: var(--shadow); }
-  .demo-card p { font-size: 0.98rem; color: var(--ink); margin: 0 0 18px; }
-  .demo-verdict { display: flex; align-items: center; gap: 9px; font-size: 0.88rem; font-weight: 700; }
-  .demo-verdict svg { flex: none; width: 18px; height: 18px; }
-  .verdict-good { color: var(--cited); }
-  .verdict-bad { color: var(--faint); }
-  .demo-card.ghosted p { color: var(--muted); }
-
-  /* ---------- Pricing ---------- */
-  .pricing { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 760px; margin: 0 auto; }
-  .plan-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 30px; box-shadow: var(--shadow); }
-  .plan-card.pro { border-color: var(--accent); border-width: 1.5px; }
-  .plan-card h3 { margin: 0 0 4px; font-size: 1.25rem; font-weight: 600; }
-  .plan-card .price { font-family: -apple-system, sans-serif; font-size: 1.8rem; font-weight: 800; margin: 10px 0 20px; }
-  .plan-card .price span { font-size: 0.95rem; font-weight: 500; color: var(--muted); }
-  .plan-card ul { list-style: none; margin: 0 0 24px; padding: 0; color: var(--muted); font-size: 0.92rem; }
-  .plan-card li { padding: 5px 0; }
-  .plan-card li::before { content: "✓ "; color: var(--cited); font-weight: 700; }
-  .plan-card .btn-secondary {
-    display: block; text-align: center; padding: 12px 16px; border-radius: 8px;
-    border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 0.92rem;
-  }
-  .plan-card.pro .btn-secondary { border-color: var(--accent); color: var(--accent); }
-
-  /* ---------- FAQ ---------- */
-  .faq { max-width: 700px; margin: 0 auto; }
-  .faq details { border-bottom: 1px solid var(--line); padding: 18px 0; }
-  .faq summary { font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
-  .faq summary::-webkit-details-marker { display: none; }
-  .faq summary::after { content: "+"; color: var(--faint); font-weight: 400; }
-  .faq details[open] summary::after { content: "–"; }
-  .faq p { color: var(--muted); margin: 12px 0 0; }
-
-  /* ---------- Final CTA band ---------- */
-  .cta-band {
-    text-align: center; padding: 72px 0; border-top: 1px solid var(--line);
-    background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 6%, transparent));
-  }
-  .cta-band h2 { margin: 0 0 26px; max-width: 20ch; margin-inline: auto; }
-
-  footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-size: 0.85rem; }
-
-  @media (max-width: 640px) {
-    .hero { padding: 32px 0 12px; }
-    section { padding: 48px 0; }
-    .dissolve-panel.old, .dissolve-panel.new, .demo-card, .plan-card { padding: 18px; }
-  }
-</style>
+<!-- Shared Spotlight theme — tokens and base styles for all four static
+     marketing pages, consolidated 2026-08-17 so palette updates can't
+     drift out of sync across pages again. See brand/BRAND.md. -->
+<link rel="stylesheet" href="/marketing-theme.css" />
 </head>
 <body>
 
@@ -363,22 +149,23 @@
   <a class="logo" href="/">AIVis</a>
   <div class="links">
     <a href="/app/login">Log in</a>
-    <a class="cta" href="/app/signup">Sign up free</a>
+    <a class="cta" href="/app/signup">Get in the spotlight</a>
   </div>
 </nav>
 
 <div class="wrap">
 
   <section class="hero" style="border-top:none;">
-    <div class="eyebrow">There's no page 1 anymore</div>
-    <h1>AI search doesn't give you a results page. It gives you one paragraph — and your name is either in it, or it isn't.</h1>
+    <div class="eyebrow">No page 1. Just a spotlight.</div>
+    <h1>AI search doesn't give you a results page. It gives you one spotlight — and your name is either standing in it, or left in the dark.</h1>
     <p class="lead">
-      ChatGPT and Gemini already answer "who does X near me" for your customers,
-      with no blue links to click. AIVis checks what those answers actually say
-      about you, scores it, and tracks whether that's getting better or worse.
+      ChatGPT and Gemini already answer "who does X near me" for your customers —
+      with no blue links, no results page, just one spotlight. AIVis checks who's
+      standing in it, scores your business, and tracks whether that's getting
+      better or worse.
     </p>
-    <a class="btn-primary" href="/app/signup">Check your AI visibility — free</a>
-    <div class="hero-note">No credit card required. Takes about a minute.</div>
+    <a class="btn-primary" href="/app/signup">Get in the spotlight — free</a>
+    <div class="hero-note">No credit card required. About a minute — see if it's you.</div>
 
     <div class="dissolve" aria-hidden="true">
       <div class="dissolve-panel old">
@@ -414,7 +201,7 @@
   <div class="quote-band">
     <p class="quote">
       Google gave every business a shot at page 1.
-      An AI answer gives you <span class="accent-run">one sentence — or none.</span>
+      An AI answer gives you <span class="accent-run">one spotlight — you're in it, or you're offstage.</span>
     </p>
   </div>
 
@@ -435,14 +222,14 @@
       <div class="step">
         <span class="num">03</span>
         <h3>See your score</h3>
-        <p>A 0-100 visibility score, who's beating you, and what to fix — tracked over every future scan.</p>
+        <p>A 0-100 visibility score, who's in the spotlight instead of you, and what to fix — tracked over every future scan.</p>
       </div>
     </div>
   </section>
 
   <section>
-    <h2>Cited, or invisible — there's no in between</h2>
-    <p class="section-sub">Two real answer shapes from the same kind of question. AIVis tells you which one you're getting.</p>
+    <h2>Cited, or offstage. There's no in between.</h2>
+    <p class="section-sub">Two real answers to the same kind of question — one in the spotlight, one in the dark. AIVis tells you which one you're getting.</p>
     <div class="demo-grid">
       <div class="demo-card">
         <span class="answer-tag mono">Example answer</span>
@@ -465,7 +252,7 @@
 
   <section>
     <h2>Pricing</h2>
-    <p class="section-sub">Start free. Upgrade when you outgrow it.</p>
+    <p class="section-sub">Start free. Stay in the light once you outgrow it.</p>
     <div class="pricing">
       <div class="plan-card">
         <h3>Free</h3>
@@ -475,7 +262,7 @@
           <li>3 scans total</li>
           <li>No credit card required</li>
         </ul>
-        <a class="btn-secondary" href="/app/signup">Get started</a>
+        <a class="btn-secondary" href="/app/signup">Start free</a>
       </div>
       <!-- Pro price intentionally left unset in copy and in the JSON-LD
            above — not finalized yet. The actual charge is whatever Price is
@@ -489,7 +276,7 @@
           <li>Unlimited scans</li>
           <li>Deeper, AI-generated advice</li>
         </ul>
-        <a class="btn-secondary" href="/app/signup">Sign up to upgrade</a>
+        <a class="btn-secondary" href="/app/signup">Stay in the light</a>
       </div>
     </div>
   </section>
@@ -511,7 +298,7 @@
       </details>
       <details>
         <summary>What does it cost?</summary>
-        <p>Free to try — one company and three scans, no credit card required. A paid plan unlocks unlimited companies and scans for a single flat monthly price.</p>
+        <p>Free to try — one company and three scans, no credit card required. Upgrade for unlimited companies and scans at one flat monthly price.</p>
       </details>
     </div>
   </section>
@@ -520,9 +307,9 @@
 
 <div class="cta-band">
   <div class="wrap">
-    <h2>Find out what AI search is already saying about you.</h2>
-    <a class="btn-primary" href="/app/signup">Check your AI visibility — free</a>
-    <div class="hero-note">No credit card required. Takes about a minute.</div>
+    <h2>There's a spotlight on every AI answer. Make sure it's on you.</h2>
+    <a class="btn-primary" href="/app/signup">Get in the spotlight — free</a>
+    <div class="hero-note">No credit card required. About a minute — see if it's you.</div>
   </div>
 </div>
 

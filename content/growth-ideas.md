@@ -1,5 +1,19 @@
 # Top Banana — Growth Ideas
 
+> **Stale flag (2026-08-17):** the CEO rejected the "Top Banana" mascot
+> direction outright in favor of a new, mascot-free "Spotlight" identity
+> (see `brand/BRAND.md`). Three specifics below are now superseded and
+> should not be executed as written: **Idea 2** ("Caught in the
+> Underbrush," a mascot-led social series — there is no mascot anymore),
+> its claim that **"mascot art is already in progress"** (false as of
+> 2026-08-17 — no mascot art was ever produced, and none will be), and
+> **Idea 3**'s "banana glyph" embeddable badge (the glyph doesn't exist in
+> the new identity). The rest of this document's campaign ideas are not
+> rewritten here — that's a separate pass — but read everything below with
+> that context: any mention of the banana/jungle/canopy vocabulary or
+> imagery needs to be re-thought for Spotlight before execution, not taken
+> as still-accurate.
+
 Campaign/content concepts for launch, built around the approved "Top Banana"
 creative direction: AI search is a jungle, every business is climbing the
 canopy toward the golden banana, most are invisible in the underbrush, AIVis

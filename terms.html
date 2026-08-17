@@ -11,7 +11,8 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 <link rel="manifest" href="/site.webmanifest" />
-<meta name="theme-color" content="#0d0d0d" />
+<!-- Matches --stage-black in public/marketing-theme.css. -->
+<meta name="theme-color" content="#0a0a0d" />
 <meta property="og:type" content="article" />
 <meta property="og:title" content="Terms of Service — AIVis" />
 <meta property="og:description" content="AIVis's terms of service: plans and billing, acceptable use, and what a visibility score does and doesn't guarantee." />
@@ -21,87 +22,50 @@
 <meta name="twitter:title" content="Terms of Service — AIVis" />
 <meta name="twitter:description" content="AIVis's terms of service: plans and billing, acceptable use, and what a visibility score does and doesn't guarantee." />
 <meta property="twitter:image" content="https://aivis-scan.netlify.app/og-image.png" />
+<!-- Self-contained @graph: this page is a separate HTTP document from
+     index.html, so the WebPage node's isPartOf/publisher @id references
+     below only resolve if the WebSite/Organization nodes they point at are
+     also defined here — copied verbatim (same @id values) from index.html's
+     own JSON-LD so both documents describe the same conceptual site/org. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "WebPage",
-  "@id": "https://aivis-scan.netlify.app/terms#webpage",
-  "url": "https://aivis-scan.netlify.app/terms",
-  "name": "Terms of Service — AIVis",
-  "description": "AIVis's terms of service: plans and billing, acceptable use, and what a visibility score does and doesn't guarantee.",
-  "isPartOf": { "@id": "https://aivis-scan.netlify.app/#website" },
-  "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://aivis-scan.netlify.app/#website",
+      "url": "https://aivis-scan.netlify.app/",
+      "name": "AIVis",
+      "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://aivis-scan.netlify.app/#organization",
+      "name": "AIVis",
+      "url": "https://aivis-scan.netlify.app/",
+      "logo": "https://aivis-scan.netlify.app/og-image.png"
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://aivis-scan.netlify.app/terms#webpage",
+      "url": "https://aivis-scan.netlify.app/terms",
+      "name": "Terms of Service — AIVis",
+      "description": "AIVis's terms of service: plans and billing, acceptable use, and what a visibility score does and doesn't guarantee.",
+      "isPartOf": { "@id": "https://aivis-scan.netlify.app/#website" },
+      "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
+    }
+  ]
 }
 </script>
-<style>
-  :root {
-    color-scheme: light;
-    --bg: #f9f9f7;
-    --card: #fcfcfb;
-    --fg: #0b0b0b;
-    --muted: #52514e;
-    --faint: #898781;
-    --border: rgba(11, 11, 11, 0.10);
-    --accent: #2a78d6;
-    --good: #0ca30c;
-    --warning: #b8860b;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --bg: #0d0d0d;
-      --card: #1a1a19;
-      --fg: #ffffff;
-      --muted: #c3c2b7;
-      --faint: #898781;
-      --border: rgba(255, 255, 255, 0.10);
-      --accent: #3987e5;
-      --good: #0ca30c;
-      --warning: #e8a33d;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    line-height: 1.5;
-  }
-  a { color: var(--accent); }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+<!-- Display font (Space Grotesk) — see public/marketing-theme.css. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
-  nav.top {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 20px 0;
-  }
-  nav.top .logo { font-weight: 800; font-size: 1.1rem; text-decoration: none; color: var(--fg); }
-  nav.top .links { display: flex; gap: 20px; align-items: center; font-size: 0.9rem; }
-  nav.top .links a { text-decoration: none; color: var(--muted); }
-  nav.top .links a.cta {
-    color: #fff; background: var(--accent); padding: 8px 16px; border-radius: 8px; font-weight: 600;
-  }
-
-  footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-size: 0.85rem; }
-
-  .legal { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
-  .legal .back { display: inline-block; margin-bottom: 24px; font-size: 0.88rem; color: var(--muted); text-decoration: none; }
-  .legal .back:hover { text-decoration: underline; }
-  .legal h1 { font-size: 1.7rem; margin: 0 0 8px; }
-  .legal .draft-note {
-    font-size: 0.88rem; font-weight: 600; color: var(--warning);
-    background: color-mix(in srgb, var(--warning) 14%, transparent);
-    border: 1px solid var(--warning); border-radius: 8px; padding: 10px 14px;
-    margin: 0 0 8px; display: inline-block;
-  }
-  .legal .updated { font-size: 0.82rem; color: var(--faint); margin: 0 0 32px; }
-  .legal section { margin-bottom: 28px; }
-  .legal h2 { font-size: 1.15rem; margin: 0 0 10px; }
-  .legal p { color: var(--muted); margin: 0 0 12px; }
-  .legal ul { color: var(--muted); margin: 0 0 12px; padding-left: 22px; }
-  .legal li { margin-bottom: 8px; }
-  .legal a { color: var(--accent); }
-</style>
+<!-- Shared Spotlight theme — see brand/BRAND.md and index.html's own
+     comment on this link for why this replaced a per-page inline <style>
+     block (this page had drifted onto an already-retired palette). -->
+<link rel="stylesheet" href="/marketing-theme.css" />
 </head>
 <body>
 
@@ -110,7 +74,7 @@
     <a class="logo" href="/">AIVis</a>
     <div class="links">
       <a href="/app/login">Log in</a>
-      <a class="cta" href="/app/signup">Sign up free</a>
+      <a class="cta" href="/app/signup">Get in the spotlight</a>
     </div>
   </nav>
 

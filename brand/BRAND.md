@@ -1,34 +1,41 @@
 # AIVis brand design
 
 Written 2026-08-10. Original version anchored the CEO's "AI scoring = more
-sales!!" positioning into a generic blue/violet SaaS visual identity. Same
-day, the CEO approved a new creative direction — **Top Banana** — pitched
-by the creative director in session: the visual identity, palette, and
-motif language below **supersede** that earlier version entirely. The
-positioning statement's causal logic and the product-mechanics grounding
-carry forward unchanged; only the "what it looks like" layer changes.
-Companion file [`image-prompts.md`](./image-prompts.md) turns the visual
-style anchor below into ready-to-paste prompts for an external image
-generator.
+sales!!" positioning into a generic blue/violet SaaS visual identity. That
+day, the CEO approved a jungle/mascot direction — **Top Banana** — pitched
+by the creative director in session. **2026-08-17: the CEO reviewed Top
+Banana and rejected it outright** — "no mascot, brand new design" — before
+a single pixel of it had shipped (zero palette tokens, zero font loading,
+zero copy had actually landed in code). This document replaces Top Banana
+entirely with **Spotlight**, per that decision. The positioning statement's
+causal logic and the product-mechanics grounding carry forward unchanged
+from both prior versions; only the "what it looks like and what it's
+called" layer changes. `image-prompts.md` (Top Banana's companion file of
+external mascot image-generation prompts) is deleted — there is no
+character to generate art of anymore.
 
-**Critical boundary:** this brand direction governs marketing, social, and
-onboarding surfaces only. The in-app product dashboard (`src/shared/theme.css`,
-`ScanDetail.vue`, `CompanyProgressChart.vue`, `CompaniesListView.vue`,
-`CompanyDetailView.vue`) is deliberately unaffected — stays calm, muted,
-professional, exactly as it is today. Boss and the jungle world never
-appear inside the working tool a signed-in user actually uses to read
-their score. See "Why this scales" below for the reasoning.
+**Critical boundary:** this brand direction governs the four static
+marketing entry points only — `index.html`, `how-it-works.html`,
+`privacy.html`, `terms.html` — plus their shared stylesheet and OG/favicon
+assets. It does **not** govern `src/app/**` (including `LoginView.vue` /
+`SignupView.vue`), `result.html`, or `src/shared/theme.css` — the
+authenticated app dashboard and the pre-pivot legacy shareable-link page
+are deliberately unaffected and stay exactly as they are today: calm,
+muted, professional. See "Why this scales" below for the reasoning that
+justifies keeping that split, which predates both Top Banana and
+Spotlight.
 
 ## The world
 
-AI search is a jungle now. Every business is a creature in the canopy,
-scrambling upward toward the light; most are invisible in the underbrush —
-never mentioned, never cited, never picked by the AI answering the
-question. AIVis shows a business exactly where it sits in that canopy, and
-the climb to the top. "Top banana" is a real, century-old idiom — vaudeville
-slang for the headline act, the boss, the one everyone's watching — chosen
-because it needs zero explanation: wanting to be the one AI picks is a
-universal, primal desire, not a niche B2B metric.
+An AI-generated answer works like a stage spotlight. There's room for very
+few names in the light — usually one, sometimes a handful — and everyone
+else the model considered stays offstage, invisible to the person who
+asked the question. That's not a metaphor stretched to fit; it's a literal
+description of what AIVis measures: cited (in the light) vs. never
+mentioned (offstage), for a business asking "does the AI recommend me or
+someone else?" No character is needed to explain a spotlight — everyone
+already knows what it means to be the one it lands on, and what it means
+to be standing just outside its edge.
 
 ## Positioning statement
 
@@ -42,201 +49,175 @@ The causal chain is the whole pitch: *AI search is replacing "10 blue
 links" with a single spoken answer → if that answer doesn't name you, the
 sale already happened for someone else → your AI Score is a leading
 indicator of that outcome, not a vanity metric.* Every headline should
-imply this chain, not just state "we check AI visibility." Top Banana
-doesn't replace this logic — it's the emotional hook that makes the logic
-land faster: everyone already wants to win, AIVis just shows the
-scoreboard.
+imply this chain, not just state "we check AI visibility." Spotlight
+doesn't replace this logic — it's the visual/verbal hook that makes the
+logic land faster: there's a spotlight on every AI answer, and the only
+question is whether it's on you.
 
 ## Tagline
 
-**Primary: "Everyone wants to be Top Banana. Now you can see who's winning."**
-
-Replaces the earlier "Your AI Score. More Sales." as the primary line —
-that phrasing still describes the mechanism accurately and is kept below
-as a variant for placements that need the causal chain spelled out
-literally (e.g. ad copy aimed at someone who's never heard "Top Banana"
-and needs the payoff named directly).
+**Primary: "There's a spotlight on every AI answer. Make sure it's on
+you."**
 
 | Variant | Where to use |
 |---|---|
-| "Everyone wants to be Top Banana. Now you can see who's winning." | Hero headline, logo lockup, social bio |
-| "Higher AI Score. More Sales." | Ad copy, comparative/before-after framing, anywhere the causal chain needs to be stated plainly rather than implied |
-| "AI recommends you — or your competitor. Know which." | Sets up the "How it works" section; longer, scarcity-flavored |
-| "Climb out of the underbrush." | Onboarding empty states, loading screens — pairs naturally with Boss mid-climb |
+| "There's a spotlight on every AI answer. Make sure it's on you." | Hero headline, logo lockup, social bio |
+| "Get in the spotlight." | Nav CTA, OG image, tight spaces |
+| "AI already picked someone. Was it you?" | Ad copy, retargeting — loss-framed, states the causal chain's stakes directly rather than implying them |
+
+(These taglines are provided for the content pass that follows this one —
+this document does not itself rewrite the four marketing pages' visible
+copy; see `CLAUDE.md`'s note on execution order.)
 
 ## Voice
 
-Direct, causal, a little urgent — the CEO's own "!!" energy, toned down
-just enough to stay credible. Concretely:
+Direct, causal, grounded — unchanged in substance from both prior versions
+of this document, only the flavor vocabulary changes (no more "climb,"
+"canopy," "underbrush," "top banana"; now "spotlight," "cited," "offstage,"
+"in the light"):
 
 - Lead with the outcome (sales), not the mechanism (AI visibility). "More
   sales" beats "better visibility" in every headline-level sentence.
 - Short sentences. No "leverage," "unlock," "empower," or other SaaS filler.
 - It's fine to name the threat plainly: *a competitor is the one getting
-  mentioned instead of you.* Loss-framing is on-brand here, not fear-mongering
-  — it's the literal mechanism (`competitorTallies` in the scoring engine).
-- Every claim stays grounded in what the product actually does: two AI
-  models (GPT-5 mini, Gemini 3 Flash) queried through Perplexity's grounded
-  search, a 0-100 score, tracked over time. Don't inflate beyond that.
-- New: the Top Banana / competitive-leaderboard framing is now available
-  for headline-level copy ("who's winning," "climb," "canopy,"
-  "underbrush") — but it's flavor on top of the same grounded claims above,
-  not a license to invent capabilities. A line like "see who's winning"
-  still means "see your 0-100 AI Score," nothing more mystical.
+  mentioned instead of you.* Loss-framing is on-brand here, not
+  fear-mongering — it's the literal mechanism (`competitorTallies` in the
+  scoring engine).
+- Every claim stays grounded in what the product actually does: four AI
+  models (OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude
+  Haiku 4.5, xAI's Grok 4.6), five prompts per scan, twenty checks total, a
+  0-100 score tracked over time. Don't inflate beyond that.
+- Spotlight vocabulary ("in the spotlight," "cited," "offstage," "the
+  light") is available for headline-level copy, but it's flavor on top of
+  the same grounded claims above, not a license to invent capabilities. "In
+  the spotlight" still means "your 0-100 AI Score is high," nothing more
+  mystical.
 
 ## Color palette
 
-Two palettes now coexist, scoped to different surfaces — same split as
-before, sharpened:
+Two palettes coexist, scoped to different surfaces — unchanged split from
+both prior versions of this document:
 
 - **In-app dashboard** (`src/shared/theme.css`) — deliberately calm and
   utilitarian, muted grays, one blue accent, plus the existing score-band
   colors (`--good`/`--warning`/`--serious`/`--critical`). **Unchanged by
   this document.** Nothing in `theme.css` is edited here or implied to
   change.
-- **Marketing/social/onboarding (Top Banana world)** — the palette below,
-  replacing the earlier blue/violet marketing gradient entirely.
+- **Marketing (the four static entry points)** — the Spotlight palette
+  below, replacing Top Banana's jungle palette entirely, which in turn had
+  replaced the original blue/violet gradient.
 
-| Role | Hex | Notes |
+**Dark-first, deliberately:** the site now defaults to this dark theme
+directly — `color-scheme: dark` set outright in the shared stylesheet, not
+toggled via `prefers-color-scheme` the way `index.html` did before this
+pass. The spotlight metaphor needs real darkness to read as a spotlight;
+a light-mode fallback would mean half of visitors never see the metaphor
+at all. This matches the CEO's standing "dark mode default where
+appropriate" preference.
+
+| Role | Hex | Use |
 |---|---|---|
-| Canopy black | `#0b0f0d` | Background — the dark base every marketing surface sits on |
-| Jungle green | `#113d2c` | Foliage / depth — mid-tone shadow layer behind the neon elements |
-| Neon leaf | `#39e28d` | "You're cited" glow — deliberately close to the existing product's `--good` green token in `theme.css`, so the marketing world and the real in-app "good" signal feel like the same color family even though the files never touch |
-| Banana gold | `#ffc94d` | **The prize color.** CTAs, the top of any score ring depicted in marketing art, Boss's banana itself. Used sparingly, only to mean "winning" — never a background or general fill |
-| AI violet | `#a855f7` | Tech-glow accent — vines, data trails, canopy network lines |
+| Stage black | `#0a0a0d` | Base background |
+| Surface | `#17171b` | Cards, panels |
+| Ink | `#f5f4f0` | Primary text |
+| Muted | `#a8a6a0` | Secondary text |
+| Spotlight gold | `#ffb830` | The light itself — CTAs, the "cited" highlight, the score-ring peak. Used sparingly, same "prize color, not a fill color" discipline the Top Banana version got right about banana gold — reserved for the moment something is chosen, never a background or general fill |
+| Signal blue | `#4da3ff` | Secondary/workhorse accent — body links, focus rings, icons, the UI chrome that isn't a "you're chosen" moment |
+| Offstage graphite | `#3a3a40` | The "unlit"/not-mentioned state — ghosted or dimmed content, the track behind a score-ring's gold arc |
 
-The old marketing-only palette (`#2a78d6` blue / `#7c5cff` violet /
-`#1fae64` growth green) is retired for new marketing work. It never
-touched `theme.css` and still doesn't — this is strictly a swap of what
-marketing/social/onboarding assets use going forward.
+"Cited" and "not mentioned" map directly to gold vs. graphite — lit vs.
+unlit — the same "no separate green needed" logic Top Banana's neon-leaf
+palette used, just simplified to two states instead of three. In the
+shared stylesheet (`public/marketing-theme.css`), gold and blue are kept
+as **separate tokens** (`--gold` / `--accent`) specifically so implementers
+don't default every interactive element to gold out of convenience —
+gold appears only where something has actually been chosen (CTA buttons,
+the cited-name highlight, the Pro plan's border, the score-ring), while
+blue carries the rest of the UI (links, focus outlines, secondary numerals).
 
-## Mascot: Boss (working name)
-
-**Boss** is a working name — the CEO is open to changing it. Everything
-else about the mascot is locked.
-
-**Who Boss is:** a sharp, slightly cocky ape, permanently mid-climb,
-reaching for one glowing golden banana at the top of a neon jungle canopy
-shaped like a network graph. Confident, a little cheeky, competitive —
-Boss wants to win and isn't shy about it. Never cute, never cartoonish,
-never a kids'-app icon. Boss is a mascot for people who want to win, not a
-mascot for children.
-
-**Physical description:** lean, athletic ape silhouette, mid-reach or
-mid-climb posture (rarely standing still). Bold, confident linework —
-graphic-novel-adjacent, not soft/plush. Vines under Boss pulse like data
-trails (glowing lines, not naturalistic plant texture); leaves around Boss
-flicker on/off like citations lighting up. The one golden banana at the
-top of the canopy is always the visual endpoint of whatever Boss is doing.
-
-**How Boss appears:**
-- Marketing hero sections, social posts/profile art, onboarding flow
-  illustrations, loading/empty states in the marketing site
-- Sticker-sheet / turnaround art for reuse across campaigns
-- Always in the jungle-tech world (canopy black background, neon leaf /
-  banana gold / AI violet palette)
-
-**How Boss never appears:**
-- Never on the actual scan-results page or anywhere inside the
-  authenticated app dashboard (`ScanDetail.vue`, `CompanyDetailView.vue`,
-  `CompanyProgressChart.vue`, `CompaniesListView.vue`) — that surface stays
-  mascot-free, calm, and professional
-- Never depicted as representing a specific real user's business (Boss is
-  AIVis itself, not a stand-in for "your company")
-- Never rendered cute/plush/child-facing — no oversized eyes, no
-  rounded-toy proportions
-- Never mixed into the old blue/violet palette — Boss only exists in the
-  jungle-tech world
+The old Top Banana palette (`#0b0f0d` canopy black / `#113d2c` jungle green
+/ `#39e28d` neon leaf / `#ffc94d` banana gold / `#a855f7` AI violet) is
+retired, unused anywhere in code, and superseded by the table above.
 
 ## Typography
 
-**Display/headline: Baloo 2.** Rounded and confident without tipping into
-a toy-like register — it carries enough weight and sturdiness to read as
-"competitive" rather than "kids' app," which matters given the mascot
-brief explicitly rules out cute/cartoonish. (Considered and rejected:
-Fredoka, whose rounder, bouncier letterforms skew closer to a
-children's-app feel than a mascot who's supposed to be cocky and want to
-win; Space Grotesk, which is confident and modern but not rounded, so it
-undersells the "friendly but sharp" jungle-mascot personality on its own.)
-This is a documentation recommendation only — no CSS file is edited by
-this document; implementation is a separate follow-up.
+**Display/headline: Space Grotesk**, loaded via Google Fonts (`wght@500;
+600;700` — the three weights actually used across headings, the nav
+wordmark, and the pull-quote). Body text stays the existing system-ui
+stack (`-apple-system, "Segoe UI", system-ui, sans-serif`) — unchanged,
+same as every prior version of this document.
 
-**Body: existing system-ui stack, unchanged.** No reason to touch it —
-Baloo 2 headlines over a system-ui body is a common, legible pairing
-(distinctive display type, invisible/fast-loading body type) and doesn't
-require any change to the in-app dashboard, which this document doesn't
-touch anyway.
+Notably, the Top Banana version of this doc already evaluated Space
+Grotesk and rejected it *only* because it wasn't rounded/friendly enough
+for a cheeky mascot personality. With no mascot, that objection is gone —
+confident, modern, geometric is exactly right for a spotlight-on-a-stage
+identity. No re-evaluation needed; the earlier assessment already reached
+the right answer for this direction.
 
-## Visual style anchor
+## Why no mascot
 
-Copy this paragraph verbatim into every image-generation prompt — it's
-what keeps separately-generated assets looking like one brand instead of a
-grab-bag. Replaces the old blue/violet paragraph entirely.
+A spotlight doesn't need a character standing in it to explain the idea —
+the empty circle of light *is* the idea, and who's standing in it (or
+isn't) is literally the reader's own business, not a drawn character
+representing it. Top Banana needed Boss because "everyone wants to be top
+banana" is an idiom that benefits from a face; "there's a spotlight on
+every AI answer" is already a complete, self-explaining image without one.
+Skipping a mascot also removes an entire category of ongoing cost and risk
+that Top Banana would have carried indefinitely: no image-generation
+pipeline to keep in sync, no character consistency to maintain across
+separately-generated assets, no risk of the mascot reading as a kids'-app
+character despite the "not cute" brief. Spotlight is 100% CSS/SVG-drawable
+— gradients, arcs, and a gold/graphite palette — which is also just a
+better fit for a small self-serve SaaS with no dedicated design headcount.
 
-> Flat-vector modern illustration style, jungle-tech aesthetic. Deep
-> canopy black (#0b0f0d) base background with jungle green (#113d2c)
-> foliage silhouettes for depth. Neon leaf green (#39e28d) as the primary
-> glow color for vines, data-trail lines, and "cited" highlights — vines
-> rendered as thin glowing circuit-like trails, not naturalistic plant
-> texture. Banana gold (#ffc94d) reserved exclusively for the
-> prize/winning moment — the top banana itself, the peak of a score ring,
-> a CTA, Boss's held-up banana — never used as a general background or
-> fill color. AI violet (#a855f7) as a secondary tech-glow accent threaded
-> through vines and canopy lines. The jungle canopy itself is stylized as
-> a network/node graph — branches read as data connections, leaves as node
-> points that flicker on/off like citations lighting up. Bold, confident,
-> graphic-novel-adjacent linework — not photorealistic, not soft
-> stock-illustration, not cutesy or kids'-app cartoonish. Mascot Boss (a
-> sharp, slightly cocky ape) reads as a confident competitor, not a
-> children's character. Clean silhouettes, strong contrast, minimal
-> clutter.
+## Motifs
 
-## Motif language
+Recurring shapes, all achievable in pure CSS/SVG — no illustration tool
+needed:
 
-Recurring shapes to reuse across every asset, so a viewer sees the same
-visual vocabulary on the hero, the OG image, the icon set, and social art:
-
-- **Top banana (the reward icon)** — one glowing golden banana at the top
-  of the canopy. This is the single most important recurring shape: it's
-  the literal visual payoff of "winning," reused as a small glyph anywhere
-  the brand needs to say "this is the prize."
-- **Canopy skyline silhouette** — a jagged tree-canopy horizon line,
-  backlit or glowing at the edges, usable as a standalone background
-  texture or a footer/divider motif.
-- **Vines as data trails** — thin glowing lines (neon leaf or AI violet)
-  that read simultaneously as jungle vines and as network/data
-  connections. This is what makes the "AI search is a jungle" metaphor
-  visually literal rather than just verbal.
-- **Leaderboard as jungle branches** — different ape/creature silhouettes
-  perched at different canopy heights, representing different score
-  bands: near the top (near the golden banana, lit in neon leaf) for high
-  scores, mid-canopy (partially lit) for middling scores, deep in
-  shadow/underbrush (unlit, barely visible) for low or absent scores. This
-  motif directly visualizes the competitive positioning — "see who's
-  winning" — and is the basis for the dedicated leaderboard graphic in
-  `image-prompts.md`.
-
-## Why this scales
-
-The marketing world is loud and mascot-driven on purpose; the product
-stays calm and mascot-free on purpose. These are different jobs. A
-first-time visitor needs a hook strong enough to make an abstract 0-100
-visibility metric feel like something worth caring about — "everyone wants
-to be Top Banana" does that in one line, and Boss makes it visually
-memorable and shareable in a way a generic SaaS gradient never could. A
-signed-in user checking their actual score, though, is doing repeat-use,
-trust-sensitive work — they need the dashboard to read as accurate and
-serious, not entertaining. Putting Boss on `ScanDetail.vue` would
-undercut the very credibility the score needs to be useful. Same logic
-that justified a marketing-only palette in the original version of this
-doc; Top Banana just gives that split a much stronger, more ownable idea
-to work with on the loud side.
+- **Radial spotlight glow** — a soft radial-gradient in spotlight gold,
+  low-opacity, behind the hero headline and layered into the final CTA
+  band's background. Implemented as a `background-image` layer in
+  `public/marketing-theme.css`, not a separate illustrated asset.
+- **The "cited" highlight** — `mark.cited-name` in the hero's dissolve demo
+  now glows gold (a soft radial tint plus a subtle gold text-shadow)
+  instead of the old plain green highlight — literally "this name is in
+  the light."
+- **Score-ring dial** — a small gold-arc-over-graphite-track circle
+  (CSS `conic-gradient` + a mask, no SVG file needed), reused as a
+  decorative badge in two spots: the corner of the "AI answer" panel in
+  the hero dissolve demo, and the corner of the Pro plan card. Ties
+  directly to the product's actual 0-100 score rather than being pure
+  decoration.
+- **Stage-line dividers** — section boundaries that used to be a flat
+  `border-top: 1px solid var(--line)` are now a horizontal gradient line
+  (transparent → line-bright → transparent) painted as a 1px background
+  layer. Deliberately restrained — no glow, no gold, just a slightly more
+  designed divider than a flat border, per the explicit "keep it simple,
+  don't overdo it" brief.
+- **No character, mascot, or animal artwork of any kind.** This is a
+  confirmed, deliberate absence, not an oversight — see "Why no mascot"
+  above.
 
 ## What this doc deliberately does not include
 
-No competitive brand research and no fabricated market stats — skipped
-per the CEO's "keep it simple" instruction, and per the "no competitive
-brand research" reasoning already established in the original version of
-this doc. Positioning is grounded entirely in what the product verifiably
-does (see `CLAUDE.md`'s Architecture section: 4 models, Perplexity-grounded,
-0-100 score), not claims about competitors.
+No competitive brand research and no fabricated market stats — same
+"keep it simple" reasoning both prior versions of this document already
+established. Positioning is grounded entirely in what the product
+verifiably does (see `CLAUDE.md`'s Architecture section: 4 models,
+5 prompts, 20 checks, 0-100 score), not claims about competitors.
+
+## Why this scales
+
+The marketing surface can afford to be more visually confident than the
+product; the product stays calm and mascot-free on purpose. These are
+different jobs. A first-time visitor needs a hook strong enough to make an
+abstract 0-100 visibility metric feel like something worth caring about —
+the spotlight metaphor does that without needing a character to sell it. A
+signed-in user checking their actual score, though, is doing repeat-use,
+trust-sensitive work — they need the dashboard to read as accurate and
+serious, not staged. Putting a spotlight glow or a score-ring flourish on
+`ScanDetail.vue` would undercut the very credibility the score needs to be
+useful. Same logic that justified a marketing-only palette in both prior
+versions of this doc; Spotlight just executes that split with less
+ongoing production cost than a mascot would have required.
