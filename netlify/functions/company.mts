@@ -11,7 +11,7 @@ export default async (req: Request, context: Context) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
 
-  if (req.method !== 'GET' && req.method !== 'PATCH') {
+  if (req.method !== 'GET') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
@@ -28,38 +28,6 @@ export default async (req: Request, context: Context) => {
 
   const companyId = context.params.id;
   const db = sql();
-
-  if (req.method === 'PATCH') {
-    let body: Record<string, any>;
-    try {
-      body = await req.json();
-    } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-      });
-    }
-
-    // Only is_public is patchable today — this endpoint exists specifically
-    // for the public-report opt-in toggle (CompanyDetailView.vue), not a
-    // general-purpose company editor.
-    const isPublic = body.is_public === true;
-    const updated = await db`
-      UPDATE public.companies SET is_public = ${isPublic}, updated_at = now()
-      WHERE id = ${companyId} AND owner_user_id = ${userId}
-      RETURNING *
-    `;
-    if (updated.length === 0) {
-      return new Response(JSON.stringify({ error: 'Not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-      });
-    }
-    return new Response(JSON.stringify({ ok: true, company: updated[0] }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
-  }
 
   const companies = await db`
     SELECT * FROM public.companies WHERE id = ${companyId} AND owner_user_id = ${userId}

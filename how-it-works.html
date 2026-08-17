@@ -160,10 +160,14 @@
         genuinely deciding between options might ask.
       </p>
       <p>
-        All four models are queried through <strong>Perplexity's grounded
-        search API</strong>, which means each answer is backed by a live web
-        search rather than only the model's static training data — closer to
-        what a real user would see today than asking a model in isolation.
+        Every answer is grounded in a live web search rather than only the
+        model's static training data — but not all through the same route.
+        GPT-5 mini is queried through <strong>Perplexity's grounded search
+        API</strong>; Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 are
+        queried <strong>directly against each provider's own API</strong>,
+        each using that provider's own web-search tool. See "Limitations,
+        honestly stated" below for what that distinction does and doesn't
+        change about what's being measured.
       </p>
       <p>
         For each of the 20 responses, AIVis checks whether your brand name
@@ -261,19 +265,27 @@
         not the whole picture on its own.
       </p>
       <p>
-        <strong>On the "4 AI models" claim, specifically:</strong> every
-        check is routed through Perplexity's API, addressing each underlying
-        model (GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6)
-        <em>through that one gateway</em> — not by calling OpenAI, Google,
-        Anthropic, or xAI's own consumer products directly. In practice this
-        measures how each model answers when Perplexity is the one asking and
+        <strong>On the "4 AI models" claim, specifically:</strong> three of
+        the four — Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 — are
+        called directly against Google's, Anthropic's, and xAI's own APIs,
+        each grounded using that provider's own web-search tool. The fourth,
+        GPT-5 mini, is addressed through Perplexity's grounded search API
+        <em>gateway</em> rather than OpenAI's own API directly, since no
+        direct OpenAI account exists for this yet. For that one model, this
+        measures how it answers when Perplexity is the one asking and
         grounding the response in its own web search, which is usually close
         to, but not guaranteed identical to, what you'd see typing the same
-        question into chatgpt.com, gemini.google.com, or claude.ai yourself.
-        AIVis also doesn't currently check Google's AI Overviews/AI Mode or
-        Microsoft Copilot, two AI-answer surfaces this scan doesn't cover.
-        We'd rather state that plainly than let "4 models" imply broader or
-        more direct coverage than what's actually being measured.
+        question into chatgpt.com yourself. There's one further asterisk
+        worth naming: Gemini's citations come back as Google's own
+        grounding-redirect links rather than the original source URL, so
+        while Gemini's <em>answer text</em> is checked the same way as the
+        other three models, its citation links can't be matched against your
+        own site's domain the way Perplexity, Anthropic, and xAI's citations
+        can. AIVis also doesn't currently check Google's AI Overviews/AI
+        Mode or Microsoft Copilot, two AI-answer surfaces this scan doesn't
+        cover. We'd rather state all of this plainly than let "4 models"
+        imply more uniform or more direct coverage than what's actually
+        being measured.
       </p>
     </section>
   </main>

@@ -229,7 +229,19 @@ wasn't revisited by it.
   present-but-dead column** — it backed an opt-in public leaderboard feature
   (shipped, then deleted per Milestone B of `PLAN_NEXT_PHASE.md`) and is no
   longer read or written anywhere in the app. Left in place deliberately
-  (not dropped) rather than a destructive live migration.
+  (not dropped) rather than a destructive live migration. **Briefly
+  re-activated a second time** in commit `555e3f4` (2026-08-14, "Make AIVis
+  SEO/AI-crawler friendly...") for an unrequested per-company "public report
+  page" feature (a `PATCH /companies/:id` toggle plus a public `/reports/:id`
+  page and `/sitemap-reports.xml`) built as apparent scope creep during
+  what was meant to be technical-SEO work — never an approved milestone
+  item. Removed again 2026-08-17 once the CEO flagged it as something he
+  never asked for; the column reverts to dormant-but-present, same state as
+  before `555e3f4`. Three companies had already been toggled `true` in the
+  live DB by the time this was caught — those rows were deliberately left
+  as `true` rather than reset (the serving route is gone, so the flag is
+  inert either way) — if this column is ever wired up a third time, check
+  `git log --all --oneline -- netlify/functions/report.mts` first.
 - **`scans`** — one row per scan, `company_id` FK, `status` (`pending` →
   `running` → `completed`/`failed`), denormalized `brand`/`website`/
   `category` snapshot at scan time, `jsonb` columns for

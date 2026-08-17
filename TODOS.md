@@ -1,5 +1,58 @@
 # TODOs
 
+## STATUS 2026-08-17: Cascading-timeout gap (2026-08-14 entry below) — fixed with a targeted patch
+
+**Trigger:** Marc reviewed annotated screenshots of two real production
+scans (NRC, De Nara Hotel) showing `11/20` and `7/20` checks failed, with
+failure detail pointing at `xai/grok-4.6` timing out repeatedly and then
+starving unrelated openai/google/anthropic checks with "Scan deadline
+exceeded before this check started." This is the exact gap the 2026-08-14
+entry below root-caused and deliberately left unfixed ("log it, decide
+later") — now resurfacing via `xai/grok-4.6` specifically, whose documented
+30-50s+ typical latency (see aivis-core.mjs's MODELS comment, added
+2026-08-15) sits right up against the unchanged 60s `CALL_TIMEOUT_MS`.
+
+**Fix shipped, deliberately the smallest of the three candidates the
+2026-08-14 entry listed** (chose this over shortening `CALL_TIMEOUT_MS` or
+re-testing `CONCURRENCY_LIMIT` across independent providers, since those are
+bigger changes to knobs already mistuned three times in production):
+
+1. `callModelWithRetry` (`shared/aivis-core.mjs`) now only retries on HTTP
+   429 (rate-limit) errors. A timeout was previously retried the same as
+   any other failure — up to 3 attempts x 60s `CALL_TIMEOUT_MS`, ~182s
+   worst case for one stuck call, all of it serialized under
+   `CONCURRENCY_LIMIT=1`. A timeout is very unlikely to succeed on
+   immediate retry the way a transient rate-limit response is, so this
+   drops the worst case for a genuinely stuck call to ~60s (one attempt, no
+   retry) without touching the rate-limit backoff path that's demonstrably
+   working (see the 2026-08-13 429 incident below).
+2. `run-scan-background.mts`'s task queue is now built model-major
+   (`[allPrompts x model1, allPrompts x model2, ...]`) instead of
+   prompt-major. Doesn't reduce total sequential time, but changes which
+   calls get starved if the deadline does fire: `MODELS`' existing order
+   already puts `xai/grok-4.6` last, so a slow xai run can now only eat
+   into xai's own remaining checks instead of blocking whichever
+   openai/google/anthropic calls happened to queue right behind it for the
+   same prompt — the exact pattern both real scans hit.
+
+**Not changed:** `CONCURRENCY_LIMIT` (still 1), `SCAN_DEADLINE_MS` (still
+600000), `CALL_TIMEOUT_MS` (still 60000) — same reasoning as the
+2026-08-15 direct-provider migration's own note about not blind-retuning
+multiple knobs in one change. Re-testing whether `CONCURRENCY_LIMIT` needs
+to be a hard global 1 now that 3 of 4 models call independent providers
+(not sharing Perplexity's rate limit anymore) is still a real, plausible
+follow-up — just not bundled into this patch, so if something regresses
+it's traceable to one change at a time.
+
+**Next steps:** re-run a real scan against a company that previously showed
+high failure counts and confirm the failure count drops and any remaining
+failures concentrate in `xai/grok-4.6` rather than spreading across
+providers — not yet done as of this entry (this patch shipped fixing the
+code paths and passing `npm run build`/`proof-script --dry-run`, but a real
+end-to-end scan against production Perplexity/provider traffic, the same
+kind of live verification the 2026-08-14 entry below did for the model
+expansion, is still outstanding).
+
 ## STATUS 2026-08-14: Live verification of Milestone C1/C2 — confirmed live, but surfaced a new reliability gap (not fixed, logged for later)
 
 **What was done:** the 2026-08-13 entry below shipped `d43ac1a` (Milestone

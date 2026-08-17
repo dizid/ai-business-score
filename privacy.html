@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Privacy Policy — AIVis</title>
-<meta name="description" content="What AIVis collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Stripe, Neon, Netlify) involved." />
+<meta name="description" content="What AIVis collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Neon, Netlify) involved." />
 <link rel="canonical" href="https://aivis-scan.netlify.app/privacy" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -14,12 +14,12 @@
 <meta name="theme-color" content="#0d0d0d" />
 <meta property="og:type" content="article" />
 <meta property="og:title" content="Privacy Policy — AIVis" />
-<meta property="og:description" content="What AIVis collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Stripe, Neon, Netlify) involved." />
+<meta property="og:description" content="What AIVis collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Neon, Netlify) involved." />
 <meta property="og:url" content="https://aivis-scan.netlify.app/privacy" />
 <meta property="og:image" content="https://aivis-scan.netlify.app/og-image.png" />
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="Privacy Policy — AIVis" />
-<meta name="twitter:description" content="What AIVis collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Stripe, Neon, Netlify) involved." />
+<meta name="twitter:description" content="What AIVis collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Neon, Netlify) involved." />
 <meta property="twitter:image" content="https://aivis-scan.netlify.app/og-image.png" />
 <script type="application/ld+json">
 {
@@ -28,7 +28,7 @@
   "@id": "https://aivis-scan.netlify.app/privacy#webpage",
   "url": "https://aivis-scan.netlify.app/privacy",
   "name": "Privacy Policy — AIVis",
-  "description": "What AIVis collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Stripe, Neon, Netlify) involved.",
+  "description": "What AIVis collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Neon, Netlify) involved.",
   "isPartOf": { "@id": "https://aivis-scan.netlify.app/#website" },
   "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
 }
@@ -121,15 +121,15 @@
     <p class="draft-note">
       Draft — have this reviewed before relying on it for compliance.
     </p>
-    <p class="updated">Last updated: 2026-08-11</p>
+    <p class="updated">Last updated: 2026-08-17</p>
 
     <section>
       <h2>Overview</h2>
       <p>
         AIVis ("we", "us") is a small, self-serve tool that checks whether AI
-        search tools like ChatGPT and Gemini mention your business, and tracks
-        that over time. This policy explains what we collect, why, and how
-        it's handled.
+        search tools like ChatGPT, Gemini, Claude, and Grok mention your
+        business, and tracks that over time. This policy explains what we
+        collect, why, and how it's handled.
       </p>
     </section>
 
@@ -155,8 +155,10 @@
       <h2>How we use it</h2>
       <ul>
         <li>Running the AI-visibility scans you request, which involves sending
-          your company/category/competitor data to AI models via Perplexity's
-          API so it can generate grounded, web-search-backed answers.</li>
+          your company/category/competitor data to AI models to generate
+          grounded, web-search-backed answers — one model (GPT-5 mini) via
+          Perplexity's grounded search API, and three (Gemini, Claude, Grok)
+          sent directly to their own providers' APIs.</li>
         <li>Computing and displaying your visibility score and scan history.</li>
         <li>Billing and subscription management, handled through Stripe.</li>
         <li>Operating, maintaining, and improving the product — for example,
@@ -173,8 +175,13 @@
       <p>These service providers process data on our behalf, only as needed to run AIVis:</p>
       <ul>
         <li><strong>Perplexity AI</strong> — receives the prompts built from your company data to run
-          grounded searches against AI models. This is the core of how a scan
-          works.</li>
+          a grounded search against GPT-5 mini. This is one of the four AI
+          checks that make up a scan.</li>
+        <li><strong>Anthropic, Google, and xAI</strong> — each receives the prompts built from your
+          company data directly (not through Perplexity) to run a grounded
+          search against their own model — Claude Haiku 4.5, Gemini 3 Flash,
+          and Grok 4.6 respectively. Together with Perplexity above, these are
+          the four AI checks that make up a scan.</li>
         <li><strong>Stripe</strong> — handles all payment processing for paid plans. AIVis never
           stores your card number or full payment details.</li>
         <li><strong>Neon</strong> — hosts our database and authentication (login/session) system.</li>

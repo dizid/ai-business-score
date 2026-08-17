@@ -384,12 +384,26 @@ function sleep(ms) {
 // rate-limiting, not actual absence). Rate-limit errors now get a longer,
 // escalating backoff instead of the flat short one used for other
 // failures.
-const RETRY_BACKOFF_MS = 1000;
 const RATE_LIMIT_BACKOFF_MS = 5000;
 
 // apiKeys: same `{ perplexity, anthropic, google, xai }` shape callModel
 // takes — named apiKeys (not apiKey) throughout since 2026-08-15's
 // direct-provider migration, see callModel's own comment for the full story.
+//
+// 2026-08-17: retries are now scoped to HTTP 429 (rate-limit) errors only —
+// previously ANY failure, including a plain timeout, got the same up-to-3x
+// retry treatment. Under CONCURRENCY_LIMIT=1 (fully sequential, one shared
+// scan-wide deadline) that meant a single slow/timed-out call could consume
+// up to ~182s (3 attempts x 60s CALL_TIMEOUT_MS + backoff) of the scan's
+// budget, starving every other call still queued behind it regardless of
+// provider — the exact cascading-timeout gap logged in TODOS.md's
+// 2026-08-14 entry, which resurfaced in production via xai/grok-4.6's
+// documented 30-50s+ latency running right up against the 60s timeout. A
+// timeout is very unlikely to succeed identically on immediate retry the
+// way a transient rate-limit response is, so retrying it bought little and
+// cost a lot of shared budget. Rate-limit errors still get the full
+// escalating-backoff retry treatment, since that's what it was designed for
+// and it demonstrably works (see the 2026-08-13 429 incident above).
 export async function callModelWithRetry(apiKeys, model, prompt, timeoutMs, maxAttempts = 2, externalSignal) {
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -398,9 +412,9 @@ export async function callModelWithRetry(apiKeys, model, prompt, timeoutMs, maxA
     } catch (err) {
       lastErr = err;
       if (externalSignal?.aborted) break;
+      if (err.status !== 429) break;
       if (attempt < maxAttempts) {
-        const backoff = err.status === 429 ? RATE_LIMIT_BACKOFF_MS * attempt : RETRY_BACKOFF_MS;
-        await sleep(backoff);
+        await sleep(RATE_LIMIT_BACKOFF_MS * attempt);
       }
     }
   }

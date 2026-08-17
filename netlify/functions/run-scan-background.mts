@@ -174,11 +174,27 @@ export default async (req: Request) => {
   // that true; until it ships, `CompanyDetailView.vue`'s live polling UI is
   // this feature's actual UX, and it now takes several minutes.
   const SCAN_DEADLINE_MS = 600000;
+  // Queued model-major (all prompts for model 1, then all prompts for model
+  // 2, ...) rather than prompt-major, as of 2026-08-17. Under
+  // CONCURRENCY_LIMIT=1 this doesn't change total sequential time, but it
+  // changes WHICH calls get starved if the shared deadline fires partway
+  // through: prompt-major ordering meant a single slow/timed-out call for
+  // one model sat directly in front of the OTHER three models' calls for
+  // that same prompt, so real production scans were losing openai/google/
+  // anthropic checks to "scan deadline exceeded before this check started"
+  // purely because they happened to queue behind a struggling xai/grok-4.6
+  // call (see TODOS.md's 2026-08-14 cascading-timeout entry, and
+  // callModelWithRetry's comment in aivis-core.mjs for the same-day
+  // no-retry-on-timeout fix). MODELS' existing order (openai, google,
+  // anthropic, xai) already puts xai/grok-4.6 — the one model with
+  // documented 30-50s+ typical latency, per aivis-core.mjs's MODELS comment
+  // — last, so model-major queueing means a slow xai run can only eat into
+  // xai's own remaining checks instead of starving faster providers that
+  // would otherwise have completed fine.
   const tasks: { prompt: string; model: string; promptIndex: number }[] = [];
-  for (const [promptIndex, template] of scanPrompts.entries()) {
-    const prompt = template(prospect);
-    for (const model of MODELS) {
-      tasks.push({ prompt, model, promptIndex });
+  for (const model of MODELS) {
+    for (const [promptIndex, template] of scanPrompts.entries()) {
+      tasks.push({ prompt: template(prospect), model, promptIndex });
     }
   }
 

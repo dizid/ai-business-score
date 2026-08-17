@@ -21,7 +21,6 @@ interface CompanyRow {
   customer_segment: string;
   competitors: string[];
   is_legacy_import: boolean;
-  is_public: boolean;
 }
 
 const company = ref<CompanyRow | null>(null);
@@ -39,57 +38,6 @@ let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
 const deepAdviceLoading = ref(false);
 const sentimentJudgeLoadingKey = ref<string | null>(null);
-
-const isPublic = computed(() => company.value?.is_public === true);
-// scans.value entries come from toScanPayload (scanRow.mts), which doesn't
-// carry the DB's `status` column — a numeric score is the already-available
-// signal this view already uses elsewhere (see the scan-list "no data"
-// badge below) to mean "this scan produced real, renderable data."
-const hasCompletedScan = computed(() => scans.value.some((s) => typeof s.score === 'number'));
-const publicToggleLoading = ref(false);
-const publicToggleError = ref('');
-const publicUrlCopied = ref(false);
-const publicUrl = computed(() =>
-  company.value ? `${window.location.origin}/reports/${company.value.id}` : ''
-);
-
-async function togglePublic() {
-  if (!company.value) return;
-  publicToggleLoading.value = true;
-  publicToggleError.value = '';
-  publicUrlCopied.value = false;
-  try {
-    const res = await authFetch(`/companies/${company.value.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_public: !isPublic.value }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      publicToggleError.value = data.error || 'Failed to update sharing setting.';
-      return;
-    }
-    company.value = { ...company.value, is_public: data.company.is_public };
-  } catch (err) {
-    publicToggleError.value = (err as Error).message;
-  } finally {
-    publicToggleLoading.value = false;
-  }
-}
-
-async function copyPublicUrl() {
-  try {
-    await navigator.clipboard.writeText(publicUrl.value);
-    publicUrlCopied.value = true;
-    setTimeout(() => {
-      publicUrlCopied.value = false;
-    }, 2000);
-  } catch {
-    // Clipboard API can fail (permissions, insecure context) — the URL is
-    // already visible as selectable text, so this is a nice-to-have, not
-    // required for the feature to work.
-  }
-}
 
 function keyOf(scan: Record<string, unknown>, index: number): string {
   return (scan.id as string) || String(index);
@@ -346,59 +294,6 @@ watch(() => route.params.id, load);
         </div>
       </div>
 
-      <div class="public-share">
-        <div class="public-share-head">
-          <div>
-            <strong>Public report page</strong>
-            <p class="public-share-desc">
-              Publish a shareable, no-login report page for this scan — the kind of
-              real, crawlable page AI search engines and Google can actually index.
-            </p>
-          </div>
-          <button
-            type="button"
-            class="public-toggle"
-            :class="{ on: isPublic }"
-            :disabled="publicToggleLoading || (!hasCompletedScan && !isPublic)"
-            @click="togglePublic"
-          >
-            {{ publicToggleLoading ? 'Updating…' : isPublic ? 'Make private' : 'Make public' }}
-          </button>
-        </div>
-
-        <p class="public-share-hint" v-if="!hasCompletedScan && !isPublic">
-          Run a scan first — a report needs at least one completed scan before it can be published.
-        </p>
-
-        <div class="public-share-consent" v-if="isPublic || hasCompletedScan">
-          <p>
-            <strong>Before you turn this on:</strong> anyone with the link can view this
-            report, no login required, and it becomes indexable content — visible to
-            search engines and AI crawlers, not just a private link. You can turn it off
-            anytime; that removes it from the report URL and future crawls, though copies
-            already cached or indexed elsewhere are outside AIVis's control. Only publish
-            this for <strong>your own business</strong> — not a competitor or prospect
-            you're tracking privately.
-          </p>
-        </div>
-
-        <div class="public-share-url" v-if="isPublic">
-          <label for="public-share-url-input">Shareable URL</label>
-          <div class="public-share-url-row">
-            <input
-              id="public-share-url-input"
-              type="text"
-              readonly
-              :value="publicUrl"
-              @focus="($event.target as HTMLInputElement).select()"
-            />
-            <button type="button" @click="copyPublicUrl">{{ publicUrlCopied ? 'Copied!' : 'Copy' }}</button>
-          </div>
-        </div>
-
-        <p class="public-share-error" v-if="publicToggleError">{{ publicToggleError }}</p>
-      </div>
-
       <p class="empty" v-if="scans.length === 0">
         No scans yet for this company — click "Run new scan" to check its AI search visibility.
       </p>
@@ -499,48 +394,6 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   .skeleton-bar, .skeleton-card { animation: none; background: var(--gridline); }
 }
-
-.public-share {
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px 20px 18px; margin-bottom: 20px;
-  box-shadow: var(--shadow);
-  border-top: 3px solid var(--faint);
-  transition: border-top-color 0.2s ease;
-}
-.public-share:has(.public-toggle.on) { border-top-color: var(--accent); }
-.public-share-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.public-share-head > div:first-child { min-width: 0; flex: 1; }
-.public-share-desc { color: var(--muted); font-size: 0.85rem; margin: 4px 0 0; max-width: 480px; }
-.public-toggle {
-  flex: none; padding: 8px 14px; font-size: 0.85rem; font-weight: 600;
-  border: 1px solid var(--accent); border-radius: 8px;
-  background: transparent; color: var(--accent); cursor: pointer;
-}
-.public-toggle.on { background: var(--accent); color: var(--accent-ink); }
-.public-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
-.public-share-hint { color: var(--muted); font-size: 0.82rem; margin: 10px 0 0; }
-.public-share-consent {
-  margin-top: 12px; padding: 10px 14px;
-  background: color-mix(in srgb, var(--warning) 14%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
-  border-radius: 8px;
-}
-.public-share-consent p { margin: 0; font-size: 0.82rem; color: var(--fg); line-height: 1.5; }
-.public-share-url { margin-top: 14px; }
-.public-share-url label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
-.public-share-url-row { display: flex; gap: 8px; }
-.public-share-url-row input {
-  flex: 1; min-width: 0; padding: 8px 10px; font-size: 0.85rem;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: var(--card); color: var(--fg); font-family: ui-monospace, monospace;
-}
-.public-share-url-row button {
-  flex: none; padding: 8px 14px; font-size: 0.85rem; font-weight: 600;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: transparent; color: var(--fg); cursor: pointer;
-}
-.public-share-url-row button:hover { border-color: var(--accent); }
-.public-share-error { color: var(--critical); font-size: 0.82rem; margin: 10px 0 0; }
 
 .dashboard { margin-top: 24px; display: block; }
 .list-pane { display: block; }
