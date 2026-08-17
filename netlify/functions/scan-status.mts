@@ -40,6 +40,11 @@ export default async (req: Request, context: Context) => {
       ok: true,
       status: row.status,
       errorMessage: row.error_message,
+      // Live call-progress while running — {completed, total, currentModel}
+      // written incrementally by run-scan-background.mts, null for scans
+      // that are still pending (not claimed yet) or finalized before this
+      // column existed. See the `progress` column comment for the shape.
+      progress: row.progress ?? null,
       scan: row.status === 'completed' ? toScanPayload(row) : null,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } }

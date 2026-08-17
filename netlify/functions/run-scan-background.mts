@@ -78,7 +78,7 @@ export default async (req: Request) => {
   // this scanId was already picked up, whether by a legitimate retry or a
   // duplicate trigger.
   const claimed = await db`
-    UPDATE public.scans SET status = 'running'
+    UPDATE public.scans SET status = 'running', progress = '{"completed":0,"total":0,"currentModel":null}'
     WHERE id = ${scanId} AND status = 'pending'
     RETURNING *
   `;
@@ -145,6 +145,24 @@ export default async (req: Request) => {
   // instead of letting the full 10-prompt set push a scan to 40 calls.
   const scanPrompts = PROMPT_TEMPLATES.slice(0, 5);
   const CALL_TIMEOUT_MS = 60000;
+  // xai/grok-4.6 gets its own longer per-call timeout — root-caused
+  // 2026-08-17 (docs/grok-timeout-investigation.md) from a production
+  // screenshot showing all 5 of a scan's xai calls failing with "Timed out
+  // after 60000ms waiting for xai/grok-4.6". aivis-core.mjs's MODELS
+  // comment already documents Grok as structurally slower than the other
+  // three (30-50s+ typical, agentic multi-round web search vs. a single
+  // lookup) — its normal-case latency already brushes the flat 60s
+  // CALL_TIMEOUT_MS, so a meaningful fraction of calls tip over it even
+  // with nothing actually wrong. 100s gives real margin over that
+  // documented range without loosening the timeout for the other three
+  // models, which don't need it. Not yet live-verified against a full
+  // production scan (no provider API keys available in this environment,
+  // same blocker the investigation doc hit) — worth confirming with one
+  // timed live scan per this codebase's own "verify live before trusting"
+  // discipline.
+  const CALL_TIMEOUT_MS_BY_MODEL: Record<string, number> = {
+    'xai/grok-4.6': 100000,
+  };
   // Was 10 — live scans (TSMC, Google LLC, Hotel De Nara, 2026-08-13) showed
   // 16-18 of 20 calls failing with HTTP 429 request_rate_limit_exceeded,
   // because a burst of 10 simultaneous calls exceeded this key's actual
@@ -173,7 +191,18 @@ export default async (req: Request) => {
   // scan-complete notification (email/etc.) is planned separately to make
   // that true; until it ships, `CompanyDetailView.vue`'s live polling UI is
   // this feature's actual UX, and it now takes several minutes.
-  const SCAN_DEADLINE_MS = 600000;
+  // Was 600000 (10 min). Bumped modestly alongside the per-model xai
+  // timeout above (2026-08-17): raising one model's CALL_TIMEOUT_MS from
+  // 60000 to 100000 without also giving the overall scan more room would
+  // shrink, not grow, the deadline's margin for xai's own 5 calls (queued
+  // last under model-major ordering — see below), since each of those
+  // calls can now legitimately run longer before this file gives up on it.
+  // 720000 (12 min) stays comfortably under Background Functions' 900000ms
+  // (15 min) platform ceiling while adding 2 min of headroom. Like the
+  // timeout change above, this is a reasoned bump, not a live-verified one
+  // — no provider API keys were available in this environment to run a
+  // timed scan and confirm the actual number needed.
+  const SCAN_DEADLINE_MS = 720000;
   // Queued model-major (all prompts for model 1, then all prompts for model
   // 2, ...) rather than prompt-major, as of 2026-08-17. Under
   // CONCURRENCY_LIMIT=1 this doesn't change total sequential time, but it
@@ -198,6 +227,36 @@ export default async (req: Request) => {
     }
   }
 
+  // Live progress for the polling UI (roadmap doc's "stream scan progress
+  // instead of poll-and-wait" — CompanyDetailView.vue previously showed a
+  // static "Running checks (~5-8 min)…" for the whole scan with no signal
+  // of what's actually happening). `progress.completed` counts tasks that
+  // have finished running, success OR failure — deliberately distinct from
+  // `scans.completed_calls` (set once at the end, and success-only). One
+  // write right before each call starts, both to record which model is now
+  // in flight and to reflect the previous call's outcome via the updated
+  // count. Best-effort: a failed progress write is logged but never
+  // affects the scan itself, same "don't let a nice-to-have break the
+  // actual work" pattern as the scan-complete email below.
+  //
+  // `completedCount` is a plain JS counter, not an atomic SQL increment —
+  // only safe because CONCURRENCY_LIMIT is 1 (the worker pool runs one
+  // task at a time, so there's no concurrent write race). If concurrency
+  // is ever raised (see docs/improvement-roadmap.md's re-test plan), this
+  // needs to move to an atomic `UPDATE ... SET progress = jsonb_set(...)`
+  // or the count can under-report.
+  let completedCount = 0;
+  async function updateProgress(currentModel: string) {
+    try {
+      await db`
+        UPDATE public.scans SET progress = ${JSON.stringify({ completed: completedCount, total: tasks.length, currentModel })}
+        WHERE id = ${scanId}
+      `;
+    } catch (err) {
+      console.error(`run-scan-background: progress update failed for scan ${scanId}:`, err);
+    }
+  }
+
   const deadline = new AbortController();
   const deadlineTimer = setTimeout(() => deadline.abort(), SCAN_DEADLINE_MS);
   let callResults;
@@ -208,15 +267,20 @@ export default async (req: Request) => {
       // ran long) — skip the network call entirely rather than starting
       // work that would just be aborted immediately.
       if (deadline.signal.aborted) {
+        completedCount++;
         return { ok: false, error: 'Scan deadline exceeded before this check started', model: task.model, promptIndex: task.promptIndex };
       }
+      await updateProgress(task.model);
       try {
         // maxAttempts 2 -> 3: gives a call that hits a rate limit twice one
         // more shot after the longer rate-limit backoff (aivis-core.mjs),
         // instead of giving up right as the limit window is clearing.
-        const result = await callModelWithRetry(apiKeys, task.model, task.prompt, CALL_TIMEOUT_MS, 3, deadline.signal);
+        const timeoutMs = CALL_TIMEOUT_MS_BY_MODEL[task.model] ?? CALL_TIMEOUT_MS;
+        const result = await callModelWithRetry(apiKeys, task.model, task.prompt, timeoutMs, 3, deadline.signal);
+        completedCount++;
         return { ok: true, ...result, model: task.model, promptIndex: task.promptIndex };
       } catch (err) {
+        completedCount++;
         const message = (err as Error).message;
         console.error(
           `Scan call failed [scan ${scanId}, prompt ${task.promptIndex}, ${task.model}]: ${message}`

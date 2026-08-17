@@ -91,6 +91,19 @@ function stopPolling() {
 // blip, surfacing as a raw "TypeError: Failed to fetch" with no recovery.
 const POLL_RETRY_BACKOFFS_MS = [2000, 4000, 8000];
 
+// Formats the live { completed, total, currentModel } progress the backend
+// now writes incrementally during a scan (run-scan-background.mts) into a
+// one-line status — replaces the old static "Running checks (~5-8 min)…"
+// that gave no signal of what was actually happening for the whole wait.
+// Falls back to the old static text if progress hasn't arrived yet (e.g.
+// the very first poll, or a scan finalized before the `progress` column
+// existed) rather than showing a broken "0/0" line.
+function formatRunningStatus(progress: { completed: number; total: number; currentModel: string | null } | null) {
+  if (!progress || !progress.total) return 'Running checks (~5-8 min)…';
+  const checking = progress.currentModel ? ` — checking ${progress.currentModel}…` : '';
+  return `Running checks: ${progress.completed}/${progress.total} done${checking}`;
+}
+
 async function pollScan(scanId: string, retriesLeft = POLL_RETRY_BACKOFFS_MS.length) {
   try {
     const res = await authFetch(`/scans/${scanId}`);
@@ -111,7 +124,7 @@ async function pollScan(scanId: string, retriesLeft = POLL_RETRY_BACKOFFS_MS.len
       scanError.value = data.errorMessage || 'Scan failed.';
       return;
     }
-    scanStatus.value = data.status === 'running' ? 'Running checks (~5-8 min)…' : 'Queued…';
+    scanStatus.value = data.status === 'running' ? formatRunningStatus(data.progress) : 'Queued…';
     pollHandle = setTimeout(() => pollScan(scanId), 2000);
   } catch (err) {
     if (retriesLeft > 0) {
@@ -367,7 +380,7 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 }
 .scan-trigger button:hover:not(:disabled) { transform: translateY(-1px); }
 .scan-trigger button:disabled { opacity: 0.6; cursor: wait; transform: none; }
-.scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 220px; }
+.scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 280px; }
 .scan-status.error { color: var(--critical); }
 .inline-upgrade {
   display: block; margin-top: 6px; padding: 4px 10px; font-size: 0.8rem; font-weight: 600;

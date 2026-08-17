@@ -1,5 +1,68 @@
 # TODOs
 
+## STATUS 2026-08-17 (continuing same day): Grok timeout root cause + streaming scan progress — SHIPPED, not yet live-verified
+
+**Trigger:** `docs/grok-timeout-investigation.md` and
+`docs/improvement-roadmap.md` (written earlier the same day, branch
+`claude/delays-root-cause-solution-ofveu8`) — the investigation doc
+root-caused the entry directly below (`xai/grok-4.6` timing out) one level
+deeper: the 2026-08-17 patch below stopped a slow xai call from starving
+other providers, but never addressed why xai itself keeps timing out — a
+flat 60s `CALL_TIMEOUT_MS` shared by all 4 models is simply too tight a
+margin over Grok's own documented 30-50s+ typical latency
+(`aivis-core.mjs`'s `MODELS` comment). The roadmap doc's top follow-up
+(re-testing `CONCURRENCY_LIMIT` now that 3 of 4 models call independent
+providers) and its "stream scan progress" UX candidate are the other two
+items addressed here.
+
+**Shipped:**
+1. **Per-model call timeout** (`run-scan-background.mts`) — `xai/grok-4.6`
+   now gets 100000ms instead of the shared 60000ms `CALL_TIMEOUT_MS`
+   (`CALL_TIMEOUT_MS_BY_MODEL`), Option 1 from the investigation doc. Chose
+   this over Option 2 (swap Grok for a different/faster model) since the
+   candidate replacement IDs in that doc are explicitly unverified against
+   a live call (no `XAI_API_KEY` available in this environment either) and
+   swapping xAI out changes the product's "4 major AI assistants" story —
+   a bigger, less reversible call than widening one timeout.
+2. **`SCAN_DEADLINE_MS`** 600000 → 720000 (10 → 12 min) — a longer xai
+   timeout without more overall room would shrink the deadline's margin for
+   xai's own 5 calls (queued last), not grow it. Stays well under
+   Background Functions' 900000ms platform ceiling.
+3. **Streaming scan progress** — new nullable `scans.progress jsonb` column
+   (`{completed, total, currentModel}`, additive migration via Neon MCP,
+   same pattern as `failures`/`own_site_citations`/`sentiment_judgments`),
+   written incrementally by `run-scan-background.mts` before each call
+   starts. `scan-status.mts` now returns it; `CompanyDetailView.vue`'s
+   polling UI shows "Running checks: 12/20 done — checking
+   anthropic/claude-haiku-4-5…" instead of a static "Running checks (~5-8
+   min)…" for the whole wait. `completedCount` is a plain JS counter, not
+   an atomic SQL increment — safe only because `CONCURRENCY_LIMIT` is 1; if
+   concurrency is ever raised this needs to change too (noted inline).
+
+**Deliberately NOT done, matching this file's own established caution
+around this specific knob:**
+- **`CONCURRENCY_LIMIT` re-test** (roadmap doc's #1 priority item) — still
+  blocked. This environment has only `PERPLEXITY_API_KEY` available
+  locally (checked `proof-script/.env`); the re-test needs
+  `ANTHROPIC_API_KEY`/`GOOGLE_API_KEY`/`XAI_API_KEY` too, none of which are
+  present. `CONCURRENCY_LIMIT` has been mistuned three times already
+  (2026-08-09 10→4, 2026-08-13 4→1, both from live incidents) — not
+  something to guess at without the live burst-test data the roadmap doc's
+  own throwaway script is designed to produce. Whoever next has all 4 keys
+  locally should run that script first.
+- **Grok replacement (Option 2 / candidate models)** — not attempted, for
+  the same reason: the candidate IDs (`perplexity/sonar`,
+  `xai/grok-4-1-fast-non-reasoning`, etc.) are sourced from web search, not
+  a live call, and this file's own 2026-08-09 entry is a direct precedent
+  for what happens when unverified model IDs ship anyway.
+
+**Next steps:** a live timed scan (needs all 4 provider keys) to confirm
+the new 100s xai timeout and 12-minute deadline actually behave as
+reasoned above rather than assumed — this patch passed `npm run build` and
+`npm run test:run` but nothing here has touched a real provider API. Once
+someone has real keys: run the roadmap doc's concurrency-test script too,
+in the same session, and log the result here.
+
 ## STATUS 2026-08-17: Cascading-timeout gap (2026-08-14 entry below) — fixed with a targeted patch
 
 **Trigger:** Marc reviewed annotated screenshots of two real production
