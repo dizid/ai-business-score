@@ -1,0 +1,187 @@
+# CLAUDE.md — shared/
+
+Scoped guidance for `shared/`, split out of the project root `CLAUDE.md` on
+2026-08-17 (via `/doctor`) so it only loads when a session actually touches
+this directory, instead of every session paying for it. See the root
+`CLAUDE.md` for overall project context.
+
+### `shared/aivis-core.mjs`
+
+The single source of truth, imported by every consumer:
+
+- **Prompt templates** (10, generic brand/competitor substitution only —
+  vertical-specific templating still deferred, see `TODOS.md`) x **4
+  models** (`openai/gpt-5-mini`, `google/gemini-3-flash-preview`,
+  `anthropic/claude-haiku-4-5`, `xai/grok-4.6`, the latter two added
+  2026-08-13). Prompt count grew from 8 to 10 on 2026-08-09, and the hosted
+  site briefly ran the full 10-prompt set (both `proof-script` and the
+  hosted site running all 10) before being cut back to a **5-prompt slice**
+  on 2026-08-13 when the model count grew — see this file's "Update
+  2026-08-13" note above for why (concurrency dropped to 1, so more calls
+  means direct wall-clock cost with no parallelism to hide it behind).
+  `proof-script` still runs the full 10.
+- **Multi-provider model client** (`callModel`) — **rewritten 2026-08-15,
+  direct-provider migration.** Until this date every model, regardless of
+  its `provider/model-name` string, was routed through Perplexity's Agent
+  API gateway (`POST /v1/responses`) — one key, one shape, but meaning every
+  result reflected "what Perplexity says GPT-5/Gemini/Claude/Grok would
+  answer," not each provider's own product (the exact gap
+  `how-it-works.html`'s methodology-disclosure section, added the same day,
+  called out). At the CEO's explicit direction, `callModel` now dispatches
+  by provider prefix — verified live against each provider's own current
+  docs and a real smoke-test call with a working key (found by searching
+  other Dizid projects under `/home/marc/DEV` for reusable personal API
+  keys — same reuse-across-projects pattern already established for
+  `RESEND_API_KEY`), not guessed:
+  - **`anthropic/*`** — direct `POST https://api.anthropic.com/v1/messages`,
+    `web_search_20250305` tool. `ANTHROPIC_API_KEY`.
+  - **`google/*`** — direct `POST .../v1beta/models/{model}:generateContent`
+    (Gemini), `google_search` tool. `GOOGLE_API_KEY`. **Citations are
+    Google grounding-redirect URLs
+    (`vertexaisearch.cloud.google.com/grounding-api-redirect/...`), not the
+    real source URL** — confirmed live, a real limitation: Gemini-sourced
+    citations will never hostname-match a company's own domain the way
+    Perplexity/Anthropic/xAI citations do (`aggregateProspect`'s
+    `ownSiteCitations`).
+  - **`xai/*`** — direct `POST https://api.x.ai/v1/responses`. `XAI_API_KEY`.
+    Confirmed live to be the *same* OpenAI-Responses-API-compatible shape
+    Perplexity already used, so `extractText`/`extractCitations` are reused
+    unchanged. **Noticeably slower than the other three in live testing —
+    30-50s+ per call observed** (Grok's agentic multi-round web search),
+    versus single-digit-to-teens seconds for Anthropic/Google. Not yet
+    reflected in any timeout/deadline tuning (`CALL_TIMEOUT_MS`/
+    `SCAN_DEADLINE_MS` in `run-scan-background.mts` are unchanged by this
+    migration, deliberately — see below) — a real risk worth watching once
+    this runs against production scan volume.
+  - **`openai/*`** (`gpt-5-mini`) — **no direct key exists anywhere** (this
+    migration searched; genuinely absent). Still routed through the
+    Perplexity gateway (`PPLX_URL`), unchanged from before. Deep advice,
+    the sentiment judge, and `enrich.mts` all hardcode this exact model, so
+    they're unaffected by everything above.
+  - `apiKeys` is now always an object (`{ perplexity, anthropic, google,
+    xai }`, any entry optional) rather than a single string — every caller
+    (`run-scan-background.mts`, `generate-deep-advice.mts`,
+    `judge-sentiment.mts`, `enrich.mts`, `proof-script/index.mjs`) was
+    updated. A model whose provider has no configured key throws a clear,
+    attributable per-model error rather than a confusing generic one — same
+    "skip and count separately" failure shape every other call failure
+    already used, so a single missing key degrades that one provider's
+    calls to failures instead of failing the whole scan.
+  - **Deliberately NOT changed by this migration**: `CONCURRENCY_LIMIT`
+    (still 1) and `SCAN_DEADLINE_MS` (still 600000) in
+    `run-scan-background.mts` — those were tuned specifically against
+    Perplexity's own real per-key rate limit (~1 concurrent), which no
+    longer gates 3 of the 4 models now that they call separate independent
+    services. Revisiting concurrency now that most calls don't share one
+    rate limit is a real, plausible follow-up, but retuning it blind in the
+    same change as the provider migration would make it impossible to tell
+    which change caused which effect if something broke — this file's own
+    history (three separate concurrency-tuning incidents: 2026-08-09's
+    10→4 revert, 2026-08-13's 4→1 finding, 2026-08-14's cascading-timeout
+    gap) is the reason for that caution, not theoretical.
+  - **Not yet live-verified**: an actual full 20-call scan through
+    `run-scan-background.mts` with real production traffic — the
+    per-provider smoke tests above each confirmed one call succeeds with
+    real output, not that the full concurrency/deadline/retry machinery
+    behaves correctly across a real scan's mix of all 4 providers. Do that
+    once, timed, before fully trusting this the way past model/concurrency
+    changes in this file were each verified live before being trusted.
+- **Detection** (`findBrandMention`, `findMentions`) — whole-word,
+  case-insensitive regex match on the brand name and a domain-derived alias.
+  Presence-only, not sentiment-aware. Common-word brand names (from a
+  curated `COMMON_WORD_STOPLIST`) are flagged ambiguous and skip
+  auto-detection. **Fixed 2026-08-12**: a blanket "any single word ≤4
+  characters" clause used to also trigger this, independent of the
+  stoplist — a real bug that gave short real brand names (ASML, TSMC, NRC,
+  IBM, SAP) a false ambiguous flag and a `0/100` score. Removed; ambiguity
+  now comes only from stoplist membership. Competitor names get the same
+  check but no domain-alias fallback (they have no associated website in
+  the schema) — an ambiguous competitor now sets a visible `ambiguous` flag
+  on its tally instead of silently staying indistinguishable from "never
+  mentioned."
+- **Aggregation** (`aggregateProspect`) — cited count, completed vs. failed
+  call counts, heuristic first-mention-order ranking, and
+  `competitorTallies` (computed unconditionally per completed response, not
+  gated on the brand itself being cited). Also returns `ownSiteCitations`
+  (added 2026-08-15, Milestone F) — see "Citation-URL attribution" below.
+- **Citation-URL attribution** (`extractCitations`, in `aggregateProspect`'s
+  `ownSiteCitations`/per-response `citations`) — Perplexity's `/v1/responses`
+  payload carries `url_citation` annotations on each message's content parts
+  (confirmed against the live OpenAPI schema at
+  `docs.perplexity.ai/api-reference/agent-post`, not guessed). `callModel`
+  now also returns `citations: extractCitations(json)` alongside `text`;
+  `aggregateProspect` matches each completed call's citations against the
+  scanned company's own hostname (subdomain-tolerant) and collects matches
+  into `ownSiteCitations`, while every citation (own-domain or not) rides
+  along on that call's `rawResponses[i].citations` entry. Zero extra
+  Perplexity calls — pure post-processing of data the app was already
+  fetching and discarding. Surfaced in `ScanDetail.vue` as a "Your site,
+  cited" section plus a per-check "Sources:" line in the check-by-check
+  breakdown.
+- **Sentiment judge** (`buildSentimentJudgePrompt`,
+  `parseSentimentJudgeResponse`, `netlify/functions/judge-sentiment.mts`) —
+  the other half of Milestone F: a second live grounded Perplexity call
+  (`openai/gpt-5-mini`) that classifies how a brand was portrayed in one
+  specific completed check's response text — `recommended`/`neutral`/
+  `negative`/`comparison-only` — replacing presence-only detection's
+  boolean with an actual read of tone. **Calibrated before shipping**: a
+  throwaway script (deleted after use, same discipline as smoke-testing a
+  new model) ran the real prompt against 5 hand-labeled example texts
+  covering all 4 classifications plus a "brand not mentioned" case, via a
+  live call with the production `PERPLEXITY_API_KEY` — 5/5 agreement.
+  Deliberately **on-demand and per-check**, same shape as deep advice and
+  for the same reason, taken further: a "Judge sentiment" button appears
+  per check in `ScanDetail.vue`'s check-by-check breakdown (only when that
+  check actually mentioned the brand), POSTs `{promptIndex, model}` to
+  `/scans/:id/judge-sentiment`, and the result is upserted into a new
+  `sentiment_judgments jsonb` column on `scans` (additive, nullable) keyed
+  by `(promptIndex, model)` so re-judging replaces rather than duplicates.
+  **Never runs automatically as part of a scan** — a second LLM call per
+  judged check would be a real cost/latency multiplier on an already-tight
+  5-8 min, 20-call sequential scan, and this file's own history
+  (2026-08-09 model revert, 2026-08-13 concurrency incidents) is two
+  separate real production incidents that both trace back to adding more
+  calls to the automatic scan pipeline without checking capacity first —
+  opt-in per-check avoids repeating that.
+- **Score** (`computeScore`, `scoreBand`) — 0-100 (or `null` if
+  `completedCalls < 4` — never a fake 0 from too little data). **Updated**:
+  no longer the simple `ranked1Count + 0.4*beatenCount` formula this doc
+  previously described (that was stale, predating the "Overhaul scoring:
+  positional ranking + strategic query weighting" commit) — `computeScore`
+  now weights each completed call by rank (`RANK_WEIGHTS`: ranked-1 1.0,
+  ranked-2 0.6, ranked-3 0.3, mentioned 0.1) multiplied by that prompt's
+  query-category weight (`DEFAULT_QUERY_WEIGHTS`: high-intent 3, comparison
+  2, informational 1, via `PROMPT_CATEGORIES`), then
+  `round(100 * totalWeightedScore / totalMaximumScore)` — so ranking first
+  on a direct-buying-intent prompt moves the score more than ranking first
+  on a broad informational one.
+- **Advice** (`selectAdvice`) — rule-based/templated, not a live LLM call,
+  always computed synchronously right after a scan completes. Copy lives in
+  `src/shared/ScanDetail.vue`'s template branches.
+- **Deep advice** (`buildDeepAdvicePrompt`, `parseDeepAdviceResponse`) —
+  added in the SaaS pivot's Milestone 6, additive only. Unlike
+  `selectAdvice`, this **is** a live grounded Perplexity call — safe to add
+  specifically because scans are async now, so there's no synchronous
+  function-timeout budget left to blow (the exact constraint that used to
+  block this is described on `selectAdvice` above, and no longer applies to
+  this one). Deliberately on-demand (a "Generate deeper advice" button on a
+  completed scan, not automatic) — it roughly doubles Perplexity spend per
+  scan. Free/Pro plan limits now exist (see "Billing (Stripe)" in
+  `netlify/functions/CLAUDE.md`), but deep advice itself is **not yet
+  plan-gated** — any authenticated owner of a completed scan can generate
+  it, unlimited times, regardless of plan. Gating it behind Pro/a one-time
+  report purchase is Milestone E of `PLAN_NEXT_PHASE.md`, not yet built —
+  deliberately deferred until Marc's manual outbound sales test (Milestone
+  E0) shows someone will actually pay for it. `buildDeepAdvicePrompt`
+  grounds the prompt in the actual scan data (citation rate, competitor
+  tallies) rather than generic SEO advice; `parseDeepAdviceResponse`
+  follows the same lenient-JSON-extraction, always-safe-shape pattern as
+  `parseEnrichmentResponse` below.
+- **Enrichment** (`buildEnrichPrompt`, `parseEnrichmentResponse`) — used by
+  `netlify/functions/enrich.mts`. Asks a model to research a bare URL and
+  return the rest of the prospect fields as JSON; always returns every
+  field, defaulted to `''`/`[]` rather than throwing. Wired into the app
+  shell's "create company" form since the "URL-first onboarding" work
+  (`CompaniesListView.vue`'s two-step flow: URL → `/enrich` pre-fills the
+  rest → editable review before `POST /companies`) — this doc previously
+  said it was still unwired; it wasn't, that was stale.
