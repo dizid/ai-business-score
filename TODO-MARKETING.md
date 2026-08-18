@@ -1,6 +1,96 @@
 # TODO-MARKETING
 
-## STATUS 2026-08-17: "Spotlight" rebrand + schema.org + SEO/GEO — SHIPPED, not yet deployed
+## STATUS 2026-08-18: renamed AIVis → Foreground — SHIPPED and pushed
+
+**Trigger:** asked to start planning a real custom domain for AIVis.
+Researching domain availability turned up two separate collisions:
+"AIVis" is already used by several companies in the identical
+AI-visibility/GEO niche (`aivis.ai`, `aivis.biz` — doing near-identical
+work, `aivis-os.com` — literally branded "AI Visibility", AIVIS Inc. — a
+funded medical-AI company likely holding real trademarks); separately,
+"Spotlight" (the marketing identity from the entry below, shipped hours
+earlier) collided too — `get-spotlight.com` is a live direct competitor
+with the identical pitch. You reviewed a vetted shortlist (checked against
+the same competitor landscape) and picked **"Foreground"** — clean against
+everyone found. Full plan:
+`~/.claude/plans/let-our-marketing-department-starry-frog.md` (overwritten
+with this task's plan; the Spotlight plan above is no longer there, but
+its outcome is unaffected).
+
+**What shipped:** a full user-facing rename, everywhere a user or crawler
+sees the product name — the four marketing pages (titles, wordmark,
+footer, JSON-LD `name` fields, meta tags), the authenticated app's page
+titles and nav wordmark (`src/app/App.vue`, `router.ts`,
+`CompanyDetailView.vue`), the legacy `result.html`'s error copy,
+`site.webmanifest`, `llms.txt`, the `proof-script` CLI's `--help` banner,
+the outreach playbook, and `README.md`/`CLAUDE.md`'s current-state
+sections. Every literal "spotlight/stage/offstage" metaphor word in the
+marketing copy moved to "foreground/background" language — new primary
+tagline: **"Every AI answer has a foreground. Make sure you're in it."**
+The Spotlight-era **visual system is unchanged** (same dark palette, same
+hex values, same Space Grotesk, same radial-glow/score-ring/stage-line
+motifs) — only the words "AIVis" and "Spotlight" had collided, not the
+design, so `public/marketing-theme.css` wasn't touched.
+`brand/BRAND.md`/`brand/voice.md` rewritten again (third supersession:
+Top Banana → Spotlight → Foreground), same in-place pattern as before.
+`public/og-image.png` regenerated with the new wordmark/tagline via the
+same browse-skill screenshot method.
+
+**Deliberately NOT renamed** (internal-only, zero user-visible benefit,
+real migration cost): `shared/aivis-core.mjs` and its ~10 importers,
+`package.json`'s `"name": "aivis-web"`, the Netlify site name/ID
+(`aivis-scan`), the Neon project name (`aivis`), the Netlify Blobs store
+(`aivis-scans`), the GitHub repo. Dated/historical docs (`TODOS.md`,
+`PLAN_NEXT_PHASE.md`, `DASHBOARD.md`, `NEXT-STEPS.md`, `WISH_LIST.md`,
+`MIGRATION.md`, `REPORTPLAN.md`, `V2_SCORING_MODEL.md`, `docs/*`, the
+nested `CLAUDE.md` files, `content/growth-ideas.md`) still say "AIVis"
+where that was the real name on that date — intentional, not missed.
+
+**A domain has NOT been registered yet.** Every canonical/OG/JSON-LD/
+sitemap/robots/llms.txt URL still intentionally points at
+`aivis-scan.netlify.app` — swapping them to a domain nobody owns yet would
+break real, live, crawled metadata. Candidates worth checking/registering
+(your action — no payment/registrar access from this session):
+`foreground.ai`, `getforeground.com`, `tryforeground.com`,
+`foreground.app`. `foreground.com` is likely unavailable (an unrelated
+Atlanta photography-tools company appears to hold it, not a category
+collision). **Once you own one:** add it as a Netlify custom domain (DNS +
+auto-SSL), update Neon Auth's `trusted_origins`, then swap every URL above
+to the new domain in one coordinated pass — don't do the URL swap before
+the domain is actually live.
+
+**Verification:** `npm run build` and `npm run test:run` both green
+(40/40 tests pass, including the word-boundary fixture in
+`tests/aivis-core.test.mjs` that deliberately still says "AIVis" on
+purpose — don't "fix" it, it exercises the `\b` boundary check). Scoped
+case-sensitive grep (`\bAIVis\b`, excluding node_modules/dist/.git)
+confirmed the only remainders are: intentional historical docs, the
+preserved test fixture, `shared/aivis-core.mjs`'s own header comment (and
+its siblings' matching header-comment style, left alone for consistency),
+`DEEPSEEK.md` (an unrelated external handoff doc), and this file's own
+history section below. All 4 pages' JSON-LD validated with `JSON.parse`.
+Visually checked all 4 marketing pages plus `app.html`'s built title via
+the `browse` skill against a local `dist/` server — correct rendering, no
+console errors, no leftover "spotlight" text anywhere in shipped copy.
+Committed (`d5f68bb`) and pushed to `master`.
+
+## Open items carried forward
+
+1. **Favicon is still shared site-wide** (unchanged from the entry below —
+   this rename didn't touch icons, only text). Still an open decision if
+   you want the in-app dashboard to keep a different tab icon.
+2. **`src/app/` visual system still not extended** — the *name* changed
+   throughout the app (titles, nav wordmark now say "Foreground"), but
+   `LoginView.vue`/`SignupView.vue`/the dashboard still use the old
+   blue/light in-app palette, not the dark/gold marketing system. The
+   visual seam between marketing and app-shell login noted below is now
+   smaller (same product name on both sides) but still there
+   (different palette/theme).
+3. **Pro price still unset in Stripe** — unchanged, see below.
+
+---
+
+## STATUS 2026-08-17: "Spotlight" rebrand + schema.org + SEO/GEO — SHIPPED, superseded 2026-08-18 by the rename above (name/tagline only — palette/type/motifs described below are still current)
 
 **Trigger:** CEO asked marketing to continue the (mis-typed as "/branding")
 `/brand` folder work, add schema.org structured data, and finish SEO/GEO
