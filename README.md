@@ -1,4 +1,4 @@
-# AIVis
+# Foreground
 
 Checks whether a business shows up when AI search engines (ChatGPT, Gemini,
 via Perplexity's Agent API) are asked about their category, scores the

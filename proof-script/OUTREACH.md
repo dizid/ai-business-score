@@ -1,6 +1,6 @@
-# Outreach playbook — AIVis-hooked cold email → Site Improver
+# Outreach playbook — Foreground-hooked cold email → Site Improver
 
-Phase 1 of the AIVis GTM plan (2026-08-03): use real AIVis scan results as
+Phase 1 of the Foreground GTM plan (2026-08-03): use real Foreground scan results as
 the opener for a small, hand-picked outbound batch. The close is Dizid's
 existing web-rebuild offer (Site Improver) — AI-visibility fixes are framed
 as part of that rebuild, not sold as a separate product. Volume target:
@@ -17,7 +17,7 @@ curated list and the whole hook only works if the finding is real.
    drop them from this batch. Emailing someone who already wins undercuts
    the whole premise; the point is a real, specific finding, not a form
    letter.
-3. For qualified prospects, sign into your own AIVis account at
+3. For qualified prospects, sign into your own Foreground account at
    `https://aivis-scan.netlify.app/app`, add them as a company, and run a
    scan there too. This is your visual asset: **take a screenshot** of the
    resulting score ring / scoreboard and attach or inline it in the email —

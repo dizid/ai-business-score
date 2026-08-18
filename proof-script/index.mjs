@@ -42,7 +42,7 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`
-AIVis manual proof script
+Foreground manual proof script
 
 Usage:
   node index.mjs --dry-run

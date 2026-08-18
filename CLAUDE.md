@@ -2,9 +2,36 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**2026-08-18: renamed AIVis → Foreground.** "AIVis" collided with several
+existing companies in the identical AI-visibility/GEO niche (`aivis.ai`,
+`aivis.biz`, `aivis-os.com`, AIVIS Inc.) — discovered post-launch, not at
+naming time. Separately, "Spotlight" — the marketing identity that had
+just shipped the same day (commit `5f0d0c8`) — also collided, with
+`get-spotlight.com`, a direct competitor. "Foreground" was checked against
+the same competitor landscape and came back clean. This is a name-and-copy
+change only: the product, scoring model, architecture, and the visual
+system (dark background, gold accent, Space Grotesk — see `brand/BRAND.md`)
+are unchanged, just re-labeled from "spotlight/stage/offstage" language to
+"foreground/background" language. Internal identifiers that predate the
+rename — the Netlify site `aivis-scan`, the Neon project `aivis`,
+`shared/aivis-core.mjs`, the Netlify Blobs store `aivis-scans`,
+`package.json`'s `"name": "aivis-web"` — are deliberately left as-is
+(renaming them touches every import/deploy path for zero user-visible
+benefit) and are not evidence of an incomplete rename. Historical/dated
+entries throughout this repo's journal-style docs (`TODOS.md`,
+`PLAN_NEXT_PHASE.md`, `DASHBOARD.md`, `NEXT-STEPS.md`, `WISH_LIST.md`,
+`MIGRATION.md`, `REPORTPLAN.md`, `V2_SCORING_MODEL.md`, `docs/*`, the
+nested `netlify/functions/CLAUDE.md`/`shared/CLAUDE.md`/
+`proof-script/CLAUDE.md`) still say "AIVis" where that was the product's
+actual name on that date — intentional, not an oversight; only
+current-state prose was updated. The site still lives at
+`aivis-scan.netlify.app`; a real domain hasn't been registered yet, so
+every canonical/OG/JSON-LD/sitemap/robots/llms.txt URL still intentionally
+points there, not at a domain nobody owns yet.
+
 ## What this is
 
-AIVis: checks whether a business shows up when AI search engines (ChatGPT,
+Foreground: checks whether a business shows up when AI search engines (ChatGPT,
 Gemini, via Perplexity's Agent API) are asked about their category. Two
 implementations share one core:
 
@@ -134,7 +161,7 @@ non-owner address the same day, not just the sandbox-restricted
 `RESEND_API_KEY`/`RESEND_FROM_EMAIL` are set on the Netlify site (see
 "Deployment" below) — `RESEND_API_KEY` is reused from an existing personal
 Resend account (also used by other unrelated Dizid projects), not a new
-account created for AIVis specifically.
+account created for Foreground specifically.
 
 ## Deployment
 
@@ -161,7 +188,7 @@ account created for AIVis specifically.
   client" under `shared/aivis-core.mjs` below) — all three are personal
   keys reused from other Dizid projects (found under `/home/marc/DEV`),
   same reuse pattern already established for `RESEND_API_KEY`, not new
-  accounts created for AIVis specifically. No `OPENAI_API_KEY` exists
+  accounts created for Foreground specifically. No `OPENAI_API_KEY` exists
   anywhere — `openai/gpt-5-mini` stays on the Perplexity gateway.
 
 ## Commands

@@ -1,14 +1,14 @@
-# AIVis
+# Foreground
 
-AIVis checks whether a business is mentioned when AI search engines
+Foreground checks whether a business is mentioned when AI search engines
 (ChatGPT, Gemini, Claude, and Grok) are asked about its category, scores
 the result from 0-100, and tracks the score over time. The premise: an
-AI-generated answer has room for only a few names — AIVis checks whether
-a given business is one of them.
+AI-generated answer has room for only a few names — Foreground checks
+whether a given business is one of them.
 
 ## How it works
 
-AIVis sends 5 category-relevant prompts (e.g. "who does emergency
+Foreground sends 5 category-relevant prompts (e.g. "who does emergency
 plumbing in Rotterdam") — phrased the way a real customer would ask,
 covering direct recommendations, competitor comparisons, and "who are the
 leaders in X" questions — to 4 AI models: OpenAI's GPT-5 mini, Google's
@@ -19,7 +19,7 @@ directly against each provider's own API, each using that provider's own
 web-search grounding tool — so answers reflect live web results rather
 than each model's static training data.
 
-For each completed check, AIVis records whether the business is
+For each completed check, Foreground records whether the business is
 mentioned, whether it's the first business mentioned, and how it ranks
 relative to named competitors. This is presence detection, not sentiment
 analysis — a mention counts whether the model recommended the business
@@ -34,10 +34,10 @@ mentioned. Checks are also weighted by prompt intent — a direct
 buying-decision prompt ("what's the best X for Y?") moves the score more
 than a broad "who are the leaders in this category?" prompt. The result is
 a 0-100 score: Leading (80-100), Visible (50-79), Weak (1-49), Invisible
-(0). If too few checks complete in a scan, AIVis shows no score at all
-rather than one computed from too little data — a null score means AIVis
-couldn't get enough usable answers from the models, not that the business
-scored zero.
+(0). If too few checks complete in a scan, Foreground shows no score at all
+rather than one computed from too little data — a null score means
+Foreground couldn't get enough usable answers from the models, not that
+the business scored zero.
 
 ## Pricing
 

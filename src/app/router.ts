@@ -11,21 +11,21 @@ import { isAuthenticated, restoreSession } from './lib/auth';
 // avoids a duplicate-content SEO penalty. App.vue's footer now links to the
 // static pages with plain <a> tags instead of router-link.
 const routes = [
-  { path: '/app', name: 'companies', component: () => import('./views/CompaniesListView.vue'), meta: { requiresAuth: true, title: 'Your companies — AIVis' } },
-  { path: '/app/login', name: 'login', component: () => import('./views/LoginView.vue'), meta: { title: 'Log in — AIVis' } },
-  { path: '/app/signup', name: 'signup', component: () => import('./views/SignupView.vue'), meta: { title: 'Sign up — AIVis' } },
+  { path: '/app', name: 'companies', component: () => import('./views/CompaniesListView.vue'), meta: { requiresAuth: true, title: 'Your companies — Foreground' } },
+  { path: '/app/login', name: 'login', component: () => import('./views/LoginView.vue'), meta: { title: 'Log in — Foreground' } },
+  { path: '/app/signup', name: 'signup', component: () => import('./views/SignupView.vue'), meta: { title: 'Sign up — Foreground' } },
   {
     path: '/app/companies/:id',
     name: 'company',
     component: () => import('./views/CompanyDetailView.vue'),
-    meta: { requiresAuth: true, title: 'AIVis' }, // real title set dynamically elsewhere (other workstream)
+    meta: { requiresAuth: true, title: 'Foreground' }, // real title set dynamically elsewhere (other workstream)
     props: true,
   },
   {
     path: '/app/billing/success',
     name: 'billing-success',
     component: () => import('./views/BillingSuccessView.vue'),
-    meta: { requiresAuth: true, title: 'Billing — AIVis' },
+    meta: { requiresAuth: true, title: 'Billing — Foreground' },
   },
 ];
 
@@ -47,7 +47,7 @@ router.beforeEach(async (to) => {
 });
 
 router.afterEach((to) => {
-  document.title = (to.meta.title as string) || 'AIVis';
+  document.title = (to.meta.title as string) || 'Foreground';
 });
 
 export default router;

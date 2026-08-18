@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>How AIVis works — AI search visibility scoring explained</title>
-<meta name="description" content="How AIVis checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<title>How Foreground works — AI search visibility scoring explained</title>
+<meta name="description" content="How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
 <link rel="canonical" href="https://aivis-scan.netlify.app/how-it-works" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -14,13 +14,13 @@
 <!-- Matches --stage-black in public/marketing-theme.css. -->
 <meta name="theme-color" content="#0a0a0d" />
 <meta property="og:type" content="article" />
-<meta property="og:title" content="How AIVis works — AI search visibility scoring explained" />
-<meta property="og:description" content="How AIVis checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<meta property="og:title" content="How Foreground works — AI search visibility scoring explained" />
+<meta property="og:description" content="How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
 <meta property="og:url" content="https://aivis-scan.netlify.app/how-it-works" />
 <meta property="og:image" content="https://aivis-scan.netlify.app/og-image.png" />
 <meta name="twitter:card" content="summary" />
-<meta name="twitter:title" content="How AIVis works — AI search visibility scoring explained" />
-<meta name="twitter:description" content="How AIVis checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<meta name="twitter:title" content="How Foreground works — AI search visibility scoring explained" />
+<meta name="twitter:description" content="How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
 <meta property="twitter:image" content="https://aivis-scan.netlify.app/og-image.png" />
 <!-- Self-contained @graph: this page is a separate HTTP document from
      index.html, so the WebPage node's isPartOf/publisher @id references
@@ -37,13 +37,13 @@
       "@type": "WebSite",
       "@id": "https://aivis-scan.netlify.app/#website",
       "url": "https://aivis-scan.netlify.app/",
-      "name": "AIVis",
+      "name": "Foreground",
       "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
     },
     {
       "@type": "Organization",
       "@id": "https://aivis-scan.netlify.app/#organization",
-      "name": "AIVis",
+      "name": "Foreground",
       "url": "https://aivis-scan.netlify.app/",
       "logo": "https://aivis-scan.netlify.app/og-image.png"
     },
@@ -51,8 +51,8 @@
       "@type": "WebPage",
       "@id": "https://aivis-scan.netlify.app/how-it-works#webpage",
       "url": "https://aivis-scan.netlify.app/how-it-works",
-      "name": "How AIVis works — AI search visibility scoring explained",
-      "description": "How AIVis checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated.",
+      "name": "How Foreground works — AI search visibility scoring explained",
+      "description": "How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated.",
       "isPartOf": { "@id": "https://aivis-scan.netlify.app/#website" },
       "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
     },
@@ -66,8 +66,8 @@
         {
           "@type": "HowToStep",
           "position": 1,
-          "name": "AIVis sends 5 prompts to 4 AI models",
-          "text": "When you run a scan, AIVis sends 5 different prompts — phrased the way a real customer would actually ask, not just \"tell me about {your brand}\" — to 4 AI models (OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6), for 20 checks total per scan. Some prompts ask for a recommendation directly (\"what's the best X for Y?\"), some ask for a comparison against your named competitors, some ask \"who are the leaders in X category?\" — covering the range of ways someone genuinely deciding between options might ask."
+          "name": "Foreground sends 5 prompts to 4 AI models",
+          "text": "When you run a scan, Foreground sends 5 different prompts — phrased the way a real customer would actually ask, not just \"tell me about {your brand}\" — to 4 AI models (OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6), for 20 checks total per scan. Some prompts ask for a recommendation directly (\"what's the best X for Y?\"), some ask for a comparison against your named competitors, some ask \"who are the leaders in X category?\" — covering the range of ways someone genuinely deciding between options might ask."
         },
         {
           "@type": "HowToStep",
@@ -78,8 +78,8 @@
         {
           "@type": "HowToStep",
           "position": 3,
-          "name": "AIVis checks each response for brand mentions",
-          "text": "For each of the 20 responses, AIVis checks whether your brand name (or a domain-derived alias) is mentioned, whether it's the first business mentioned, and which competitors — if any — appear instead or alongside it. This is presence detection, not sentiment analysis: a mention is a mention, whether the model recommended you enthusiastically or brought you up only to say a competitor is better. Detection is intentionally conservative — very short or common-word brand names are flagged as ambiguous rather than guessed at, since a naive text match on a name like \"Best\" would match almost every response regardless of whether your business was actually meant."
+          "name": "Foreground checks each response for brand mentions",
+          "text": "For each of the 20 responses, Foreground checks whether your brand name (or a domain-derived alias) is mentioned, whether it's the first business mentioned, and which competitors — if any — appear instead or alongside it. This is presence detection, not sentiment analysis: a mention is a mention, whether the model recommended you enthusiastically or brought you up only to say a competitor is better. Detection is intentionally conservative — very short or common-word brand names are flagged as ambiguous rather than guessed at, since a naive text match on a name like \"Best\" would match almost every response regardless of whether your business was actually meant."
         }
       ]
     }
@@ -100,21 +100,21 @@
 
 <div class="wrap">
   <nav class="top">
-    <a class="logo" href="/">AIVis</a>
+    <a class="logo" href="/">Foreground</a>
     <div class="links">
       <a href="/app/login">Log in</a>
-      <a class="cta" href="/app/signup">Get in the spotlight</a>
+      <a class="cta" href="/app/signup">Get in the foreground</a>
     </div>
   </nav>
 
   <main class="legal">
-    <a class="back" href="/">← Back to AIVis</a>
+    <a class="back" href="/">← Back to Foreground</a>
 
-    <h1>How AIVis works</h1>
+    <h1>How Foreground works</h1>
     <p class="lead">
       A plain explanation of what "AI search visibility" means, how a scan
       actually works under the hood, and what to do if you're not the one
-      standing in the spotlight yet.
+      in the foreground yet.
     </p>
 
     <section>
@@ -133,15 +133,15 @@
         traditional SEO (does Google rank you?), applied to a different
         surface — one where there's no results page to check by hand, because
         the "result" is a sentence a model generated on the fly. Think of
-        every answer as a spotlight with room for only a few names — this is
-        how you find out whether yours is one of them.
+        every answer as having a foreground with room for only a few names —
+        this is how you find out whether yours is one of them.
       </p>
     </section>
 
     <section>
       <h2>How a scan works</h2>
       <p>
-        When you run a scan, AIVis sends <strong>5 different prompts</strong>
+        When you run a scan, Foreground sends <strong>5 different prompts</strong>
         — phrased the way a real customer would actually ask, not just "tell
         me about {your brand}" — to <strong>4 AI models</strong>
         (OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude
@@ -163,7 +163,7 @@
         change about what's being measured.
       </p>
       <p>
-        For each of the 20 responses, AIVis checks whether your brand name
+        For each of the 20 responses, Foreground checks whether your brand name
         (or a domain-derived alias) is mentioned, whether it's the
         <em>first</em> business mentioned, and which competitors — if any —
         appear instead or alongside it. This is <strong>presence
@@ -206,7 +206,7 @@
       </ul>
       <p>
         If too few checks complete — a real outage, not a real result —
-        AIVis shows no score at all rather than a misleading one computed
+        Foreground shows no score at all rather than a misleading one computed
         from too little data. Your dashboard shows exactly how many of the
         20 checks succeeded, so you can judge how much to trust a given
         score. A 0 always means "checked and genuinely not mentioned,"
@@ -217,7 +217,7 @@
     <section>
       <h2>What to do with a low score</h2>
       <p>
-        A low score means you're not the one standing in the spotlight when
+        A low score means you're not the one in the foreground when
         your customers ask AI these questions. A few directions that tend to
         help:
       </p>
@@ -274,7 +274,7 @@
         while Gemini's <em>answer text</em> is checked the same way as the
         other three models, its citation links can't be matched against your
         own site's domain the way Perplexity, Anthropic, and xAI's citations
-        can. AIVis also doesn't currently check Google's AI Overviews/AI
+        can. Foreground also doesn't currently check Google's AI Overviews/AI
         Mode or Microsoft Copilot, two AI-answer surfaces this scan doesn't
         cover. We'd rather state all of this plainly than let "4 models"
         imply more uniform or more direct coverage than what's actually
@@ -284,7 +284,7 @@
   </main>
 
   <footer>
-    &copy; 2026 AIVis. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
+    &copy; 2026 Foreground. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
     · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
     · <a href="/how-it-works">How this works</a>
     · <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>

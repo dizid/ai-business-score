@@ -67,7 +67,7 @@ async function load() {
     // never opens empty when there's already a result to show.
     selectedIndex.value = scans.value.length ? 0 : null;
     if (company.value) {
-      document.title = `${company.value.brand} — AIVis`;
+      document.title = `${company.value.brand} — Foreground`;
     }
   } catch (err) {
     loadError.value = (err as Error).message;

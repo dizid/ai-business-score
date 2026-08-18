@@ -17,7 +17,7 @@ async function handleSignOut() {
     <header class="topbar">
       <router-link class="wordmark" to="/app">
         <Icon name="logo" />
-        AIVis
+        Foreground
       </router-link>
       <AccountMenu v-if="user" :email="user.email" @sign-out="handleSignOut" />
     </header>

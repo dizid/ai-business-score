@@ -52,7 +52,7 @@ onMounted(() => {
     </template>
     <template v-else-if="errorKind === 'invalid'">
       <h1>Invalid result data</h1>
-      <p id="error">This link's data doesn't match the expected format — it may be corrupted or not a genuine AIVis link. Ask for a fresh link.</p>
+      <p id="error">This link's data doesn't match the expected format — it may be corrupted or not a genuine Foreground link. Ask for a fresh link.</p>
     </template>
 
     <ScanDetail v-else-if="data" :payload="data" />
