@@ -1,5 +1,67 @@
 # TODOs
 
+## STATUS 2026-08-19: Harmonia (technical/SEO audit) + report Overview/Details tabs — SHIPPED
+
+**Trigger:** Marc asked for "massive improvements" — technical/SEO analysis
+of scanned websites (schema.org/JSON-LD checks) plus a clearer, more
+scannable report ("harmonica bars"), with the AI Visibility Score staying
+the main thing. Mid-conversation Marc pasted in a Gemini-authored plan
+(`GEMINI-PLAN`) proposing a much larger scope — a single blended
+"Harmonia Score" (Technical 40% + On-Page 30% + Content/AI-Readability
+20% + UX 10%) that would have replaced the AI Visibility Score as the
+headline metric, plus AI-based E-E-A-T/entity-salience scoring and
+per-element Core Web Vitals diagnosis via Lighthouse. Reconciled directly
+with Marc rather than silently picking a side: AI Visibility Score stays
+the sole headline/moat metric (confirmed twice); the new "Harmonia Score"
+is a separate, secondary score, never blended in; the AI-heavy/Lighthouse
+items were deferred to a follow-up phase, not built this round. Full plan:
+`~/.claude/plans/ping-spicy-oasis.md`.
+
+**Shipped:**
+1. **`shared/harmonia.mjs`** (new file) — `analyzeHarmonia(prospect, psiApiKey)`.
+   One homepage fetch + regex HTML parsing (no cheerio/jsdom — zero new
+   dependency), `/robots.txt` + `/sitemap.xml` reachability, JSON-LD
+   structural validation (hand-rolled, not Google's Rich Results Test —
+   no public API exists for that) + rule-based (not LLM) schema
+   opportunity suggestions with copy-paste starter snippets, security
+   headers, and a PageSpeed Insights call (mobile strategy) for Core Web
+   Vitals. Never throws — every step degrades to null/empty on failure,
+   same discipline as `callModelWithRetry`. Computes 4 pillar scores
+   (Technical SEO 40%, On-Page SEO 30%, Content Structure 20%, UX Signals
+   10%) and a weighted `harmoniaScore`, renormalized across whichever
+   pillars actually computed if one fails (e.g. PSI down → UX Signals
+   pillar excluded, not zeroed).
+2. **`scans.harmonia jsonb`** — new nullable/additive column (Neon MCP
+   migration, verified on a temp branch first), same pattern as
+   `own_site_citations`/`sentiment_judgments`. `run-scan-background.mts`
+   kicks off `analyzeHarmonia()` in parallel with (not serialized into) the
+   sequential 20-call LLM loop — it's a plain fetch chain with no
+   Perplexity-rate-limit interaction, and its own ~60s internal budget
+   finishes well inside the LLM loop's 5-8 minute typical runtime, so it
+   adds no measurable wall-clock time to the scan.
+3. **`ScanDetail.vue` Overview/Details tabs** — implements `REPORTPLAN.md`'s
+   Change 1 (approved 2026-08-18, never built), extended with a new
+   `CollapsibleSection.vue` accordion component for the Details tab's
+   sections instead of one flat list. See `src/shared/CLAUDE.md` for the
+   full breakdown. `REPORTPLAN.md`'s Change 2 (agency portfolio view) is
+   unrelated to this request and remains unbuilt.
+4. Live-verified: `shared/harmonia.mjs` against real sites (stripe.com —
+   correct schema detection, opportunity suggestions, graceful PSI
+   failure with a bad key) before wiring into the pipeline; the full
+   report UI via `browse` against synthetic payloads (populated Harmonia
+   data, `harmonia: null` legacy-scan fallback, mobile viewport) — see
+   the plan doc's verification section for specifics.
+
+**Known gap, not yet resolved:** `GOOGLE_API_KEY`'s GCP project (used for
+`google/gemini-3-flash-preview`) does **not** have the PageSpeed Insights
+API enabled — confirmed live (403, "PageSpeed Insights API has not been
+used in project 746072244237 before or it is disabled"). Core Web Vitals
+will resolve to `null` (UX Signals pillar excluded from `harmoniaScore`,
+graceful per the design above) until Marc provisions a dedicated key with
+PSI enabled and it's set as `GOOGLE_PAGESPEED_API_KEY` on Netlify — in
+progress as of this entry (Marc creating a new GCP project specifically
+for this, no billing account needed for PSI's free tier).
+
 ## STATUS 2026-08-17 (continuing same day): Grok timeout root cause + streaming scan progress — SHIPPED, not yet live-verified
 
 **Trigger:** `docs/grok-timeout-investigation.md` and

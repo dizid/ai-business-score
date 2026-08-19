@@ -1,8 +1,13 @@
 # Report clarity + agency portfolio view — implementation plan
 
-Written 2026-08-18. Not yet implemented — this is the approved plan,
-committed to the repo per Marc's request, to be executed as a follow-up
-pass (small batches, verified at each step, per house rules).
+Written 2026-08-18. **Change 1 (report clarity) shipped 2026-08-19** — see
+`TODOS.md`'s 2026-08-19 entry — implemented as an Overview/Details tab
+split same as specified here, but with the Details tab further broken into
+collapsible accordion sections (a "harmonica bars" request from the same
+day, layered on top of this plan rather than replacing it) and extended
+with a new secondary "Harmonia" technical/SEO score. **Change 2 (agency
+portfolio view) is still not implemented** — untouched, remains the
+approved-but-pending plan below.
 
 ## Context
 

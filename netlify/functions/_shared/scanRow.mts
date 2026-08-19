@@ -30,5 +30,8 @@ export function toScanPayload(row: Record<string, any>) {
     generatedAt: row.generated_at,
     deepAdvice: row.deep_advice ?? null,
     deepAdviceGeneratedAt: row.deep_advice_generated_at ?? null,
+    // harmonia is new (technical/on-page/content-structure/UX audit of the
+    // scanned site) — same null default for pre-migration rows.
+    harmonia: row.harmonia ?? null,
   };
 }

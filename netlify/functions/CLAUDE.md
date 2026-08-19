@@ -63,7 +63,20 @@ See the root `CLAUDE.md` for overall project context.
   UI. The `completed` counter is a plain JS variable in
   `run-scan-background.mts`, not an atomic SQL increment — only safe
   because `CONCURRENCY_LIMIT` is 1 (see below); raising concurrency would
-  need this to change too.
+  need this to change too. Added 2026-08-19: **`harmonia jsonb`** — a
+  technical/on-page/content-structure/UX audit of the scanned business's
+  own website, computed by `shared/harmonia.mjs`'s `analyzeHarmonia()` and
+  kicked off in parallel with (not serialized into) the sequential LLM-call
+  loop in `run-scan-background.mts`, since it's a plain HTTP fetch chain
+  (the site's own homepage/robots.txt/sitemap.xml, plus PageSpeed Insights)
+  with no Perplexity-rate-limit interaction. Nullable/additive, same
+  pattern as `own_site_citations`/`sentiment_judgments` — `null` for
+  pre-migration rows, and `analyzeHarmonia()` never throws (worst case
+  resolves with mostly-null fields plus an `errors` array). **This is a
+  SEPARATE, secondary score from the AI Visibility Score (`scans.score`) —
+  a deliberate product decision (Marc confirmed AI visibility stays "the
+  main thing") — never blended into it.** See `src/shared/CLAUDE.md` for
+  the pillar breakdown and UI.
 - **`company_urls`** — an **unused, present-but-dead table**. It backed
   multi-URL-per-company tracking (shipped, then deleted per Milestone B of
   `PLAN_NEXT_PHASE.md`): every company got a primary row equal to its
@@ -194,7 +207,13 @@ gap this update fixes rather than something built this session.
   `SCAN_DEADLINE_MS` is 720000 (12 min, bumped from 600000 the same day —
   the longer xai timeout needed more overall headroom, not less). Also
   writes `scans.progress` incrementally before each call starts — see the
-  `progress` column entry above.
+  `progress` column entry above. Added 2026-08-19: also kicks off
+  `analyzeHarmonia()` (`shared/harmonia.mjs`, new file — a technical/
+  on-page/content-structure/UX audit of the scanned site, unrelated to
+  the LLM calls) as a promise alongside `runWithConcurrency(...)`, awaited
+  just before the final `UPDATE`, its own `psiApiKey` resolved from
+  `GOOGLE_PAGESPEED_API_KEY` (falls back to reusing `apiKeys.google` if
+  unset) — see `harmonia` column entry above.
 - **`scan-status.mts`** — GET `/scans/:id`, auth + ownership-scoped (join
   through `companies`), polled by the frontend. Returns `progress` (the
   live `{completed, total, currentModel}` object, added 2026-08-17)

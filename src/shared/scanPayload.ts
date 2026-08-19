@@ -28,6 +28,39 @@ export interface FailureItem { model: string; promptIndex: number; error: string
 export interface DeepAdviceStep { title: string; reasoning: string; difficulty: Difficulty; }
 export interface DeepAdvice { steps: DeepAdviceStep[]; }
 
+// Harmonia: a technical/on-page/content-structure/UX audit of the scanned
+// business's own website — a SEPARATE, secondary score from the AI
+// Visibility Score above, never blended into it. See shared/harmonia.mjs
+// for how this is computed.
+export interface HarmoniaCheck { id: string; label: string; passed: boolean; }
+export interface HarmoniaPillar { score: number | null; checks: HarmoniaCheck[]; }
+export interface HarmoniaSchemaNode { valid: boolean; type: string | null; issues: string[]; }
+export interface HarmoniaSchemaOpportunity { type: string; reason: string; example: string; }
+export interface HarmoniaCoreWebVitals {
+  strategy: string;
+  performanceScore: number | null;
+  lcpMs: number | null;
+  clsScore: number | null;
+  inpMs: number | null;
+}
+export interface HarmoniaSecurityHeader { header: string; present: boolean; }
+export interface HarmoniaResult {
+  fetchedUrl: string;
+  statusCode: number | null;
+  checkedAtDate: Date;
+  harmoniaScore: number | null;
+  pillars: {
+    technicalSeo: HarmoniaPillar;
+    onPageSeo: HarmoniaPillar;
+    contentStructure: HarmoniaPillar;
+    uxSignals: HarmoniaPillar;
+  };
+  schema: { detected: HarmoniaSchemaNode[]; opportunities: HarmoniaSchemaOpportunity[] };
+  coreWebVitals: HarmoniaCoreWebVitals | null;
+  securityHeaders: HarmoniaSecurityHeader[];
+  errors: string[];
+}
+
 export interface ValidatedPayload {
   id: string;
   brand: string;
@@ -49,6 +82,7 @@ export interface ValidatedPayload {
   generatedAtDate: Date;
   deepAdvice: DeepAdvice | null;
   deepAdviceGeneratedAtDate: Date | null;
+  harmonia: HarmoniaResult | null;
 }
 
 const RANKS = new Set(['ranked-1', 'ranked-2', 'ranked-3', 'mentioned', 'not-mentioned', 'beaten']);
@@ -68,6 +102,14 @@ const MAX_URL_LEN = 2000;
 const SENTIMENT_CLASSIFICATIONS = new Set(['recommended', 'neutral', 'negative', 'comparison-only']);
 const MAX_SENTIMENT_JUDGMENTS = 20;
 const MAX_REASONING_LEN = 300;
+const MAX_HARMONIA_CHECKS = 20;
+const MAX_SCHEMA_NODES = 40;
+const MAX_SCHEMA_OPPORTUNITIES = 10;
+const MAX_SECURITY_HEADERS = 10;
+const MAX_HARMONIA_ERRORS = 20;
+const MAX_SCHEMA_EXAMPLE_LEN = 3000;
+const MAX_ISSUE_LEN = 200;
+const MAX_ISSUES_PER_NODE = 10;
 
 // href-safety, same rule as the website link below: only http(s) survives,
 // anything else (javascript:, data:, etc.) is dropped rather than escaped.
@@ -106,6 +148,112 @@ export function b64urlDecode(str: string): string {
       .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
       .join('')
   );
+}
+
+function asHarmoniaScore(v: unknown): number | null {
+  if (v === null) return null;
+  const n = asNonNegativeInt(v);
+  return n === null || n > 100 ? null : n;
+}
+
+function asHarmoniaChecks(raw: unknown): HarmoniaCheck[] {
+  if (!Array.isArray(raw)) return [];
+  const checks: HarmoniaCheck[] = [];
+  for (const c of raw.slice(0, MAX_HARMONIA_CHECKS)) {
+    const id = asShortString(c && c.id);
+    const label = typeof (c && c.label) === 'string' ? c.label.slice(0, MAX_TEXT_LEN) : null;
+    if (id === null || label === null || typeof (c && c.passed) !== 'boolean') continue;
+    checks.push({ id, label, passed: c.passed });
+  }
+  return checks;
+}
+
+function asHarmoniaPillar(raw: unknown): HarmoniaPillar {
+  if (!raw || typeof raw !== 'object') return { score: null, checks: [] };
+  const r = raw as Record<string, unknown>;
+  return { score: asHarmoniaScore(r.score), checks: asHarmoniaChecks(r.checks) };
+}
+
+// harmonia is a whole secondary report section — same lenient
+// degrade-on-malformed treatment as deepAdvice above (missing, null, or
+// any structural issue degrades to null rather than rejecting the whole
+// payload), since it's additive on top of the always-present AI score.
+function asHarmonia(raw: unknown): HarmoniaResult | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, any>;
+  if (typeof r.fetchedUrl !== 'string') return null;
+  const checkedAtDate = new Date(r.checkedAtDate);
+  if (Number.isNaN(checkedAtDate.getTime())) return null;
+
+  const statusCode = typeof r.statusCode === 'number' ? r.statusCode : null;
+  const harmoniaScore = asHarmoniaScore(r.harmoniaScore);
+
+  const pillars = {
+    technicalSeo: asHarmoniaPillar(r.pillars?.technicalSeo),
+    onPageSeo: asHarmoniaPillar(r.pillars?.onPageSeo),
+    contentStructure: asHarmoniaPillar(r.pillars?.contentStructure),
+    uxSignals: asHarmoniaPillar(r.pillars?.uxSignals),
+  };
+
+  const detected: HarmoniaSchemaNode[] = [];
+  if (Array.isArray(r.schema?.detected)) {
+    for (const n of r.schema.detected.slice(0, MAX_SCHEMA_NODES)) {
+      if (!n || typeof n.valid !== 'boolean') continue;
+      const type = typeof n.type === 'string' ? n.type.slice(0, MAX_NAME_LEN) : null;
+      const issues = Array.isArray(n.issues)
+        ? n.issues.filter((i: unknown) => typeof i === 'string').slice(0, MAX_ISSUES_PER_NODE).map((i: string) => i.slice(0, MAX_ISSUE_LEN))
+        : [];
+      detected.push({ valid: n.valid, type, issues });
+    }
+  }
+
+  const opportunities: HarmoniaSchemaOpportunity[] = [];
+  if (Array.isArray(r.schema?.opportunities)) {
+    for (const o of r.schema.opportunities.slice(0, MAX_SCHEMA_OPPORTUNITIES)) {
+      const type = asShortString(o && o.type);
+      const reason = typeof (o && o.reason) === 'string' ? o.reason.slice(0, MAX_TEXT_LEN) : null;
+      const example = typeof (o && o.example) === 'string' ? o.example.slice(0, MAX_SCHEMA_EXAMPLE_LEN) : null;
+      if (type === null || reason === null || example === null) continue;
+      opportunities.push({ type, reason, example });
+    }
+  }
+
+  let coreWebVitals: HarmoniaCoreWebVitals | null = null;
+  if (r.coreWebVitals && typeof r.coreWebVitals === 'object') {
+    const cwv = r.coreWebVitals;
+    coreWebVitals = {
+      strategy: typeof cwv.strategy === 'string' ? cwv.strategy.slice(0, 20) : 'mobile',
+      performanceScore: asHarmoniaScore(cwv.performanceScore),
+      lcpMs: typeof cwv.lcpMs === 'number' ? cwv.lcpMs : null,
+      clsScore: typeof cwv.clsScore === 'number' ? cwv.clsScore : null,
+      inpMs: typeof cwv.inpMs === 'number' ? cwv.inpMs : null,
+    };
+  }
+
+  const securityHeaders: HarmoniaSecurityHeader[] = [];
+  if (Array.isArray(r.securityHeaders)) {
+    for (const h of r.securityHeaders.slice(0, MAX_SECURITY_HEADERS)) {
+      const header = asShortString(h && h.header);
+      if (header === null || typeof (h && h.present) !== 'boolean') continue;
+      securityHeaders.push({ header, present: h.present });
+    }
+  }
+
+  const errors = Array.isArray(r.errors)
+    ? r.errors.filter((e: unknown) => typeof e === 'string').slice(0, MAX_HARMONIA_ERRORS).map((e: string) => e.slice(0, MAX_ERROR_LEN))
+    : [];
+
+  return {
+    fetchedUrl: r.fetchedUrl.slice(0, MAX_URL_LEN),
+    statusCode,
+    checkedAtDate,
+    harmoniaScore,
+    pillars,
+    schema: { detected, opportunities },
+    coreWebVitals,
+    securityHeaders,
+    errors,
+  };
 }
 
 // This validator is the only thing standing between a hostile/forged
@@ -277,5 +425,6 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     generatedAtDate,
     deepAdvice,
     deepAdviceGeneratedAtDate,
+    harmonia: raw.harmonia !== undefined ? asHarmonia(raw.harmonia) : null,
   };
 }

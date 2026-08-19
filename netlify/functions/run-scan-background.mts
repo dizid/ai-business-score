@@ -54,6 +54,7 @@ import {
   computeScore,
   selectAdvice,
 } from '../../shared/aivis-core.mjs';
+import { analyzeHarmonia } from '../../shared/harmonia.mjs';
 import { sql } from './_shared/db.mts';
 import { sendScanCompleteEmail } from './_shared/email.mts';
 
@@ -113,6 +114,13 @@ export default async (req: Request) => {
     google: Netlify.env.get('GOOGLE_API_KEY'),
     xai: Netlify.env.get('XAI_API_KEY'),
   };
+  // PageSpeed Insights, for the Harmonia audit's UX Signals pillar below.
+  // Tries a dedicated key first, falls back to reusing GOOGLE_API_KEY (same
+  // GCP project already used for google/gemini-3-flash-preview) if the
+  // PageSpeed Insights API turns out to be enabled there too. Either way,
+  // a missing/invalid key only nulls the UX Signals pillar — see
+  // harmonia.mjs's fetchCoreWebVitals, never fails the scan.
+  const psiApiKey = Netlify.env.get('GOOGLE_PAGESPEED_API_KEY') || apiKeys.google;
   if (!apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai) {
     await db`
       UPDATE public.scans SET status = 'failed', error_message = 'Server misconfigured: no model API keys set'
@@ -135,6 +143,16 @@ export default async (req: Request) => {
     region: company.region,
     customer_segment: company.customer_segment,
   };
+
+  // Kicked off here, awaited alongside the LLM call loop below (not
+  // serialized into it) — analyzeHarmonia is a plain HTTP fetch chain (the
+  // scanned site's own homepage/robots.txt/sitemap.xml, plus PageSpeed
+  // Insights), with no Perplexity-rate-limit interaction at all, so it's
+  // safe to run concurrently. Its own internal budget (~60s worst case,
+  // see harmonia.mjs's per-step timeouts) finishes well inside the LLM
+  // loop's typical 5-8 minute runtime, so it adds no measurable wall-clock
+  // time to the scan. Never throws — see harmonia.mjs's module comment.
+  const harmoniaPromise = analyzeHarmonia(prospect, psiApiKey);
 
   // Was PROMPT_TEMPLATES.slice(0, 3), then the full 10-prompt set once
   // Milestone 0's synchronous-timeout constraint was gone (see
@@ -300,6 +318,14 @@ export default async (req: Request) => {
     const advice = selectAdvice(agg);
     finalScore = score;
 
+    // harmoniaPromise never throws (see harmonia.mjs's module comment), but
+    // guarded anyway — this is a best-effort secondary score and must never
+    // take down the primary AI Visibility Score finalization below it.
+    const harmonia = await harmoniaPromise.catch((err) => {
+      console.error(`run-scan-background: Harmonia analysis failed for scan ${scanId}:`, err);
+      return null;
+    });
+
     await db`
       UPDATE public.scans SET
         status = 'completed',
@@ -315,6 +341,7 @@ export default async (req: Request) => {
         own_site_citations = ${JSON.stringify(agg.ownSiteCitations)},
         score = ${score},
         advice = ${JSON.stringify(advice)},
+        harmonia = ${harmonia ? JSON.stringify(harmonia) : null},
         generated_at = now()
       WHERE id = ${scanId}
     `;
