@@ -69,7 +69,19 @@ See the root `CLAUDE.md` for overall project context.
   kicked off in parallel with (not serialized into) the sequential LLM-call
   loop in `run-scan-background.mts`, since it's a plain HTTP fetch chain
   (the site's own homepage/robots.txt/sitemap.xml, plus PageSpeed Insights)
-  with no Perplexity-rate-limit interaction. Nullable/additive, same
+  with no Perplexity-rate-limit interaction. `website` is fully
+  user-controlled (a company's own field), so `harmonia.mjs`'s three direct
+  fetches go through a `safeFetch()` SSRF guard (flagged by automated
+  security review the same day it shipped, fixed same-day): rejects
+  non-http(s) schemes, resolves the hostname via DNS and refuses any
+  loopback/private/link-local/cloud-metadata address (`169.254.169.254`
+  included) before fetching, and re-validates on every redirect hop
+  (`redirect: 'manual'`, max 3 hops) rather than trusting `fetch`'s default
+  auto-follow — a public hostname's *response* redirecting to an internal
+  address would otherwise bypass the initial check. PageSpeed Insights is
+  deliberately not covered by this guard — that fetch runs on Google's
+  infrastructure, not ours, so it isn't an SSRF vector from this server.
+  Nullable/additive, same
   pattern as `own_site_citations`/`sentiment_judgments` — `null` for
   pre-migration rows, and `analyzeHarmonia()` never throws (worst case
   resolves with mostly-null fields plus an `errors` array). **This is a

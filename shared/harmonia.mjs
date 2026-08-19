@@ -13,10 +13,89 @@
 // secondary score from the AI Visibility Score computed in aivis-core.mjs
 // — never blended into it.
 
+import { promises as dns } from 'node:dns';
+import { isIP } from 'node:net';
+
 const HOMEPAGE_TIMEOUT_MS = 8000;
 const ROBOTS_TIMEOUT_MS = 5000;
 const SITEMAP_TIMEOUT_MS = 5000;
 const PSI_TIMEOUT_MS = 40000;
+const MAX_REDIRECTS = 3;
+
+// ---------- SSRF guard ----------
+// website/robots.txt/sitemap.xml are all fetched by OUR server against a
+// URL a signed-up user fully controls (a company's `website` field) — a
+// classic SSRF vector (cloud metadata endpoints, internal services,
+// localhost) if not restricted. PageSpeed Insights is deliberately NOT
+// covered here — that fetch happens on Google's infrastructure, not ours.
+
+function isPrivateIPv4(ip) {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) return true; // malformed -> fail closed
+  const [a, b] = parts;
+  if (a === 127) return true; // loopback
+  if (a === 10) return true; // 10.0.0.0/8
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  if (a === 192 && b === 168) return true; // 192.168.0.0/16
+  if (a === 169 && b === 254) return true; // link-local, incl. 169.254.169.254 cloud metadata
+  if (a === 0) return true; // 0.0.0.0/8
+  if (a >= 224) return true; // multicast/reserved
+  return false;
+}
+
+function isPrivateIPv6(ip) {
+  const lower = ip.toLowerCase();
+  if (lower === '::1' || lower === '::') return true; // loopback / unspecified
+  if (lower.startsWith('fe8') || lower.startsWith('fe9') || lower.startsWith('fea') || lower.startsWith('feb')) return true; // link-local fe80::/10
+  if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique local fc00::/7
+  if (lower.startsWith('::ffff:')) {
+    const v4 = lower.split(':').pop();
+    if (v4 && v4.includes('.')) return isPrivateIPv4(v4);
+  }
+  return false;
+}
+
+function isPrivateIP(address, family) {
+  return family === 6 ? isPrivateIPv6(address) : isPrivateIPv4(address);
+}
+
+async function assertPublicHost(hostname) {
+  const literalFamily = isIP(hostname);
+  if (literalFamily) {
+    if (isPrivateIP(hostname, literalFamily)) throw new Error(`Refusing to fetch private/internal address ${hostname}`);
+    return;
+  }
+  let addresses;
+  try {
+    addresses = await dns.lookup(hostname, { all: true, verbatim: true });
+  } catch (err) {
+    throw new Error(`DNS resolution failed for ${hostname}: ${err.message}`);
+  }
+  if (addresses.length === 0) throw new Error(`DNS resolution returned no addresses for ${hostname}`);
+  for (const { address, family } of addresses) {
+    if (isPrivateIP(address, family)) throw new Error(`Refusing to fetch private/internal address ${hostname} (resolved ${address})`);
+  }
+}
+
+// fetch() with redirect: 'manual' + a hostname re-check on every hop —
+// following a redirect blindly (fetch's default) would let a public
+// hostname's response redirect the request to an internal address after
+// the initial check already passed.
+async function safeFetch(url, options, redirectsLeft = MAX_REDIRECTS) {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Refusing non-http(s) scheme: ${parsed.protocol}`);
+  }
+  await assertPublicHost(parsed.hostname);
+  const res = await fetch(url, { ...options, redirect: 'manual' });
+  if ([301, 302, 303, 307, 308].includes(res.status)) {
+    if (redirectsLeft <= 0) throw new Error('Too many redirects');
+    const location = res.headers.get('location');
+    if (!location) throw new Error('Redirect response missing Location header');
+    return safeFetch(new URL(location, url).toString(), options, redirectsLeft - 1);
+  }
+  return res;
+}
 
 const PILLAR_WEIGHTS = { technicalSeo: 0.4, onPageSeo: 0.3, contentStructure: 0.2, uxSignals: 0.1 };
 
@@ -196,7 +275,7 @@ function generateSchemaOpportunities(detectedTypes, { brand, website }) {
 async function fetchHomepage(origin) {
   const { signal, clear } = withTimeout(HOMEPAGE_TIMEOUT_MS);
   try {
-    const res = await fetch(origin, { signal, redirect: 'follow' });
+    const res = await safeFetch(origin, { signal });
     const html = await res.text();
     return { statusCode: res.status, httpsOk: res.url.startsWith('https://'), headers: res.headers, html, error: null };
   } catch (err) {
@@ -223,7 +302,7 @@ function robotsBlanketDisallow(text) {
 async function fetchRobotsTxt(origin) {
   const { signal, clear } = withTimeout(ROBOTS_TIMEOUT_MS);
   try {
-    const res = await fetch(`${origin}/robots.txt`, { signal });
+    const res = await safeFetch(`${origin}/robots.txt`, { signal });
     if (!res.ok) return { reachable: false, blanketDisallow: false, hasSitemapDirective: false, error: null };
     const text = await res.text();
     return {
@@ -242,7 +321,7 @@ async function fetchRobotsTxt(origin) {
 async function fetchSitemapXml(origin) {
   const { signal, clear } = withTimeout(SITEMAP_TIMEOUT_MS);
   try {
-    const res = await fetch(`${origin}/sitemap.xml`, { signal });
+    const res = await safeFetch(`${origin}/sitemap.xml`, { signal });
     return { reachable: res.ok, error: null };
   } catch (err) {
     return { reachable: false, error: `sitemap.xml check failed: ${err.message}` };
