@@ -52,15 +52,25 @@ items were deferred to a follow-up phase, not built this round. Full plan:
    data, `harmonia: null` legacy-scan fallback, mobile viewport) — see
    the plan doc's verification section for specifics.
 
-**Known gap, not yet resolved:** `GOOGLE_API_KEY`'s GCP project (used for
+**Resolved same day:** `GOOGLE_API_KEY`'s GCP project (used for
 `google/gemini-3-flash-preview`) does **not** have the PageSpeed Insights
 API enabled — confirmed live (403, "PageSpeed Insights API has not been
-used in project 746072244237 before or it is disabled"). Core Web Vitals
-will resolve to `null` (UX Signals pillar excluded from `harmoniaScore`,
-graceful per the design above) until Marc provisions a dedicated key with
-PSI enabled and it's set as `GOOGLE_PAGESPEED_API_KEY` on Netlify — in
-progress as of this entry (Marc creating a new GCP project specifically
-for this, no billing account needed for PSI's free tier).
+used in project 746072244237 before or it is disabled"). Marc provisioned
+a dedicated GCP project + key with PSI enabled; live-verified against the
+real API (HTTP 200, real performance score/LCP/CLS returned) before being
+set as `GOOGLE_PAGESPEED_API_KEY` on Netlify, followed by a fresh manual
+deploy (via Netlify MCP `deploy-site`) to make sure that specific deploy's
+function config includes it rather than assuming the next auto-deploy
+would. Also fixed the same day, flagged by an automated security review of
+the initial commit: `harmonia.mjs`'s three direct site fetches
+(homepage/robots.txt/sitemap.xml) had no restriction on target address — a
+company's fully user-controlled `website` field could point at an internal
+service or cloud metadata endpoint (SSRF). Added a `safeFetch()` guard:
+rejects non-http(s) schemes, DNS-resolves the hostname and refuses
+loopback/private/link-local/metadata addresses, and re-validates on every
+redirect hop instead of trusting `fetch`'s default auto-follow. PageSpeed
+Insights itself is deliberately not covered — that fetch runs on Google's
+infrastructure, not ours.
 
 ## STATUS 2026-08-17 (continuing same day): Grok timeout root cause + streaming scan progress — SHIPPED, not yet live-verified
 

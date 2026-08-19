@@ -190,6 +190,14 @@ account created for Foreground specifically.
   same reuse pattern already established for `RESEND_API_KEY`, not new
   accounts created for Foreground specifically. No `OPENAI_API_KEY` exists
   anywhere — `openai/gpt-5-mini` stays on the Perplexity gateway.
+  `GOOGLE_PAGESPEED_API_KEY` added 2026-08-19 for Harmonia's Core Web
+  Vitals pillar (`shared/harmonia.mjs`) — a **dedicated new GCP project**
+  (`GOOGLE_API_KEY`'s existing project doesn't have the PageSpeed Insights
+  API enabled, confirmed live via a 403), unlike every other key above.
+  Live-verified against the real API before being set, then a fresh manual
+  deploy triggered (via Netlify MCP) to make sure this specific deploy's
+  function config actually includes it, not just an assumption from the
+  next auto-deploy.
 
 ## Commands
 
