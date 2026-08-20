@@ -51,6 +51,28 @@ const sentimentByKey = computed(() => {
   return map;
 });
 
+// Overview-tab summary (2026-08-20): sentiment is now auto-judged for most
+// mentions during the scan itself (see run-scan-background.mts), so it's
+// no longer worth burying entirely in the per-check Details accordion —
+// this rollup gives an at-a-glance read without expanding anything. Fixed
+// classification order so the pills don't reshuffle scan to scan; only
+// non-zero counts render, and the whole row is absent for scans with no
+// judgments yet (pre-2026-08-20 scans, or ones the auto-pass ran out of
+// deadline budget for before covering every mention).
+const SENTIMENT_SUMMARY_ORDER = ['recommended', 'neutral', 'comparison-only', 'negative'] as const;
+interface SentimentSummaryRow { classification: string; label: string; count: number; }
+const sentimentSummaryRows = computed<SentimentSummaryRow[]>(() => {
+  const counts = new Map<string, number>();
+  for (const j of props.payload.sentimentJudgments) {
+    counts.set(j.classification, (counts.get(j.classification) ?? 0) + 1);
+  }
+  return SENTIMENT_SUMMARY_ORDER.filter((c) => (counts.get(c) ?? 0) > 0).map((c) => ({
+    classification: c,
+    label: SENTIMENT_LABEL[c],
+    count: counts.get(c)!,
+  }));
+});
+
 const BAND_LABEL: Record<string, string> = {
   leading: 'Leading', visible: 'Visible, often beaten',
   weak: 'Weak presence', invisible: 'Invisible', unavailable: 'Score unavailable',
@@ -290,6 +312,16 @@ function formatSeconds(ms: number | null) {
       </div>
       <div class="warn" v-if="payload.failedCalls > 0">
         {{ payload.failedCalls }} of {{ payload.completedCalls + payload.failedCalls }} checks failed to complete and are not counted above.
+      </div>
+
+      <!-- sentiment summary: at-a-glance rollup of the per-check sentiment
+           judge (see Details tab's check-by-check breakdown for the full
+           per-check badges/reasoning) -->
+      <div class="sentiment-summary-row" v-if="sentimentSummaryRows.length">
+        <span
+          v-for="row in sentimentSummaryRows" :key="row.classification"
+          class="sentiment-badge" :class="`sentiment-${row.classification}`"
+        >{{ row.count }} {{ row.label }}</span>
       </div>
 
       <!-- scoreboard: emphasis bar chart (brand = accent, rivals = de-emphasis gray) -->
@@ -729,6 +761,7 @@ h2:first-of-type { margin-top: 0; }
 .sentiment-neutral { background: color-mix(in srgb, var(--faint) 20%, transparent); color: var(--muted); }
 .sentiment-negative { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
 .sentiment-comparison-only { background: color-mix(in srgb, var(--warning) 22%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
+.sentiment-summary-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
 .check-sentiment {
   font-size: 0.82rem; color: var(--muted); font-style: italic;
   padding: 0 10px 10px;

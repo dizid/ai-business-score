@@ -48,11 +48,14 @@ import type { Config } from '@netlify/functions';
 import {
   PROMPT_TEMPLATES,
   MODELS,
+  callModel,
   callModelWithRetry,
   runWithConcurrency,
   aggregateProspect,
   computeScore,
   selectAdvice,
+  buildSentimentJudgePrompt,
+  parseSentimentJudgeResponse,
 } from '../../shared/aivis-core.mjs';
 import { analyzeHarmonia } from '../../shared/harmonia.mjs';
 import { sql } from './_shared/db.mts';
@@ -275,6 +278,11 @@ export default async (req: Request) => {
     }
   }
 
+  // Captured here (not at the very top of the handler) so it lines up with
+  // exactly what SCAN_DEADLINE_MS has always bounded — the claim/company-
+  // lookup/harmonia-kickoff steps above take negligible time and were never
+  // part of that budget either.
+  const scanStartTime = Date.now();
   const deadline = new AbortController();
   const deadlineTimer = setTimeout(() => deadline.abort(), SCAN_DEADLINE_MS);
   let callResults;
@@ -326,6 +334,54 @@ export default async (req: Request) => {
       return null;
     });
 
+    // Auto-judge sentiment for every mention (Milestone F, extended
+    // 2026-08-20 — was on-demand/manual-only, see aivis-core.mjs's comment
+    // above buildSentimentJudgePrompt for the full history and why this
+    // used to be deliberately excluded from the automatic pipeline).
+    // Bounded to whatever's left of SCAN_DEADLINE_MS after the main loop
+    // above via a second AbortController timed to the remainder — NOT a
+    // fresh budget on top — so a slow scan just auto-judges fewer checks
+    // instead of risking a repeat of the 2026-08-13 concurrency incident.
+    // Checks this pass doesn't reach in time still have the manual "Judge
+    // sentiment" button in ScanDetail.vue as a fallback — it only renders
+    // when no judgment exists yet for that check, so no frontend change
+    // was needed for that fallback to keep working.
+    const sentimentTargets = agg.rawResponses
+      .map((r: { promptIndex: number; model: string; text: string }, i: number) => ({
+        promptIndex: r.promptIndex,
+        model: r.model,
+        text: r.text,
+        rank: agg.perPromptRank[i]?.rank ?? 'not-mentioned',
+      }))
+      .filter((r: { rank: string }) => r.rank !== 'not-mentioned');
+    const sentimentJudgments: { promptIndex: number; model: string; classification: string; reasoning: string }[] = [];
+    const sentimentRemainingMs = SCAN_DEADLINE_MS - (Date.now() - scanStartTime);
+    if (sentimentTargets.length > 0 && sentimentRemainingMs > 5000) {
+      const sentimentDeadline = new AbortController();
+      const sentimentTimer = setTimeout(() => sentimentDeadline.abort(), sentimentRemainingMs);
+      try {
+        await runWithConcurrency(sentimentTargets, CONCURRENCY_LIMIT, async (target: { promptIndex: number; model: string; text: string }) => {
+          if (sentimentDeadline.signal.aborted) return;
+          try {
+            const prompt = buildSentimentJudgePrompt(prospect.brand, target.text);
+            // Same model/timeout as judge-sentiment.mts's manual endpoint —
+            // keeps the existing 5-example calibration (shared/CLAUDE.md's
+            // "Sentiment judge" section) valid for this automatic pass too.
+            const result = await callModel(apiKeys, 'openai/gpt-5-mini', prompt, 20000, sentimentDeadline.signal);
+            const judgment = parseSentimentJudgeResponse(result.text);
+            sentimentJudgments.push({ promptIndex: target.promptIndex, model: target.model, ...judgment });
+          } catch (err) {
+            console.error(
+              `run-scan-background: sentiment judge failed [scan ${scanId}, prompt ${target.promptIndex}, ${target.model}]:`,
+              (err as Error).message
+            );
+          }
+        });
+      } finally {
+        clearTimeout(sentimentTimer);
+      }
+    }
+
     await db`
       UPDATE public.scans SET
         status = 'completed',
@@ -339,6 +395,7 @@ export default async (req: Request) => {
         failures = ${JSON.stringify(agg.failures)},
         total_tokens = ${agg.totalTokens},
         own_site_citations = ${JSON.stringify(agg.ownSiteCitations)},
+        sentiment_judgments = ${JSON.stringify(sentimentJudgments)},
         score = ${score},
         advice = ${JSON.stringify(advice)},
         harmonia = ${harmonia ? JSON.stringify(harmonia) : null},

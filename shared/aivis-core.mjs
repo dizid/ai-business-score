@@ -930,21 +930,28 @@ export function parseDeepAdviceResponse(text) {
   }
 }
 
-// ---------- Sentiment judge (on-demand, live LLM call) ----------
+// ---------- Sentiment judge (live LLM call) ----------
 // PLAN_NEXT_PHASE.md Milestone F item 2: replace the whole-word regex
 // presence check with a second LLM pass classifying HOW a brand was
 // portrayed in one specific completed check's response text — not just
-// whether it was mentioned. Same on-demand shape as buildDeepAdvicePrompt
-// above and for the same reason: a second LLM call per judged check is
-// real added cost/latency, and this repo's own history (the 2026-08-09
-// model-count revert, the 2026-08-13 concurrency incidents) is two
-// separate real production incidents that both trace back to adding more
-// calls to the automatic scan pipeline without checking capacity first.
-// Deliberately scoped to judge ONE check at a time, triggered by the user
-// (a button per check in ScanDetail.vue's check-by-check breakdown), never
-// automatically as part of every scan — this keeps cost opt-in and keeps
-// the already-tight SCAN_DEADLINE_MS budget (see run-scan-background.mts)
-// untouched.
+// whether it was mentioned. Originally shipped on-demand only (a button per
+// check in ScanDetail.vue's check-by-check breakdown, via
+// judge-sentiment.mts) and deliberately kept out of the automatic scan
+// pipeline — this repo's own history (the 2026-08-09 model-count revert,
+// the 2026-08-13 concurrency incidents) is two separate real production
+// incidents that both trace back to adding more calls to the automatic
+// pipeline without checking capacity first.
+//
+// 2026-08-20: run-scan-background.mts now runs this automatically for
+// every mentioned check right after the main scan loop, reusing this exact
+// prompt/model/timeout (so shared/CLAUDE.md's existing calibration note
+// still applies unchanged) and bounded to whatever's left of
+// SCAN_DEADLINE_MS rather than a fresh budget on top — a slow scan just
+// auto-judges fewer checks instead of
+// risking a repeat of either incident above. judge-sentiment.mts (the
+// manual endpoint) stays exactly as it was: now a fallback for checks the
+// automatic pass didn't reach in time, and for re-judging a specific check
+// on demand.
 const SENTIMENT_CLASSIFICATIONS = new Set(['recommended', 'neutral', 'negative', 'comparison-only']);
 
 export function buildSentimentJudgePrompt(brand, responseText) {

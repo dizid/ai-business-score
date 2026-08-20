@@ -5,6 +5,32 @@ Scoped guidance for `shared/`, split out of the project root `CLAUDE.md` on
 this directory, instead of every session paying for it. See the root
 `CLAUDE.md` for overall project context.
 
+### Update 2026-08-13 — call latency, concurrency, and retry history
+
+Migrated from root `CLAUDE.md` on 2026-08-20 (via `/doctor`) — that content
+had grown substantially redundant with this file and
+`netlify/functions/CLAUDE.md` by then. Two fixes the root version also
+covered were cut outright rather than migrated, since they're already
+detailed elsewhere: the `failures`/`total_tokens` columns
+(`netlify/functions/CLAUDE.md`'s DB schema section) and the
+`isAmbiguousBrandName()` stoplist-only fix (this file's own Detection bullet
+below).
+
+Real Perplexity calls with `web_search` grounding routinely take 15-20s,
+sometimes longer. `proof-script` runs the full 10 prompts x 4 models = 40
+calls; the hosted site's `run-scan-background.mts` uses a 5-prompt slice (20
+calls) — see `netlify/functions/CLAUDE.md` for why. Each call has a 60s
+per-call timeout (`xai/grok-4.6` gets 100000ms — see that file's
+`CALL_TIMEOUT_MS_BY_MODEL` note). `callModelWithRetry` uses 3 attempts with a
+rate-limit-aware escalating backoff between them (longer for HTTP 429
+specifically than other failures) — the backoff exists specifically to avoid
+re-hammering a live rate limit rather than to guard against generic
+flakiness. The concurrency-limited worker pool (`runWithConcurrency`) and
+shared `SCAN_DEADLINE_MS` `AbortController` that bound worst-case scan
+latency, plus the full three-incident concurrency-tuning history (10 → 4 →
+1), are documented in `netlify/functions/CLAUDE.md`'s `run-scan-background.mts`
+entry, not duplicated here.
+
 ### `shared/aivis-core.mjs`
 
 The single source of truth, imported by every consumer:
@@ -129,20 +155,35 @@ The single source of truth, imported by every consumer:
   new model) ran the real prompt against 5 hand-labeled example texts
   covering all 4 classifications plus a "brand not mentioned" case, via a
   live call with the production `PERPLEXITY_API_KEY` — 5/5 agreement.
-  Deliberately **on-demand and per-check**, same shape as deep advice and
-  for the same reason, taken further: a "Judge sentiment" button appears
-  per check in `ScanDetail.vue`'s check-by-check breakdown (only when that
-  check actually mentioned the brand), POSTs `{promptIndex, model}` to
-  `/scans/:id/judge-sentiment`, and the result is upserted into a new
-  `sentiment_judgments jsonb` column on `scans` (additive, nullable) keyed
-  by `(promptIndex, model)` so re-judging replaces rather than duplicates.
-  **Never runs automatically as part of a scan** — a second LLM call per
-  judged check would be a real cost/latency multiplier on an already-tight
-  5-8 min, 20-call sequential scan, and this file's own history
-  (2026-08-09 model revert, 2026-08-13 concurrency incidents) is two
-  separate real production incidents that both trace back to adding more
-  calls to the automatic scan pipeline without checking capacity first —
-  opt-in per-check avoids repeating that.
+  Shipped 2026-08-15 as **on-demand and per-check only**, same shape as deep
+  advice and for the same reason, taken further: never run automatically,
+  since a second LLM call per judged check is a real cost/latency
+  multiplier on an already-tight 5-8 min, 20-call sequential scan, and this
+  file's own history (2026-08-09 model revert, 2026-08-13 concurrency
+  incidents) is two separate real production incidents that both trace back
+  to adding more calls to the automatic scan pipeline without checking
+  capacity first.
+  **2026-08-20: also runs automatically.** `run-scan-background.mts` now
+  auto-judges every check where the brand was actually mentioned
+  (`rank !== 'not-mentioned'`), right after the main 20-call loop finishes,
+  reusing the exact same prompt/model/timeout as the manual path (so the
+  calibration above still holds). Bounded by a *second* `AbortController`
+  timed to whatever's left of `SCAN_DEADLINE_MS` after the main loop — not
+  a fresh budget on top — so a slow scan just auto-judges fewer checks
+  rather than risking a repeat of either incident above; per-judge failures
+  are caught and skipped individually, same as any other call in that file.
+  The manual "Judge sentiment" button (POSTs `{promptIndex, model}` to
+  `/scans/:id/judge-sentiment`) is unchanged and stays as the fallback for
+  whatever the automatic pass didn't reach in time, plus manual re-judging
+  — it already only renders when no judgment exists yet for that check, so
+  no frontend change was needed for that fallback to keep working. Both
+  paths upsert into the same `sentiment_judgments jsonb` column on `scans`
+  (additive, nullable), keyed by `(promptIndex, model)` so re-judging
+  replaces rather than duplicates. `ScanDetail.vue`'s Overview tab also
+  shows a compact classification-count summary (reusing the same
+  `.sentiment-badge` CSS as the per-check badges) whenever at least one
+  judgment exists, so auto-judged sentiment is visible without opening the
+  Details tab.
 - **Score** (`computeScore`, `scoreBand`) — 0-100 (or `null` if
   `completedCalls < 4` — never a fake 0 from too little data). **Updated**:
   no longer the simple `ranked1Count + 0.4*beatenCount` formula this doc

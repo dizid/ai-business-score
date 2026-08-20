@@ -1,12 +1,15 @@
 // On-demand sentiment judge — PLAN_NEXT_PHASE.md Milestone F item 2.
 // Triggered by a "Judge sentiment" button on one specific check in
-// ScanDetail.vue's check-by-check breakdown (not automatic — see
-// aivis-core.mjs's buildSentimentJudgePrompt comment for why: a second LLM
-// call per judged check is real added cost/latency on top of an
-// already-tight scan pipeline, so this stays opt-in and per-check rather
-// than baked into every scan). Mirrors generate-deep-advice.mts's shape
-// exactly (auth, ownership check, one callModel call, persist, return the
-// updated payload) — same pattern, different target field.
+// ScanDetail.vue's check-by-check breakdown. Originally the only way a
+// check got judged; since 2026-08-20 run-scan-background.mts also
+// auto-judges every mentioned check right after the main scan loop (see
+// aivis-core.mjs's comment above buildSentimentJudgePrompt for the full
+// history/reasoning). This endpoint stays as-is and now serves as the
+// fallback for whatever the automatic pass didn't reach before its share of
+// SCAN_DEADLINE_MS ran out, plus manual re-judging of a specific check.
+// Mirrors generate-deep-advice.mts's shape exactly (auth, ownership check,
+// one callModel call, persist, return the updated payload) — same pattern,
+// different target field.
 import type { Config, Context } from '@netlify/functions';
 import { callModel, buildSentimentJudgePrompt, parseSentimentJudgeResponse } from '../../shared/aivis-core.mjs';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
