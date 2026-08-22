@@ -104,7 +104,6 @@ nav.top {
   backdrop-filter: blur(10px);
   border-bottom: 1px solid transparent;
 }
-nav.top.scrolled-look { border-bottom-color: var(--line); }
 nav.top .logo { font-weight: 700; font-size: 1.25rem; text-decoration: none; color: var(--ink); }
 nav.top .links { display: flex; gap: 22px; align-items: center; font-size: 0.92rem; }
 nav.top .links a:not(.cta) { text-decoration: none; color: var(--muted); font-weight: 600; }
@@ -339,4 +338,8 @@ footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-siz
   .hero { padding: 32px 0 12px; }
   section { padding: 48px 0; }
   .dissolve-panel.old, .dissolve-panel.new, .demo-card, .plan-card { padding: 18px; }
+  nav.top { padding: 14px 16px; }
+  nav.top .logo { font-size: 1.05rem; }
+  nav.top .links { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  nav.top .links a.cta { padding: 7px 12px; font-size: 0.85rem; }
 }

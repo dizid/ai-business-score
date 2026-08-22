@@ -79,7 +79,7 @@
           "@type": "HowToStep",
           "position": 3,
           "name": "Foreground checks each response for brand mentions",
-          "text": "For each of the 20 responses, Foreground checks whether your brand name (or a domain-derived alias) is mentioned, whether it's the first business mentioned, and which competitors — if any — appear instead or alongside it. This is presence detection, not sentiment analysis: a mention is a mention, whether the model recommended you enthusiastically or brought you up only to say a competitor is better. Detection is intentionally conservative — very short or common-word brand names are flagged as ambiguous rather than guessed at, since a naive text match on a name like \"Best\" would match almost every response regardless of whether your business was actually meant."
+          "text": "For each of the 20 responses, Foreground checks whether your brand name (or a domain-derived alias) is mentioned, whether it's the first business mentioned, and which competitors — if any — appear instead or alongside it. This is presence detection, and it's intentionally conservative — very short or common-word brand names are flagged as ambiguous rather than guessed at, since a naive text match on a name like \"Best\" would match almost every response regardless of whether your business was actually meant. On top of presence, every check where your brand is actually mentioned is also automatically classified by tone — recommended, neutral, negative, or comparison-only — so a mention isn't just counted, it's read for whether the model was actually vouching for you."
         }
       ]
     }
@@ -167,13 +167,21 @@
         (or a domain-derived alias) is mentioned, whether it's the
         <em>first</em> business mentioned, and which competitors — if any —
         appear instead or alongside it. This is <strong>presence
-        detection</strong>, not sentiment analysis: a mention is a mention,
-        whether the model recommended you enthusiastically or brought you up
-        only to say a competitor is better. Detection is intentionally
-        conservative — very short or common-word brand names are flagged as
-        ambiguous rather than guessed at, since a naive text match on a name
-        like "Best" would match almost every response regardless of whether
-        your business was actually meant.
+        detection</strong>, and it's intentionally conservative — very short
+        or common-word brand names are flagged as ambiguous rather than
+        guessed at, since a naive text match on a name like "Best" would
+        match almost every response regardless of whether your business was
+        actually meant.
+      </p>
+      <p>
+        Presence alone doesn't say whether a mention was a genuine
+        recommendation or just a competitor beating you to the punch, so
+        every check where your brand is actually mentioned also gets run
+        through a second pass: a <strong>sentiment judge</strong> that
+        classifies the mention as recommended, neutral, negative, or
+        comparison-only. This runs automatically on every scan, right after
+        the main 20-check pass completes, and shows up as a summary on the
+        Overview tab plus a per-check badge in the detailed breakdown.
       </p>
     </section>
 
@@ -262,11 +270,11 @@
         the four — Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 — are
         called directly against Google's, Anthropic's, and xAI's own APIs,
         each grounded using that provider's own web-search tool. The fourth,
-        GPT-5 mini, is addressed through Perplexity's grounded search API
-        <em>gateway</em> rather than OpenAI's own API directly, since no
-        direct OpenAI account exists for this yet. For that one model, this
-        measures how it answers when Perplexity is the one asking and
-        grounding the response in its own web search, which is usually close
+        GPT-5 mini, works differently: it's addressed through Perplexity's
+        grounded search API <em>gateway</em> rather than a direct OpenAI
+        integration. For that one model, this measures how it answers when
+        Perplexity is the one asking and grounding the response in its own
+        web search, which is usually close
         to, but not guaranteed identical to, what you'd see typing the same
         question into chatgpt.com yourself. There's one further asterisk
         worth naming: Gemini's citations come back as Google's own

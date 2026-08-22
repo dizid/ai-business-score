@@ -307,7 +307,7 @@ watch(() => route.params.id, load);
         </div>
       </div>
 
-      <p class="empty" v-if="scans.length === 0">
+      <p class="empty" v-if="scans.length === 0 && !scanError">
         No scans yet for this company — click "Run new scan" to check its AI search visibility.
       </p>
 
