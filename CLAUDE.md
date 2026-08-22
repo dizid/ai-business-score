@@ -70,98 +70,14 @@ not just the earlier "add a Blobs store" reversal it already describes.
 Vertical prompt templating is still deliberately deferred per that doc's
 original reasoning (see `TODOS.md`).
 
-**Known limitation, unchanged by the pivot:** real Perplexity calls with
-`web_search` grounding routinely take 15-20s, sometimes longer. proof-script
-runs the full 10 prompts x 4 models = 40 calls (prompts grew from 3 to 10 on
-2026-08-09 at a live user's request — see `shared/aivis-core.mjs`'s
-`PROMPT_TEMPLATES` comment; models grew from 2 to 4 on 2026-08-13, after a
-briefly-reverted attempt at 6 on 2026-08-09 — see the `MODELS` comment for
-the full history). The hosted site's `run-scan-background.mts` uses a
-**5-prompt slice** of the same `PROMPT_TEMPLATES` array (20 calls, not 40)
-— see "Async scan execution" below for why. Each call has a 60s per-call
-timeout. This used to force the whole `/scan` request to stay synchronous
-and tightly timeout-budgeted — that constraint is gone since Milestone 5
-made scans asynchronous (see "Async scan execution" below).
-
-Also changed 2026-08-09, after a live user flagged the original
-fire-everything-via-`Promise.all` approach as a real risk once call counts
-grew: `run-scan-background.mts` runs calls through a concurrency-limited
-worker pool (`runWithConcurrency` in `aivis-core.mjs`) instead of all at
-once, and every call shares one scan-wide `SCAN_DEADLINE_MS` via a single
-`AbortController` — this is what actually bounds worst-case scan latency as
-prompt/model count grows, since otherwise each call gets its own full retry
-budget regardless of how long the batch had already run. Calls still in
-flight when the scan deadline fires are aborted and counted as failed, same
-as any other failure. **The concurrency limit and deadline value have
-changed twice since, most recently to 1 / 600000ms (10 min) — see "Update
-2026-08-13" below; don't trust a specific number in older prose without
-checking `run-scan-background.mts` directly.** `callModelWithRetry` uses 3
-attempts with a rate-limit-aware escalating backoff between them (longer for
-HTTP 429 specifically than other failures) — the backoff exists specifically
-to avoid re-hammering a live rate limit rather than to guard against generic
-flakiness.
-
-**Update 2026-08-12 (Milestone A of `PLAN_NEXT_PHASE.md`, shipped):**
-per-check failure detail (which prompt/model failed, and why) is now
-persisted — a `failures jsonb` column on `scans`, populated by
-`aggregateProspect`'s return value and rendered in `ScanDetail.vue` in
-place of the old "isn't currently recorded" note. This resurrects a feature
-that briefly existed (commit `522eb63`) and was accidentally deleted the
-next day during an unrelated refactor (`74afa41`) — diagnosing which calls
-failed no longer needs the Netlify function logs. A `total_tokens integer`
-column on `scans` was added the same migration, DB-only (not surfaced in
-any UI), so real per-scan Perplexity cost can be queried directly via Neon
-MCP — this exists to inform report/subscription pricing, not as a product
-feature.
-
-Also fixed the same milestone: `isAmbiguousBrandName()`
-(`shared/aivis-core.mjs`) used to flag **any** single-word brand name of 4
-characters or fewer as ambiguous and skip detection entirely, regardless of
-whether it was an actual common word — a real bug, not a design choice,
-that gave real brands (ASML, TSMC, NRC, IBM, SAP) a false `0/100 —
-Invisible` score. Ambiguity is now driven only by `COMMON_WORD_STOPLIST`
-membership. Competitor-name ambiguity (which previously failed silently,
-indistinguishable from "never mentioned") now sets a per-competitor
-`ambiguous` flag surfaced in `ScanDetail.vue`'s scoreboard.
-
-**Update 2026-08-13 (Milestone C1 of `PLAN_NEXT_PHASE.md`, shipped):**
-`MODELS` grew from 2 to 4 (`anthropic/claude-haiku-4-5`, `xai/grok-4.6`
-added, both live-smoke-tested first — see `shared/aivis-core.mjs`'s
-`MODELS` comment). Anthropic models need an explicit `max_output_tokens` in
-the request body that the other providers don't (`callModel` now sends it
-conditionally). The same smoke-testing pass found something bigger than the
-model additions: **Perplexity's real per-key concurrency limit is ~1**, not
-the 4 this file previously documented — bursts of 2-4 concurrent calls,
-including across different providers, failed 50-83% of the time with HTTP
-429, while fully sequential calls succeeded 100%. `CONCURRENCY_LIMIT` is
-now `1` (fully sequential) and `SCAN_DEADLINE_MS` is `600000` (10 min) —
-see `run-scan-background.mts`'s `CONCURRENCY_LIMIT` comment for the full
-incident writeup (this is the second retune the same day; an earlier
-same-day fix for a *worse* incident, concurrency=10 causing 16-18/20 calls
-to fail, had already dropped it to 4 — which turned out to still be wrong).
-Sequential-only means wall-clock time scales directly with call count, so
-the hosted site's scan was cut to a 5-prompt slice of `PROMPT_TEMPLATES`
-(20 calls total, same as before the model expansion) rather than growing to
-40 — proof-script keeps the full 10-prompt set since it isn't
-latency-constrained by a live browser tab. A scan now takes several minutes
-end to end; a Pro-plan monthly fair-use cap (`PRO_PLAN_MONTHLY_SCAN_LIMIT`,
-`_shared/plan.mts`) was added the same change since per-scan Perplexity
-cost also went up with the pricier model mix. A scan-complete email
-notification was also added the same day (`_shared/email.mts`,
-`sendScanCompleteEmail`, called from `run-scan-background.mts` after every
-scan finalizes, success or failure) via Resend's plain HTTP API — best-
-effort, a failed send is logged but never changes the scan's own
-already-persisted status. Sends from `scans@notifications.dizid.com` — this
-domain is registered and **DNS-verified with Resend** (`region: eu-west-1`;
-DKIM/MX/SPF records live on `dizid.com`'s Netlify-managed DNS zone),
-confirmed working end-to-end with a real delivered test email to a
-non-owner address the same day, not just the sandbox-restricted
-`onboarding@resend.dev` address.
-
-`RESEND_API_KEY`/`RESEND_FROM_EMAIL` are set on the Netlify site (see
-"Deployment" below) — `RESEND_API_KEY` is reused from an existing personal
-Resend account (also used by other unrelated Dizid projects), not a new
-account created for Foreground specifically.
+**Scan pipeline mechanics** — prompt/model counts, per-call timeouts, the
+concurrency-limit incident history, retry/backoff behavior, DB schema, and
+the scan-complete email — live in `shared/CLAUDE.md` (the `aivis-core.mjs`
+single source of truth) and `netlify/functions/CLAUDE.md`
+(`run-scan-background.mts` + DB schema). Read those when touching the scan
+pipeline; this always-loaded root file no longer restates that detail
+(trimmed 2026-08-20 via `/doctor` — it had grown substantially redundant
+with both nested files by then).
 
 ## Deployment
 
@@ -180,8 +96,11 @@ account created for Foreground specifically.
 - Env vars on the Netlify site (all non-secret, per standing rule):
   `PERPLEXITY_API_KEY`, `DATABASE_URL` (Neon pooled connection string),
   `NEON_AUTH_JWKS_URL`, `RESEND_API_KEY`/`RESEND_FROM_EMAIL` (added
-  2026-08-13, scan-complete email, sending domain DNS-verified same day —
-  see "Update 2026-08-13" note above). `SCAN_PASSPHRASE` was removed
+  2026-08-13, scan-complete email — see `netlify/functions/CLAUDE.md`'s
+  `run-scan-background.mts` entry for the Resend/DNS-verification detail;
+  `RESEND_API_KEY` is reused from an existing personal Resend account also
+  used by other Dizid projects, not a new account created for Foreground).
+  `SCAN_PASSPHRASE` was removed
   2026-08-03 (Milestone 8 cleanup) once nothing in code referenced it
   anymore. `ANTHROPIC_API_KEY`/`GOOGLE_API_KEY`/`XAI_API_KEY` added
   2026-08-15 for the direct-provider migration (see "Multi-provider model

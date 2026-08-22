@@ -1,5 +1,39 @@
 # TODOs
 
+## STATUS 2026-08-20: Auto-judge sentiment on every scan — SHIPPED; mobile QA pass documented, fixes not yet built
+
+**Shipped:** the sentiment judge (Milestone F of `PLAN_NEXT_PHASE.md`, live
+since 2026-08-15 as an on-demand per-check button) now also runs
+automatically. `run-scan-background.mts` auto-judges every check where the
+brand was actually mentioned right after the main 20-call loop finishes,
+bounded to whatever's left of `SCAN_DEADLINE_MS` (not a fresh budget) so a
+slow scan just auto-judges fewer checks rather than repeating either of the
+two past concurrency incidents. The manual "Judge sentiment" button is
+unchanged and stays as the fallback for whatever the automatic pass didn't
+reach, plus manual re-judging. `ScanDetail.vue`'s Overview tab gained a
+compact sentiment-classification summary row so this is visible without
+opening the Details tab. See `shared/CLAUDE.md`'s "Sentiment judge" entry
+for the full detail; `PLAN_NEXT_PHASE.md`'s Milestone F is now marked
+shipped.
+
+**Not shipped, documented as a handoff plan:** Marc ran a mobile QA pass
+(Android Chrome) over 2026-08-19 and 2026-08-20 on the marketing site,
+`how-it-works.html`, and the authenticated app, marking up screenshots. The
+7 annotated issues were researched (root causes traced, two items
+clarified directly with Marc) and written up as `QA-FIXES-PLAN.md`
+(untracked at repo root) — deliberately left as a plan rather than
+implemented, since another session was mid-implementation on unrelated work
+when this was written. Headline items: a real mobile nav-collision CSS bug
+on `index.html` (`nav.top` has zero `@media` treatment below ~640px); a
+"Failed to fetch" error on "Run new scan" that's a frontend polling
+UX gap in `CompanyDetailView.vue`'s `pollScan()` (retries exhaust without
+re-syncing to the server, root cause needs live Netlify log access to fully
+confirm); a docs gap where `how-it-works.html` doesn't mention the
+sentiment-judge feature exists; and a confirmed follow-up to migrate
+`gpt-5-mini` off the Perplexity gateway onto a direct OpenAI API key,
+matching the anthropic/google/xai pattern. Full detail, root-cause tracing,
+and suggested shipping order in `QA-FIXES-PLAN.md` itself.
+
 ## STATUS 2026-08-19: Harmonia (technical/SEO audit) + report Overview/Details tabs — SHIPPED
 
 **Trigger:** Marc asked for "massive improvements" — technical/SEO analysis

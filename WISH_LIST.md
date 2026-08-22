@@ -64,7 +64,8 @@ about worst-case latency, not measured — which turned out to matter: a live
 smoke test found Perplexity's real per-key concurrency limit is ~1, not the
 10 (then 4) this item's numbers assumed. `CONCURRENCY_LIMIT` is now `1`
 (fully sequential) and `SCAN_DEADLINE_MS` is `600000` (10 min) — see
-`CLAUDE.md`'s "Update 2026-08-13" note and `run-scan-background.mts` for
+`shared/CLAUDE.md`'s "Update 2026-08-13" note (moved there from root
+`CLAUDE.md` on 2026-08-20 via `/doctor`) and `run-scan-background.mts` for
 the full writeup. Tracked as Milestone C in `PLAN_NEXT_PHASE.md`, now
 shipped. Trade-off this surfaced: scans now take 5-8 minutes wall-clock
 (sequential, no parallelism to hide call count behind) — a scan-complete

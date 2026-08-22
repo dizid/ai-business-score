@@ -21,7 +21,19 @@ reference for later — the technical detail lives in `CLAUDE.md`.
    for manual review), warnings if the brand name was too generic to detect
    reliably or if some checks failed.
 
-## The score formula
+## The score formula — STALE, formula changed since this was written
+
+**This section describes the 2026-07-29 formula, which is no longer what
+the app computes.** `computeScore` (`shared/aivis-core.mjs`) was overhauled
+to weight each completed call by rank (ranked-1 counts fully, ranked-2 60%,
+ranked-3 30%, mentioned-but-unranked 10%) multiplied by that prompt's
+query-intent weight (high-intent "buying" prompts count 3x an informational
+one) — see `shared/CLAUDE.md`'s "Score" entry for the exact current
+formula. The scan also now computes a **separate, secondary "Harmonia"
+technical/SEO score** (shipped 2026-08-19, `shared/harmonia.mjs`) — never
+blended into the AI Visibility Score below, shown alongside it on the
+Overview tab. Kept below as historical record of the 2026-07-29 formula,
+not current fact:
 
 ```
 score = round(100 × (timesRankedFirst + 0.4 × timesBeatenButMentioned) / totalChecksCompleted)

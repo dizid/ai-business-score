@@ -8,7 +8,7 @@
 | B — Remove leaderboard + multi-URL | **Shipped**, pushed to `master`. |
 | C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13**, confirmed live in production 2026-08-14 via a real end-to-end scan — but that same live scan found a new cascading-timeout reliability gap (15/20 calls lost on one scan), not yet fixed. See `TODOS.md`'s 2026-08-14 entry and Milestone C below. C3 (locale-aware prompts) not started. |
 | D — Product depth & trust surfaces | **D3 (footer/legal) and D4 (technical SEO) shipped.** D1 (raw data — likely already satisfied by A3, needs Marc's confirmation) and D2 (competitor click-through) not started. |
-| F — Differentiation | Not started — deliberately deferred this round (needs live API exploration + calibration, shouldn't be rushed). |
+| F — Differentiation | **Both picks shipped** (row updated 2026-08-20). Citation-URL attribution shipped 2026-08-15 (Milestone F1). Sentiment-aware judge shipped 2026-08-15 as on-demand-only, then extended 2026-08-20 to auto-run on every scan — see `shared/CLAUDE.md`'s "Sentiment judge" entry for the full history. |
 | E — Monetization | Not started. E0 (manual sales test) is Marc's task, not engineering — see "The assignment" below. |
 | G — Growth loop | Not started, gated on E0. |
 
@@ -319,32 +319,32 @@ Marc's call, logged for later prioritization rather than fixed inline.
    wasn't among the 15 images provided — if it has requirements beyond this
    audit, share it and it'll get folded in before this milestone ships.*
 
-### Milestone F — Differentiation (before Milestone E0 — strengthens the report being tested) — not started
+### Milestone F — Differentiation (before Milestone E0 — strengthens the report being tested) — ✅ SHIPPED 2026-08-15, extended 2026-08-20
 
 An office-hours pass on this plan (see "Competitive landscape" above) found
 the real gap: detection is presence-only regex, and Perplexity's responses
 already carry citation data the app captures and throws away. Two picks
-from that pass, both selected to ship now rather than deferred:
+from that pass, both shipped:
 
-1. **Citation-URL attribution**: Perplexity's `web_search`-grounded
-   responses return source citations — capture that array (currently
-   discarded once `aggregateProspect` returns) and match cited URLs against
-   the scanned company's own domain. When a match exists, advice can point
-   at the exact page the AI drew from instead of generic guidance. Persist
-   alongside `raw_responses` (same migration as Milestone A3's `failures`
-   column, additive).
-2. **Semantic/sentiment-aware citation judge**: replace the whole-word
-   regex presence check with a second LLM pass that classifies each brand
-   mention — recommended, neutral, negative, or comparison-only — instead
-   of a boolean. Implement this as an extension of Milestone A1's detection
-   fix, not a parallel detection path: a judge reading context for meaning
-   doesn't need a length-based ambiguity heuristic at all, so this
-   subsumes A1 rather than sitting beside it. Needs a small calibration
-   pass (a handful of hand-labeled example responses, checked for
-   agreement) before it's trusted live — same discipline as adding a new
-   model in Milestone C.
+1. **Citation-URL attribution** — ✅ shipped 2026-08-15. Perplexity's
+   `web_search`-grounded responses return source citations; `aggregateProspect`
+   now matches cited URLs against the scanned company's own domain into
+   `ownSiteCitations`, surfaced in `ScanDetail.vue` as a "Your site, cited"
+   section plus a per-check "Sources:" line. See `shared/CLAUDE.md`'s
+   "Citation-URL attribution" entry.
+2. **Semantic/sentiment-aware citation judge** — ✅ shipped 2026-08-15 as
+   **on-demand-only** (a manual "Judge sentiment" button per check,
+   calibrated against 5 hand-labeled examples, 5/5 agreement, before
+   shipping). **Extended 2026-08-20**: `run-scan-background.mts` now
+   auto-judges every mentioned check automatically right after the main
+   20-call loop, bounded to whatever's left of `SCAN_DEADLINE_MS`; the
+   manual button stays as the fallback for anything the auto-pass misses.
+   `ScanDetail.vue`'s Overview tab shows a compact classification-count
+   summary. See `shared/CLAUDE.md`'s "Sentiment judge" entry for the full
+   history and reasoning (including why auto-judging was deliberately held
+   back for 5 days after the manual version shipped).
 
-Both ship before Milestone E0: a report backed by page-specific,
+Both shipped before Milestone E0: a report backed by page-specific,
 sentiment-aware findings is a stronger thing to ask €499 for than a
 regex-presence count, which directly raises the odds the manual validation
 test converts.
@@ -380,7 +380,8 @@ same-day: `PRO_PLAN_MONTHLY_SCAN_LIMIT = 20` (chosen low, per Marc's
 explicit instruction, rather than the 50 originally proposed here) added to
 `_shared/plan.mts`, reusing the exact counting-query pattern `scan.mts`
 already uses for the free-tier limit (`FREE_PLAN_SCAN_LIMIT`) — see
-`CLAUDE.md`'s "Update 2026-08-13" note.
+`shared/CLAUDE.md`'s "Update 2026-08-13" note (moved there from root
+`CLAUDE.md` on 2026-08-20 via `/doctor`).
 
 **E0 — Validate before building (do this first, before E1-E4).** A quick
 office-hours pass on this plan surfaced the one real gap: the €499/$299

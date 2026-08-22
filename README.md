@@ -60,34 +60,47 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
    to HTTP 429) and polls every 2s. The status line will say "Queued…" then
    "Running checks (~5-8 min)…". A scan-complete notification (so you don't
    have to sit and watch this) is planned but not yet built.
-4. **Check the result** — score ring, scoreboard (your brand vs.
-   competitors), advice cards, a check-by-check breakdown grouped by
-   prompt (per-model raw text, expandable), and — **since 2026-08-12** — a
-   list of exactly which prompt/model failed and why, if any did, instead
-   of just an aggregate count. **Some calls failing is normal, not a
-   bug** — see "Known quirks" below.
-5. **Generate deep advice** — the "Generate deeper advice" button on a
+4. **Check the result** — an **Overview tab** (since 2026-08-19) with the
+   score ring, scoreboard (your brand vs. competitors), advice cards, a
+   compact sentiment-classification summary (since 2026-08-20 — see point 5
+   below), and the secondary "Harmonia" technical/SEO score (also since
+   2026-08-19, its own 4-pillar breakdown — schema/JSON-LD, crawlability,
+   Core Web Vitals, security headers — never blended into the main AI
+   Visibility Score); and a **Details tab** with the check-by-check
+   breakdown grouped by prompt (per-model raw text, expandable) inside
+   collapsible sections, and — **since 2026-08-12** — a list of exactly
+   which prompt/model failed and why, if any did, instead of just an
+   aggregate count. **Some calls failing is normal, not a bug** — see
+   "Known quirks" below.
+5. **Sentiment classification** — **since 2026-08-20**, every check where
+   your brand was actually mentioned gets auto-classified (recommended /
+   neutral / negative / comparison-only) right after the scan finishes, no
+   extra click needed — summarized on the Overview tab, with the full
+   per-check badges on the Details tab. A manual "Judge sentiment" button
+   (shipped 2026-08-15) still appears on any check the automatic pass
+   didn't reach in time, or to re-judge one.
+6. **Generate deep advice** — the "Generate deeper advice" button on a
    completed scan. This is a second, on-demand live Perplexity call
    (another 15-20s wait) — only trigger it a few times while testing, it
    roughly doubles the Perplexity spend for that scan. Free for any
    signed-in owner today — not yet plan-gated (see `CLAUDE.md`'s Billing
    section).
-6. **Run a second scan on the same company** — once you have 2+ scans,
+7. **Run a second scan on the same company** — once you have 2+ scans,
    `CompanyProgressChart.vue` renders a score-over-time line on the
    company detail page. With only 1 scan, no chart shows (by design — a
    single point isn't a trend).
-7. **Log out / log back in** — confirm the session round-trips and you
+8. **Log out / log back in** — confirm the session round-trips and you
    land back on `/app`, not stuck on a blank page.
-8. **Check the footer** — every `/app/*` page (added 2026-08-12) has a
+9. **Check the footer** — every `/app/*` page (added 2026-08-12) has a
    footer linking to `/app/privacy`, `/app/terms`, `/app/how-it-works`, and
    Dizid's site. Click through all three — they're real static content,
    not placeholders.
-9. **Legacy link check (optional)** — `result.html#d=<encoded>` still
+10. **Legacy link check (optional)** — `result.html#d=<encoded>` still
    renders old pre-2026-08-03 shareable links client-side, no login, no
    API call. There's no way to generate a *new* one of these anymore
    (see `CLAUDE.md` if you're wondering why) — this step just confirms
    old links weren't broken by later changes.
-10. **Confirm removed features stay removed** — `/app/leaderboard` should
+11. **Confirm removed features stay removed** — `/app/leaderboard` should
     resolve to nothing (deleted 2026-08-12); a company's detail page should
     show no "+ Add URL" / multi-URL chip selector and no public-leaderboard
     toggle (also removed 2026-08-12).
@@ -101,7 +114,8 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
   is normal; occasional failures don't invalidate the score.
 - **Scans take 5-8 minutes, not under a minute** (since 2026-08-13). This
   is a deliberate reliability tradeoff, not a regression to "fix" by
-  raising concurrency back up — see `CLAUDE.md`'s "Update 2026-08-13" note.
+  raising concurrency back up — see `shared/CLAUDE.md`'s "Update 2026-08-13"
+  note (moved there from root `CLAUDE.md` on 2026-08-20 via `/doctor`).
 - **Score shows "unavailable", never a fake 0**, if every call in a scan
   failed. A 0 always means "genuinely invisible," never "the API broke."
 - **Brand names that are actual common words** (e.g. "Best", "Pro") get

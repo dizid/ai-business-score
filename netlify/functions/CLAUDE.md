@@ -225,7 +225,17 @@ gap this update fixes rather than something built this session.
   the LLM calls) as a promise alongside `runWithConcurrency(...)`, awaited
   just before the final `UPDATE`, its own `psiApiKey` resolved from
   `GOOGLE_PAGESPEED_API_KEY` (falls back to reusing `apiKeys.google` if
-  unset) — see `harmonia` column entry above.
+  unset) — see `harmonia` column entry above. Also calls
+  `sendScanCompleteEmail` (`_shared/email.mts`, added 2026-08-13) after
+  every scan finalizes, success or failure, via Resend's plain HTTP API —
+  best-effort, a failed send is logged but never changes the scan's own
+  already-persisted status. Sends from `scans@notifications.dizid.com`,
+  DNS-verified with Resend (`region: eu-west-1`; DKIM/MX/SPF records live
+  on `dizid.com`'s Netlify-managed DNS zone) — confirmed working
+  end-to-end with a real delivered test email to a non-owner address the
+  same day it shipped, not just the sandbox-restricted
+  `onboarding@resend.dev` address. (Migrated here from root `CLAUDE.md` on
+  2026-08-20 via `/doctor`.)
 - **`scan-status.mts`** — GET `/scans/:id`, auth + ownership-scoped (join
   through `companies`), polled by the frontend. Returns `progress` (the
   live `{completed, total, currentModel}` object, added 2026-08-17)
