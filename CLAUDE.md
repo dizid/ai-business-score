@@ -116,7 +116,15 @@ with both nested files by then).
   Live-verified against the real API before being set, then a fresh manual
   deploy triggered (via Netlify MCP) to make sure this specific deploy's
   function config actually includes it, not just an assumption from the
-  next auto-deploy.
+  next auto-deploy. `STRIPE_SECRET_KEY`/`STRIPE_PRICE_ID`/
+  `STRIPE_WEBHOOK_SECRET` (Pro subscription billing, shipped commit
+  `5f47127`) were missing from this list until now — a pre-existing doc gap
+  backfilled here, not a change to the vars themselves. **Added
+  2026-08-23, not yet set:** `STRIPE_TOPUP_PRICE_ID` — a new one-time
+  ($19) Stripe Price for Pro scan top-up packs (see
+  `netlify/functions/CLAUDE.md`'s "Billing (Stripe)" section); until this
+  is created in the Stripe dashboard and set, `create-topup-checkout-session.mts`
+  500s with "Server misconfigured."
 
 ## Commands
 

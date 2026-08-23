@@ -213,7 +213,11 @@ The single source of truth, imported by every consumer:
   it, unlimited times, regardless of plan. Gating it behind Pro/a one-time
   report purchase is Milestone E of `PLAN_NEXT_PHASE.md`, not yet built —
   deliberately deferred until Marc's manual outbound sales test (Milestone
-  E0) shows someone will actually pay for it. `buildDeepAdvicePrompt`
+  E0) shows someone will actually pay for it. Not to be confused with the
+  unrelated one-time SKU that **did** ship 2026-08-23 — Pro scan top-up
+  packs (`scan_credit_purchases`, see `netlify/functions/CLAUDE.md`'s
+  "Billing (Stripe)" section) extend the monthly *scan count* cap, they
+  don't touch deep-advice access at all. `buildDeepAdvicePrompt`
   grounds the prompt in the actual scan data (citation rate, competitor
   tallies) rather than generic SEO advice; `parseDeepAdviceResponse`
   follows the same lenient-JSON-extraction, always-safe-shape pattern as

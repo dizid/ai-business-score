@@ -110,6 +110,22 @@ See the root `CLAUDE.md` for overall project context.
   it's a pure additive migration — the opposite case from `is_public`/
   `company_urls` above, which are dead columns from a *removed* feature;
   this one is prep for a feature that hasn't been built yet.
+- **`scan_credit_purchases`** — added 2026-08-23, backs Pro scan top-up
+  packs (see "Billing (Stripe)" below). `user_id` FK to `user_profiles`,
+  `credits integer` (granted amount, stored per-row rather than inferred
+  from a shared constant so a future pack-size/price change never corrupts
+  historical accounting), `stripe_checkout_session_id text unique` (the
+  idempotency guard against Stripe's at-least-once webhook delivery —
+  insert uses `ON CONFLICT ... DO NOTHING`), `stripe_payment_intent_id`,
+  `amount_cents`, `purchased_at timestamptz default now()`. Insert-only,
+  never updated/decremented — "credits available" is always a `SUM()` over
+  a rolling 2-calendar-month window (`purchased_at >= date_trunc('month',
+  now()) - interval '1 month'`), computed fresh on every `/scan` call, same
+  pattern `scan.mts` already used for the scan count itself. Deliberately
+  not a lifetime rollover: `PRO_PLAN_MONTHLY_SCAN_LIMIT` didn't exist
+  before 2026-08-13, so inferring historical overage from `scans` would
+  misfire for any Pro user active before that date — this table only ever
+  looks at its own `purchased_at`, never at scan history.
 
 Schema and Neon Auth were provisioned via the Neon MCP tools
 (`create_project`, `provision_neon_auth`, `prepare_database_migration` →
@@ -162,27 +178,58 @@ Shipped in commit `5f47127` — not documented here until now, a pre-existing
 gap this update fixes rather than something built this session.
 
 - **`_shared/plan.mts`** — `FREE_PLAN_COMPANY_LIMIT = 1`,
-  `FREE_PLAN_SCAN_LIMIT = 3`, `isPro(planTier)`. Centralized so limits are
-  tunable in one place instead of scattered magic numbers.
+  `FREE_PLAN_SCAN_LIMIT = 3` (lifetime), `PRO_PLAN_MONTHLY_SCAN_LIMIT = 20`
+  (calendar-month fair-use cap, added 2026-08-13 — see `scan.mts`'s entry
+  below), `isPro(planTier)`. Added 2026-08-23: `SCAN_CREDIT_PACK_SIZE = 10`,
+  `SCAN_CREDIT_PACK_PRICE_USD = 19`, `MAX_CREDIT_PACKS_PER_MONTH = 3` for
+  the scan top-up feature below. Centralized so limits are tunable in one
+  place instead of scattered magic numbers.
 - **`_shared/stripe.mts`** — cached Stripe singleton reading
   `STRIPE_SECRET_KEY`.
 - **`create-checkout-session.mts`** — POST, auth-gated. Creates a Stripe
   Checkout session, `mode: 'subscription'` (real recurring billing, not a
   one-time charge), rejects if already Pro.
+- **`create-topup-checkout-session.mts`** — added 2026-08-23, POST,
+  auth-gated. Mirrors `create-checkout-session.mts`'s shape but
+  `mode: 'payment'` (one-time, not recurring) against a separate
+  `STRIPE_TOPUP_PRICE_ID` Price. Rejects non-Pro callers (400 — top-ups
+  extend the Pro cap, they don't substitute for the Pro upgrade) and
+  callers who've already bought `MAX_CREDIT_PACKS_PER_MONTH` packs this
+  calendar month. `metadata: { type: 'scan_credit_pack', credits }` on the
+  Checkout session is how the webhook (below) tells this apart from a
+  subscription checkout.
 - **`stripe-webhook.mts`** — POST, deliberately *not* `requireAuth` (Stripe
   signs the raw body itself, verified via `STRIPE_WEBHOOK_SECRET`).
-  `checkout.session.completed` sets `plan_tier='pro'` on `user_profiles`;
+  `checkout.session.completed` sets `plan_tier='pro'` on `user_profiles`
+  for a subscription session; **added 2026-08-23**: the same event type,
+  when `session.mode === 'payment'` and `metadata.type ===
+  'scan_credit_pack'`, instead inserts a `scan_credit_purchases` row
+  (idempotent via `ON CONFLICT (stripe_checkout_session_id) DO NOTHING`) —
+  checked first, before falling through to the subscription-handling code.
   `customer.subscription.updated`/`.deleted` sync `subscription_status` and
   flip back to `'free'` if the subscription is no longer active/trialing.
-- **What Pro actually gates today**: only two quantity limits, both via
-  `isPro()` — `scan.mts` (3 scans total on Free) and `companies.mts` (1
-  company on Free), both returning a `402 {error, upgradeRequired, limit}`
-  the frontend renders as an inline "Upgrade to Pro" CTA
-  (`CompaniesListView.vue`/`CompanyDetailView.vue`). **Nothing else is
-  plan-gated** — deep advice is free for anyone today (see `shared/CLAUDE.md`
-  's "Deep advice" section), and the Pro price itself is still unset in
-  both Stripe and the landing page copy (`index.html`'s pricing card
-  intentionally says "One flat price /month" — not finalized).
+- **What Pro actually gates today**: `scan.mts` (3 scans lifetime on Free,
+  20/calendar-month fair-use on Pro — extendable via top-up packs, see
+  below) and `companies.mts` (1 company on Free), both returning a
+  `402 {error, upgradeRequired, limit}` the frontend renders as an inline
+  "Upgrade to Pro" CTA (`CompaniesListView.vue`/`CompanyDetailView.vue`).
+  The Pro-cap 402 additionally returns `topupAvailable` (added 2026-08-23)
+  so `CompanyDetailView.vue` can render a "Buy more scans" CTA instead once
+  a Pro user is capped. **Nothing else is plan-gated** — deep advice is
+  free for anyone today (see `shared/CLAUDE.md`'s "Deep advice" section),
+  and the Pro subscription price itself is still unset in both Stripe and
+  the landing page copy (`index.html`'s pricing card intentionally says
+  "One flat price /month" — not finalized).
+- **Scan top-up packs** (added 2026-08-23) — Pro users who hit the
+  monthly cap can buy a one-time $19/10-scan pack instead of waiting for
+  the reset. See the `scan_credit_purchases` schema entry above for the
+  accounting model (insert-only, rolling 2-month window, no decrementing
+  balance). **Not yet fully live**: `STRIPE_TOPUP_PRICE_ID` has not been
+  created in Stripe/set as an env var yet (see root `CLAUDE.md`'s
+  Deployment section) — until it is, `create-topup-checkout-session.mts`
+  500s. This is a distinct SKU from the still-unbuilt one-time report
+  purchase below — same architectural shape (separate one-time Stripe
+  Price + additive purchases table), different product.
 - **Not yet built**: a one-time "Full AI Visibility Report" purchase SKU
   (separate from the subscription) and gating deep advice behind
   Pro-or-purchased — both are Milestone E of `PLAN_NEXT_PHASE.md`, gated on
@@ -208,8 +255,11 @@ gap this update fixes rather than something built this session.
   synchronous-request timeout budget. Free-tier callers are capped at
   `FREE_PLAN_SCAN_LIMIT` (lifetime); Pro callers are capped at
   `PRO_PLAN_MONTHLY_SCAN_LIMIT` (calendar-month, added 2026-08-13 alongside
-  the model expansion — see `_shared/plan.mts`) — both 402 with a plain
-  `error` message, only the free-tier one sets `upgradeRequired: true`.
+  the model expansion — see `_shared/plan.mts`), **extended 2026-08-23** to
+  add any purchased `scan_credit_purchases` credits to that limit before
+  gating — both cases 402 with a plain `error` message; free-tier sets
+  `upgradeRequired: true`, the Pro-cap case sets `topupAvailable` instead
+  (see "Billing (Stripe)" above).
 - **`run-scan-background.mts`** — the actual 20-call scan (a 5-prompt slice
   × 4 models, updated 2026-08-13 — this bullet previously said "10 prompts
   × 2 models," stale since that date's model expansion) (`-background`

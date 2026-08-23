@@ -383,6 +383,19 @@ already uses for the free-tier limit (`FREE_PLAN_SCAN_LIMIT`) — see
 `shared/CLAUDE.md`'s "Update 2026-08-13" note (moved there from root
 `CLAUDE.md` on 2026-08-20 via `/doctor`).
 
+**Adjacent, unplanned, but shipped — Pro scan top-up packs. ✅ SHIPPED
+2026-08-23.** Not part of this milestone's original scope and not gated on
+E0 (triggered instead by a CEO screenshot of a Pro user hitting the
+fair-use cap above with no CTA at all) — but worth flagging here since it
+reuses this milestone's exact E1 shape (a new one-time Stripe Price, a new
+additive purchases table, a new webhook case) for a different product: a
+$19/10-scan pack, extending `PRO_PLAN_MONTHLY_SCAN_LIMIT` rather than
+unlocking a report. See `netlify/functions/CLAUDE.md`'s "Billing (Stripe)"
+section for the implementation and `scan_credit_purchases` for the schema.
+**Does not fulfill or replace E0-E4 below** — the one-time report SKU and
+deep-advice gating remain not started, still gated on the same manual
+sales test.
+
 **E0 — Validate before building (do this first, before E1-E4).** A quick
 office-hours pass on this plan surfaced the one real gap: the €499/$299
 one-time report and the paid deep-advice unlock are inferred from Marc's

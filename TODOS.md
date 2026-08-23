@@ -1,5 +1,35 @@
 # TODOs
 
+## STATUS 2026-08-23: Pro scan top-up packs — SHIPPED, but not yet live (Stripe Price not created)
+
+Triggered by a CEO screenshot: a Pro user hitting the 20-scans/month
+fair-use cap saw a dead end, no CTA at all (`scan.mts`'s Pro branch never
+set `upgradeRequired`, since there was nothing to upsell to). Shipped same
+session, commit `cad4a34`: a one-time $19/10-scan top-up pack, Pro-only,
+deliberately kept generic (no agency/team-specific segment — CEO explicitly
+scoped that out). New `scan_credit_purchases` table (insert-only, rolling
+2-calendar-month credit window, no decrementing balance), new
+`create-topup-checkout-session.mts` (`mode: payment`, capped at 3
+packs/user/month as a shared-infrastructure guardrail on the
+single-concurrency Perplexity lane), a new webhook branch in
+`stripe-webhook.mts`, and a "Buy more scans" CTA + purchase-return banner
+in `CompanyDetailView.vue`. Also fixed four places where "Pro = unlimited
+scans" copy had gone stale since the cap shipped 2026-08-13 (`index.html`
+x3, `terms.html`, `BillingSuccessView.vue`, `llms.txt`) — `terms.html`
+also gained language covering top-up non-refundability and
+forfeiture-on-downgrade, which it previously said nothing about. Full
+design record: `~/.claude/plans/analyze-this-we-need-radiant-token.md`.
+Doc detail: `netlify/functions/CLAUDE.md`'s "Billing (Stripe)" section and
+the `scan_credit_purchases` schema entry; cross-referenced from
+`PLAN_NEXT_PHASE.md`'s Milestone E (this is *not* that milestone — the
+still-unbuilt one-time report SKU and deep-advice gating are unaffected).
+
+**Not yet live**: `STRIPE_TOPUP_PRICE_ID` doesn't exist yet — needs a new
+$19 one-time Stripe Price created (test mode first) and set as a Netlify
+env var before "Buy more scans" does anything but 500. No real test-mode
+Checkout has been run end-to-end. See root `CLAUDE.md`'s Deployment
+section.
+
 ## STATUS 2026-08-20: Auto-judge sentiment on every scan — SHIPPED; mobile QA pass documented, fixes not yet built
 
 **Shipped:** the sentiment judge (Milestone F of `PLAN_NEXT_PHASE.md`, live
