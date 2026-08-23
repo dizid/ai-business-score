@@ -293,8 +293,11 @@ export default async (req: Request) => {
       await db`
         UPDATE public.scans
         SET progress = jsonb_set(
-          jsonb_set(coalesce(progress, '{}'::jsonb), '{completed}', to_jsonb(coalesce((progress->>'completed')::int, 0) + ${increment})),
-          '{currentModels}', ${JSON.stringify(Array.from(inFlightModels))}::jsonb
+          jsonb_set(
+            jsonb_set(coalesce(progress, '{}'::jsonb), '{completed}', to_jsonb(coalesce((progress->>'completed')::int, 0) + ${increment})),
+            '{currentModels}', ${JSON.stringify(Array.from(inFlightModels))}::jsonb
+          ),
+          '{total}', to_jsonb(${tasks.length})
         )
         WHERE id = ${scanId}
       `;
