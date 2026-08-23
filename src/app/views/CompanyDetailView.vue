@@ -34,6 +34,9 @@ const scanStatus = ref('');
 const scanError = ref('');
 const scanUpgradeRequired = ref(false);
 const upgrading = ref(false);
+const scanTopupAvailable = ref(false);
+const toppingUp = ref(false);
+const topupBanner = ref<'success' | 'cancelled' | ''>('');
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
 const deepAdviceLoading = ref(false);
@@ -146,6 +149,7 @@ async function runNewScan() {
   scanning.value = true;
   scanError.value = '';
   scanUpgradeRequired.value = false;
+  scanTopupAvailable.value = false;
   scanStatus.value = 'Starting scan…';
   try {
     const res = await authFetch('/scan', {
@@ -157,6 +161,7 @@ async function runNewScan() {
     if (!data.ok) {
       scanError.value = data.error || 'Failed to start scan.';
       scanUpgradeRequired.value = !!data.upgradeRequired;
+      scanTopupAvailable.value = !!data.topupAvailable;
       scanning.value = false;
       return;
     }
@@ -184,6 +189,31 @@ async function startCheckout() {
   } catch (err) {
     scanError.value = (err as Error).message;
     upgrading.value = false;
+  }
+}
+
+// Same shape as startCheckout above — kept duplicated rather than shared,
+// matching this codebase's convention of copy-pasted per-file auth/billing
+// calls over a shared abstraction.
+async function startTopupCheckout() {
+  if (!company.value) return;
+  toppingUp.value = true;
+  try {
+    const res = await authFetch('/create-topup-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_id: company.value.id }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      scanError.value = data.error || 'Failed to start checkout.';
+      toppingUp.value = false;
+      return;
+    }
+    window.location.href = data.url;
+  } catch (err) {
+    scanError.value = (err as Error).message;
+    toppingUp.value = false;
   }
 }
 
@@ -272,6 +302,18 @@ onMounted(async () => {
     delete cleanedQuery.autoscan;
     router.replace({ query: cleanedQuery });
   }
+  // Landed back here from a top-up Checkout redirect (?topup=success or
+  // ?topup=cancelled) — same strip-after-read pattern as ?autoscan above.
+  // Deliberately not routed through BillingSuccessView.vue: its poll-until
+  // plan_tier==='pro' logic would resolve instantly for an already-Pro user
+  // regardless of whether the webhook actually landed, so it's the wrong
+  // tool for confirming a top-up purchase.
+  if (route.query.topup === 'success' || route.query.topup === 'cancelled') {
+    topupBanner.value = route.query.topup;
+    const cleanedQuery = { ...route.query };
+    delete cleanedQuery.topup;
+    router.replace({ query: cleanedQuery });
+  }
 });
 onUnmounted(stopPolling);
 watch(() => route.params.id, load);
@@ -297,6 +339,14 @@ watch(() => route.params.id, load);
           <p class="sub">{{ company.category }} · {{ company.website }}</p>
         </div>
         <div class="scan-trigger">
+          <div class="scan-status topup-banner" v-if="topupBanner === 'success'">
+            Purchase received — your extra scans are ready.
+            <button type="button" class="dismiss" @click="topupBanner = ''">Dismiss</button>
+          </div>
+          <div class="scan-status" v-else-if="topupBanner === 'cancelled'">
+            Checkout cancelled — no charge was made.
+            <button type="button" class="dismiss" @click="topupBanner = ''">Dismiss</button>
+          </div>
           <button type="button" :disabled="scanning" @click="runNewScan">
             {{ scanning ? 'Scanning…' : 'Run new scan' }}
           </button>
@@ -305,6 +355,9 @@ watch(() => route.params.id, load);
             {{ scanError }}
             <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="upgrading" @click="startCheckout">
               Upgrade to Pro
+            </button>
+            <button type="button" class="inline-upgrade" v-if="scanTopupAvailable" :disabled="toppingUp" @click="startTopupCheckout">
+              Buy more scans
             </button>
           </div>
         </div>
@@ -391,6 +444,11 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
   border: 1px solid var(--critical); border-radius: 999px; background: transparent; color: var(--critical); cursor: pointer;
 }
 .inline-upgrade:disabled { opacity: 0.6; cursor: wait; }
+.topup-banner { color: var(--success-text); }
+.dismiss {
+  display: inline; margin-left: 6px; padding: 0; border: none; background: none;
+  color: inherit; text-decoration: underline; font-size: inherit; cursor: pointer;
+}
 
 .status.error { font-size: 0.9rem; color: var(--critical); }
 .empty { color: var(--muted); font-size: 0.9rem; }

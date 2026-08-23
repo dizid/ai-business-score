@@ -16,6 +16,21 @@ export const FREE_PLAN_SCAN_LIMIT = 3;
 // real usage pattern observed so far.
 export const PRO_PLAN_MONTHLY_SCAN_LIMIT = 20;
 
+// Pro top-up scan packs, added 2026-08-23 — Pro users who hit the fair-use
+// cap above can buy extra scans instead of just waiting for next month.
+// $19/10 leaves healthy margin over the ~$0.30-0.80/scan API cost noted
+// above, and lands close to competitor per-prompt pricing at their entry
+// tier (Otterly $29/15 ≈ $1.93, Peec AI $95/50 ≈ $1.90). Single pack size
+// for V1 — no tiered options.
+export const SCAN_CREDIT_PACK_SIZE = 10;
+export const SCAN_CREDIT_PACK_PRICE_USD = 19;
+
+// Cap on packs purchasable per calendar month — a shared-infrastructure
+// guardrail, not a margin one: run-scan-background.mts's openai/Perplexity
+// lane has a hard concurrency limit of 1 and three documented production
+// rate-limit incidents, so nothing should let one account monopolize it.
+export const MAX_CREDIT_PACKS_PER_MONTH = 3;
+
 export function isPro(planTier: string | null | undefined): boolean {
   return planTier === 'pro';
 }

@@ -5,6 +5,7 @@
 import type { Config } from '@netlify/functions';
 import { sql } from './_shared/db.mts';
 import { stripe } from './_shared/stripe.mts';
+import { SCAN_CREDIT_PACK_SIZE } from './_shared/plan.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
@@ -50,6 +51,31 @@ export default async (req: Request) => {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object;
+
+      // A Pro scan top-up pack (mode: 'payment') — distinct from the
+      // subscription checkout below (mode: 'subscription'). Both flags
+      // checked as belt-and-suspenders: mode alone is sufficient today
+      // since this is the only one-time SKU, but metadata.type is the
+      // durable disambiguator once a second one-time SKU exists (see
+      // PLAN_NEXT_PHASE.md's Milestone E report_purchases plan).
+      if (session.mode === 'payment' && session.metadata?.type === 'scan_credit_pack') {
+        const topupUserId = session.client_reference_id;
+        const credits = Number(session.metadata.credits) || SCAN_CREDIT_PACK_SIZE;
+        const paymentIntentId =
+          typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+        if (topupUserId) {
+          await db`
+            INSERT INTO public.scan_credit_purchases
+              (user_id, credits, stripe_checkout_session_id, stripe_payment_intent_id, amount_cents)
+            VALUES (${topupUserId}, ${credits}, ${session.id}, ${paymentIntentId ?? null}, ${session.amount_total ?? null})
+            ON CONFLICT (stripe_checkout_session_id) DO NOTHING
+          `;
+        } else {
+          console.error('checkout.session.completed (top-up) missing client_reference_id', event.id);
+        }
+        break;
+      }
+
       const userId = session.client_reference_id;
       const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
       const subscriptionId =

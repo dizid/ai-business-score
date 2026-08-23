@@ -45,7 +45,7 @@ onUnmounted(() => {
       </template>
       <template v-else-if="status === 'active'">
         <h1>You're on Pro 🎉</h1>
-        <p class="sub">Unlimited companies and scans are unlocked.</p>
+        <p class="sub">Unlimited companies and 20 scans a month are unlocked.</p>
         <router-link class="cta" to="/app">Go to your companies</router-link>
       </template>
       <template v-else>

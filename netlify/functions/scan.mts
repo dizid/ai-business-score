@@ -8,7 +8,14 @@
 import type { Config } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
-import { FREE_PLAN_SCAN_LIMIT, PRO_PLAN_MONTHLY_SCAN_LIMIT, isPro } from './_shared/plan.mts';
+import {
+  FREE_PLAN_SCAN_LIMIT,
+  PRO_PLAN_MONTHLY_SCAN_LIMIT,
+  SCAN_CREDIT_PACK_SIZE,
+  SCAN_CREDIT_PACK_PRICE_USD,
+  MAX_CREDIT_PACKS_PER_MONTH,
+  isPro,
+} from './_shared/plan.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 
 export default async (req: Request) => {
@@ -70,7 +77,7 @@ export default async (req: Request) => {
     if (count >= FREE_PLAN_SCAN_LIMIT) {
       return new Response(
         JSON.stringify({
-          error: `Free plan is limited to ${FREE_PLAN_SCAN_LIMIT} scans total. Upgrade to Pro for unlimited scans.`,
+          error: `Free plan is limited to ${FREE_PLAN_SCAN_LIMIT} scans total. Upgrade to Pro for ${PRO_PLAN_MONTHLY_SCAN_LIMIT} scans a month (with top-up packs available if you need more).`,
           upgradeRequired: true,
           limit: FREE_PLAN_SCAN_LIMIT,
         }),
@@ -79,20 +86,40 @@ export default async (req: Request) => {
     }
   } else {
     // Pro fair-use cap — monthly, not lifetime (see PRO_PLAN_MONTHLY_SCAN_LIMIT's
-    // comment in _shared/plan.mts). No upgradeRequired here — Pro is already
-    // the top tier, there's nothing to upsell, so the frontend's generic
-    // scanError display just shows a plain message without rendering an
-    // "Upgrade to Pro" CTA that would have nowhere to send the user.
+    // comment in _shared/plan.mts). Extended 2026-08-23 with top-up packs:
+    // purchased credits are additive to the base limit, valid for the
+    // calendar month bought in plus the following one (a fixed lookback
+    // window over scan_credit_purchases.purchased_at, never touching scans
+    // history — PRO_PLAN_MONTHLY_SCAN_LIMIT didn't exist before 2026-08-13,
+    // so inferring historical overage from scans would misfire for anyone
+    // active before that date).
     const [{ count }] = await db`
       SELECT count(*)::int AS count FROM public.scans s
       JOIN public.companies c ON c.id = s.company_id
       WHERE c.owner_user_id = ${userId} AND s.created_at >= date_trunc('month', now())
     `;
-    if (count >= PRO_PLAN_MONTHLY_SCAN_LIMIT) {
+    const [{ credits }] = await db`
+      SELECT COALESCE(SUM(credits), 0)::int AS credits
+      FROM public.scan_credit_purchases
+      WHERE user_id = ${userId}
+        AND purchased_at >= date_trunc('month', now()) - interval '1 month'
+    `;
+    const effectiveLimit = PRO_PLAN_MONTHLY_SCAN_LIMIT + credits;
+
+    if (count >= effectiveLimit) {
+      const [{ packsThisMonth }] = await db`
+        SELECT count(*)::int AS "packsThisMonth"
+        FROM public.scan_credit_purchases
+        WHERE user_id = ${userId} AND purchased_at >= date_trunc('month', now())
+      `;
+      const topupAvailable = packsThisMonth < MAX_CREDIT_PACKS_PER_MONTH;
       return new Response(
         JSON.stringify({
-          error: `Pro plan is limited to ${PRO_PLAN_MONTHLY_SCAN_LIMIT} scans per month (fair use) — resets at the start of next month.`,
-          limit: PRO_PLAN_MONTHLY_SCAN_LIMIT,
+          error: topupAvailable
+            ? `Pro plan is limited to ${effectiveLimit} scans this month (fair use) — buy ${SCAN_CREDIT_PACK_SIZE} more for $${SCAN_CREDIT_PACK_PRICE_USD}, or wait until next month's reset.`
+            : `You've already bought the maximum ${MAX_CREDIT_PACKS_PER_MONTH} top-up packs this month (${effectiveLimit} scans total, fair use) — resets at the start of next month.`,
+          limit: effectiveLimit,
+          topupAvailable,
         }),
         { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
       );
