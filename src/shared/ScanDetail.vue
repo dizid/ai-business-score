@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { scoreBand, PROMPT_LABELS } from '../../shared/aivis-core.mjs';
+import { scoreBand, PROMPT_LABELS, PROMPT_CATEGORIES } from '../../shared/aivis-core.mjs';
 import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceId, type Rank } from './scanPayload';
 import CollapsibleSection from './CollapsibleSection.vue';
 
@@ -72,6 +72,122 @@ const sentimentSummaryRows = computed<SentimentSummaryRow[]>(() => {
     count: counts.get(c)!,
   }));
 });
+
+// "Performance by query type" (Overview tab): computeScore already weights
+// each check by its prompt category (PROMPT_CATEGORIES: high-intent 3x,
+// comparison 2x, informational 1x, see aivis-core.mjs's DEFAULT_QUERY_WEIGHTS)
+// but that breakdown was never surfaced — the single 0-100 score and the
+// competitor bar chart don't explain *why* it's what it is (e.g. "strong on
+// high-intent queries, invisible on comparison queries"), leaving that
+// pattern only discoverable by reading the flat Details check-by-check list
+// by hand. Also folds in the sentiment mix per category (reusing
+// sentimentByKey above) rather than building a second, near-duplicate
+// breakdown just for that.
+const CATEGORY_LABEL: Record<string, string> = {
+  'high-intent': 'High-intent',
+  comparison: 'Comparison',
+  informational: 'Informational',
+};
+const CATEGORY_ORDER = ['high-intent', 'comparison', 'informational'] as const;
+interface CategoryRow {
+  category: string;
+  label: string;
+  total: number;
+  ranked1: number;
+  beaten: number;
+  notMentioned: number;
+  presencePct: number;
+  sentimentCounts: SentimentSummaryRow[];
+}
+const categoryBreakdown = computed<CategoryRow[]>(() => {
+  const byCategory = new Map<string, { rank: Rank; promptIndex: number; model: string }[]>();
+  props.payload.rawResponses.forEach((r, i) => {
+    const rank = props.payload.perPromptRank[i]?.rank ?? 'not-mentioned';
+    const category = PROMPT_CATEGORIES[r.promptIndex] ?? 'informational';
+    if (!byCategory.has(category)) byCategory.set(category, []);
+    byCategory.get(category)!.push({ rank, promptIndex: r.promptIndex, model: r.model });
+  });
+  return CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((category) => {
+    const entries = byCategory.get(category)!;
+    const total = entries.length;
+    const ranked1 = entries.filter((e) => e.rank === 'ranked-1').length;
+    const beaten = entries.filter((e) => ['ranked-2', 'ranked-3', 'mentioned', 'beaten'].includes(e.rank)).length;
+    const notMentioned = total - ranked1 - beaten;
+    const sentimentCounts = new Map<string, number>();
+    for (const e of entries) {
+      const s = sentimentByKey.value.get(sentimentKey(e.promptIndex, e.model));
+      if (s) sentimentCounts.set(s.classification, (sentimentCounts.get(s.classification) ?? 0) + 1);
+    }
+    return {
+      category,
+      label: CATEGORY_LABEL[category] ?? category,
+      total,
+      ranked1,
+      beaten,
+      notMentioned,
+      presencePct: total > 0 ? Math.round(((ranked1 + beaten) / total) * 100) : 0,
+      sentimentCounts: SENTIMENT_SUMMARY_ORDER.filter((c) => (sentimentCounts.get(c) ?? 0) > 0).map((c) => ({
+        classification: c,
+        label: SENTIMENT_LABEL[c],
+        count: sentimentCounts.get(c)!,
+      })),
+    };
+  });
+});
+
+// Sentiment-aware advice card (Overview tab): computed client-side, not
+// added to the server-side selectAdvice() output, because sentiment
+// judging finishes AFTER selectAdvice() runs in run-scan-background.mts,
+// and a user can also judge more checks later via the manual "Judge
+// sentiment" button in the Details tab — a client-side computed prop stays
+// live and correct in both cases without touching the scan-completion
+// backend code path at all. No threshold tuning: any negative or
+// comparison-only judgment is worth flagging, since presence-only detection
+// alone would have silently counted those same checks as a plain "cited."
+interface SentimentAdvice { unfavorable: number; negative: number; comparisonOnly: number; total: number; }
+const sentimentAdvice = computed<SentimentAdvice | null>(() => {
+  const judgments = props.payload.sentimentJudgments;
+  if (judgments.length === 0) return null;
+  const negative = judgments.filter((j) => j.classification === 'negative').length;
+  const comparisonOnly = judgments.filter((j) => j.classification === 'comparison-only').length;
+  const unfavorable = negative + comparisonOnly;
+  if (unfavorable === 0) return null;
+  return { unfavorable, negative, comparisonOnly, total: judgments.length };
+});
+
+// Mention highlighting (Details tab, check-by-check raw text): segment-based
+// rendering (not v-html) so there's no HTML-injection surface even though
+// the underlying text is raw, untrusted model output — matches on the
+// brand name plus every non-ambiguous competitor name (skipping
+// `ambiguous: true` entries, consistent with the existing detection-
+// ambiguity handling elsewhere in this file).
+const highlightTerms = computed<string[]>(() => {
+  const terms: string[] = [];
+  if (!props.payload.ambiguousBrandFlag) terms.push(props.payload.brand);
+  for (const c of props.payload.competitorTallies) {
+    if (!c.ambiguous) terms.push(c.name);
+  }
+  return terms;
+});
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+interface TextSegment { text: string; isMatch: boolean; }
+function highlightMentions(text: string, terms: string[]): TextSegment[] {
+  const cleaned = [...new Set(terms.filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (cleaned.length === 0) return [{ text, isMatch: false }];
+  const pattern = new RegExp(`\\b(${cleaned.map(escapeRegExp).join('|')})\\b`, 'gi');
+  const segments: TextSegment[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) segments.push({ text: text.slice(lastIndex, match.index), isMatch: false });
+    segments.push({ text: match[0], isMatch: true });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) segments.push({ text: text.slice(lastIndex), isMatch: false });
+  return segments;
+}
 
 const BAND_LABEL: Record<string, string> = {
   leading: 'Leading', visible: 'Visible, often beaten',
@@ -340,8 +456,32 @@ function formatSeconds(ms: number | null) {
         </div>
       </template>
 
+      <!-- performance by query type: the score model already weights each
+           check by category (high-intent/comparison/informational) — this
+           surfaces that breakdown plus each category's sentiment mix,
+           instead of leaving the pattern buried in the Details tab. -->
+      <template v-if="categoryBreakdown.length">
+        <h2>Performance by query type</h2>
+        <div class="card">
+          <div class="category-row" v-for="row in categoryBreakdown" :key="row.category">
+            <div class="board-label">
+              <span class="board-name">{{ row.label }}</span>
+              <span class="board-count">{{ row.ranked1 + row.beaten }}/{{ row.total }} mentioned</span>
+            </div>
+            <div class="board-track"><div class="board-fill you" :style="{ width: row.presencePct + '%' }"></div></div>
+            <div class="category-detail">{{ row.ranked1 }} first, {{ row.beaten }} beaten to it, {{ row.notMentioned }} not mentioned</div>
+            <div class="sentiment-summary-row" v-if="row.sentimentCounts.length">
+              <span
+                v-for="s in row.sentimentCounts" :key="s.classification"
+                class="sentiment-badge" :class="`sentiment-${s.classification}`"
+              >{{ s.count }} {{ s.label }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
       <!-- advice cards -->
-      <template v-if="visibleAdvice.length">
+      <template v-if="visibleAdvice.length || sentimentAdvice">
         <h2>What to do next</h2>
         <div class="advice-card" :class="`tone-${card.tone}`" v-for="card in visibleAdvice" :key="card.id">
           <div class="advice-tag">{{ ADVICE_HEADING[card.id] || 'Note' }}</div>
@@ -355,6 +495,14 @@ function formatSeconds(ms: number | null) {
             <template v-else-if="card.id === 'leading'">This is the AI's go-to answer. Every completed check ({{ asNonNegativeInt(card.params.completedCalls) ?? '?' }}/{{ asNonNegativeInt(card.params.completedCalls) ?? '?' }}) came up with this brand first — no competitor beat it to the mention. Worth re-checking periodically; this can shift as competitors publish new content.</template>
             <template v-else-if="card.id === 'mixed'">Mixed results across {{ asNonNegativeInt(card.params.completedCalls) ?? '?' }} checks: ranked first in {{ asNonNegativeInt(card.params.ranked1) ?? 0 }}, beaten by a competitor in {{ asNonNegativeInt(card.params.beaten) ?? 0 }}, not mentioned at all in {{ asNonNegativeInt(card.params.notMentioned) ?? 0 }}. The not-mentioned checks are the biggest opportunity — competitors aren't necessarily winning those either, nobody is.</template>
             <template v-else-if="card.id === 'top-rival'"><strong>{{ asShortString(card.params.name) }}</strong> is the competitor showing up most — mentioned in {{ asNonNegativeInt(card.params.mentionCount) ?? 0 }} of {{ asNonNegativeInt(card.params.completedCalls) ?? '?' }} checks. Worth understanding what makes them citable (content structure, third-party coverage, reviews).</template>
+          </div>
+        </div>
+        <div class="advice-card tone-warning" v-if="sentimentAdvice">
+          <div class="advice-tag">Sentiment</div>
+          <div class="advice-body">
+            AI mentioned {{ payload.brand }}, but framed it unfavorably in {{ sentimentAdvice.unfavorable }} of {{ sentimentAdvice.total }} judged
+            check{{ sentimentAdvice.total === 1 ? '' : 's' }} ({{ sentimentAdvice.negative }} negative, {{ sentimentAdvice.comparisonOnly }} comparison-only) —
+            a mention isn't the same as a good mention. Read the flagged responses in the Details tab below.
           </div>
         </div>
       </template>
@@ -433,6 +581,19 @@ function formatSeconds(ms: number | null) {
           <p class="harmonia-pillar-empty" v-else>Not available for this scan.</p>
         </div>
 
+        <!-- security-headers detail: checkSecurityHeaders() already computes
+             this per-header list (it feeds the Technical SEO pillar's "≥3 of
+             5 common security headers present" checklist line above) but the
+             per-header detail itself was never rendered anywhere. -->
+        <div class="harmonia-schema" v-if="payload.harmonia.securityHeaders.length">
+          <h3>Security headers</h3>
+          <ul class="harmonia-checklist">
+            <li v-for="h in payload.harmonia.securityHeaders" :key="h.header" :class="h.present ? 'passed' : 'failed'">
+              <span class="check-icon">{{ h.present ? '✓' : '✗' }}</span> {{ h.header }}
+            </li>
+          </ul>
+        </div>
+
         <div class="harmonia-cwv" v-if="payload.harmonia.coreWebVitals">
           <h3>Core Web Vitals (mobile)</h3>
           <div class="cwv-row">
@@ -502,7 +663,12 @@ function formatSeconds(ms: number | null) {
               </span>
             </summary>
             <div class="check-body">
-              <div class="check-text">{{ c.text }}</div>
+              <div class="check-text">
+                <template v-for="(seg, si) in highlightMentions(c.text, highlightTerms)" :key="si">
+                  <mark v-if="seg.isMatch" class="mention-highlight">{{ seg.text }}</mark>
+                  <template v-else>{{ seg.text }}</template>
+                </template>
+              </div>
               <div class="check-sources" v-if="c.citations.length">
                 Sources:
                 <a v-for="(cit, j) in c.citations" :key="j" :href="cit.url" target="_blank" rel="noopener">{{ cit.title || cit.url }}</a>
@@ -637,6 +803,12 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 .board-fill.rival { background: var(--debar); }
 .board-beat { color: var(--serious); font-size: 0.8rem; margin-top: 2px; }
 .board-ambiguous { color: var(--muted); font-size: 0.78rem; margin-top: 2px; font-style: italic; }
+
+/* ---- performance by query type ---- */
+.category-row { margin-bottom: 16px; }
+.category-row:last-child { margin-bottom: 0; }
+.category-detail { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+.category-row .sentiment-summary-row { margin: 8px 0 0; }
 
 /* ---- advice cards ---- */
 .advice-card {
@@ -783,6 +955,12 @@ h2:first-of-type { margin-top: 0; }
   font-size: 0.85rem; color: var(--muted);
   padding: 10px 10px 4px;
   white-space: pre-wrap;
+}
+.mention-highlight {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--fg);
+  border-radius: 3px;
+  padding: 0 2px;
 }
 .check-sources {
   font-size: 0.78rem; color: var(--muted);

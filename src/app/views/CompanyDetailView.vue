@@ -91,16 +91,19 @@ function stopPolling() {
 // blip, surfacing as a raw "TypeError: Failed to fetch" with no recovery.
 const POLL_RETRY_BACKOFFS_MS = [2000, 4000, 8000];
 
-// Formats the live { completed, total, currentModel } progress the backend
+// Formats the live { completed, total, currentModels } progress the backend
 // now writes incrementally during a scan (run-scan-background.mts) into a
 // one-line status — replaces the old static "Running checks (~5-8 min)…"
 // that gave no signal of what was actually happening for the whole wait.
 // Falls back to the old static text if progress hasn't arrived yet (e.g.
 // the very first poll, or a scan finalized before the `progress` column
-// existed) rather than showing a broken "0/0" line.
-function formatRunningStatus(progress: { completed: number; total: number; currentModel: string | null } | null) {
+// existed) rather than showing a broken "0/0" line. `currentModels` (was
+// `currentModel: string | null`) became an array once provider lanes
+// started running concurrently — more than one model can be in flight at
+// once now, not just one.
+function formatRunningStatus(progress: { completed: number; total: number; currentModels: string[] } | null) {
   if (!progress || !progress.total) return 'Running checks (~5-8 min)…';
-  const checking = progress.currentModel ? ` — checking ${progress.currentModel}…` : '';
+  const checking = progress.currentModels?.length ? ` — checking ${progress.currentModels.join(', ')}…` : '';
   return `Running checks: ${progress.completed}/${progress.total} done${checking}`;
 }
 

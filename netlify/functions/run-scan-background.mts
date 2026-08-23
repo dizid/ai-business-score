@@ -82,7 +82,7 @@ export default async (req: Request) => {
   // this scanId was already picked up, whether by a legitimate retry or a
   // duplicate trigger.
   const claimed = await db`
-    UPDATE public.scans SET status = 'running', progress = '{"completed":0,"total":0,"currentModel":null}'
+    UPDATE public.scans SET status = 'running', progress = '{"completed":0,"total":0,"currentModels":[]}'
     WHERE id = ${scanId} AND status = 'pending'
     RETURNING *
   `;
@@ -202,6 +202,23 @@ export default async (req: Request) => {
   // stay in place as a safety net for transient failures, but shouldn't be
   // needed for rate-limiting specifically anymore since there's no overlap
   // left to trip it.
+  //
+  // 2026-08-2X: all three incidents above were about concurrent calls
+  // hitting Perplexity's single gateway key specifically. Since the
+  // 2026-08-15 direct-provider migration (aivis-core.mjs's callModel
+  // comment), anthropic/google/xai each call their own independent provider
+  // API and no longer share that key or its rate limit — only
+  // openai/gpt-5-mini still goes through the Perplexity gateway. This
+  // constant now means "concurrency limit *within* one provider's lane," not
+  // "global concurrency limit": tasks are partitioned by provider below and
+  // each provider's own lane still runs at this limit (1, unchanged, same
+  // proven-safe behavior), but the lanes themselves now run in parallel
+  // with each other via Promise.all — no single provider's key ever sees
+  // more than CONCURRENCY_LIMIT concurrent requests, so none of the three
+  // incidents above can recur, while wall-clock time drops from "sum of all
+  // providers' calls" to roughly "the slowest provider's own sequential
+  // chain." Not yet live-verified with a real timed scan — do that once,
+  // same discipline as every other change in this file's history.
   const CONCURRENCY_LIMIT = 1;
   // Was 100000, then 120000 (same-day intermediate fix, see above). Raised
   // further to 600000 (10 min) for fully-sequential 20-call scans — at
@@ -253,24 +270,32 @@ export default async (req: Request) => {
   // static "Running checks (~5-8 min)…" for the whole scan with no signal
   // of what's actually happening). `progress.completed` counts tasks that
   // have finished running, success OR failure — deliberately distinct from
-  // `scans.completed_calls` (set once at the end, and success-only). One
-  // write right before each call starts, both to record which model is now
-  // in flight and to reflect the previous call's outcome via the updated
-  // count. Best-effort: a failed progress write is logged but never
-  // affects the scan itself, same "don't let a nice-to-have break the
-  // actual work" pattern as the scan-complete email below.
+  // `scans.completed_calls` (set once at the end, and success-only).
+  // Best-effort: a failed progress write is logged but never affects the
+  // scan itself, same "don't let a nice-to-have break the actual work"
+  // pattern as the scan-complete email below.
   //
-  // `completedCount` is a plain JS counter, not an atomic SQL increment —
-  // only safe because CONCURRENCY_LIMIT is 1 (the worker pool runs one
-  // task at a time, so there's no concurrent write race). If concurrency
-  // is ever raised (see docs/improvement-roadmap.md's re-test plan), this
-  // needs to move to an atomic `UPDATE ... SET progress = jsonb_set(...)`
-  // or the count can under-report.
-  let completedCount = 0;
-  async function updateProgress(currentModel: string) {
+  // Now that provider lanes run concurrently (see CONCURRENCY_LIMIT above),
+  // more than one call can be in flight at once, so `currentModel: string`
+  // became `currentModels: string[]`, and `completed` can no longer be a
+  // plain JS counter written into a client-computed snapshot — two lanes'
+  // writes could reach the DB out of order and a later write carrying a
+  // stale, smaller count would silently regress the visible progress. Fixed
+  // by computing `completed` as an atomic SQL increment off whatever value
+  // is currently stored (`coalesce((progress->>'completed')::int, 0) + N`)
+  // rather than a value read-then-written from JS — monotonic regardless of
+  // write ordering. `inFlightModels` itself (a plain JS `Set`) has no such
+  // race: JS is single-threaded, so `Set` mutations across concurrently-
+  // awaited calls never interleave mid-operation.
+  const inFlightModels = new Set<string>();
+  async function writeProgress(increment: number) {
     try {
       await db`
-        UPDATE public.scans SET progress = ${JSON.stringify({ completed: completedCount, total: tasks.length, currentModel })}
+        UPDATE public.scans
+        SET progress = jsonb_set(
+          jsonb_set(coalesce(progress, '{}'::jsonb), '{completed}', to_jsonb(coalesce((progress->>'completed')::int, 0) + ${increment})),
+          '{currentModels}', ${JSON.stringify(Array.from(inFlightModels))}::jsonb
+        )
         WHERE id = ${scanId}
       `;
     } catch (err) {
@@ -285,35 +310,58 @@ export default async (req: Request) => {
   const scanStartTime = Date.now();
   const deadline = new AbortController();
   const deadlineTimer = setTimeout(() => deadline.abort(), SCAN_DEADLINE_MS);
+  // Partition into one lane per provider (the string before "/" in each
+  // model id — "openai", "google", "anthropic", "xai") so each provider's
+  // own calls stay strictly sequential (CONCURRENCY_LIMIT, unchanged) while
+  // the lanes themselves run in parallel via Promise.all below — see
+  // CONCURRENCY_LIMIT's comment above for why this is safe. Grouping by
+  // provider rather than by exact model string future-proofs this against
+  // a provider ever gaining a second model in MODELS.
+  const tasksByProvider = new Map<string, typeof tasks>();
+  for (const task of tasks) {
+    const provider = task.model.split('/')[0];
+    const group = tasksByProvider.get(provider);
+    if (group) group.push(task);
+    else tasksByProvider.set(provider, [task]);
+  }
+
+  const worker = async (task: { prompt: string; model: string; promptIndex: number }) => {
+    // A task pulled off the queue after the deadline already fired (can
+    // happen if earlier calls in its lane ran long) — skip the network call
+    // entirely rather than starting work that would just be aborted
+    // immediately. No progress write here deliberately (same as before):
+    // once the deadline's firing, the scan is wrapping up regardless.
+    if (deadline.signal.aborted) {
+      return { ok: false, error: 'Scan deadline exceeded before this check started', model: task.model, promptIndex: task.promptIndex };
+    }
+    inFlightModels.add(task.model);
+    await writeProgress(0);
+    try {
+      // maxAttempts 2 -> 3: gives a call that hits a rate limit twice one
+      // more shot after the longer rate-limit backoff (aivis-core.mjs),
+      // instead of giving up right as the limit window is clearing.
+      const timeoutMs = CALL_TIMEOUT_MS_BY_MODEL[task.model] ?? CALL_TIMEOUT_MS;
+      const result = await callModelWithRetry(apiKeys, task.model, task.prompt, timeoutMs, 3, deadline.signal);
+      inFlightModels.delete(task.model);
+      await writeProgress(1);
+      return { ok: true, ...result, model: task.model, promptIndex: task.promptIndex };
+    } catch (err) {
+      inFlightModels.delete(task.model);
+      await writeProgress(1);
+      const message = (err as Error).message;
+      console.error(
+        `Scan call failed [scan ${scanId}, prompt ${task.promptIndex}, ${task.model}]: ${message}`
+      );
+      return { ok: false, error: message, model: task.model, promptIndex: task.promptIndex };
+    }
+  };
+
   let callResults;
   try {
-    callResults = await runWithConcurrency(tasks, CONCURRENCY_LIMIT, async (task: { prompt: string; model: string; promptIndex: number }) => {
-      // A task pulled off the queue after the deadline already fired (can
-      // happen under CONCURRENCY_LIMIT if earlier calls in its worker slot
-      // ran long) — skip the network call entirely rather than starting
-      // work that would just be aborted immediately.
-      if (deadline.signal.aborted) {
-        completedCount++;
-        return { ok: false, error: 'Scan deadline exceeded before this check started', model: task.model, promptIndex: task.promptIndex };
-      }
-      await updateProgress(task.model);
-      try {
-        // maxAttempts 2 -> 3: gives a call that hits a rate limit twice one
-        // more shot after the longer rate-limit backoff (aivis-core.mjs),
-        // instead of giving up right as the limit window is clearing.
-        const timeoutMs = CALL_TIMEOUT_MS_BY_MODEL[task.model] ?? CALL_TIMEOUT_MS;
-        const result = await callModelWithRetry(apiKeys, task.model, task.prompt, timeoutMs, 3, deadline.signal);
-        completedCount++;
-        return { ok: true, ...result, model: task.model, promptIndex: task.promptIndex };
-      } catch (err) {
-        completedCount++;
-        const message = (err as Error).message;
-        console.error(
-          `Scan call failed [scan ${scanId}, prompt ${task.promptIndex}, ${task.model}]: ${message}`
-        );
-        return { ok: false, error: message, model: task.model, promptIndex: task.promptIndex };
-      }
-    });
+    const perLaneResults = await Promise.all(
+      Array.from(tasksByProvider.values()).map((providerTasks) => runWithConcurrency(providerTasks, CONCURRENCY_LIMIT, worker))
+    );
+    callResults = perLaneResults.flat();
   } finally {
     clearTimeout(deadlineTimer);
   }
