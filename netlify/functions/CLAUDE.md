@@ -60,10 +60,15 @@ See the root `CLAUDE.md` for overall project context.
   progress, `docs/improvement-roadmap.md`'s top UX candidate), nullable —
   `null` while `pending`, meaningless once `completed`/`failed`. Read by
   `scan-status.mts` and rendered live in `CompanyDetailView.vue`'s polling
-  UI. The `completed` counter is a plain JS variable in
-  `run-scan-background.mts`, not an atomic SQL increment — only safe
-  because `CONCURRENCY_LIMIT` is 1 (see below); raising concurrency would
-  need this to change too. Added 2026-08-19: **`harmonia jsonb`** — a
+  UI. The `completed` counter is computed as an atomic SQL increment
+  (`coalesce((progress->>'completed')::int, 0) + N` inside a `jsonb_set`,
+  in `writeProgress()`) rather than a plain JS variable — fixed when
+  provider lanes first went concurrent (see `own_site_citations` era
+  comment history), specifically so more than one call can be in flight at
+  once without two lanes' writes racing each other. Confirmed this stays
+  correct under the 2026-08-23 per-provider concurrency bump below (raising
+  a lane's own limit doesn't reintroduce the old plain-counter race — the
+  increment was already SQL-side, not JS-side). Added 2026-08-19: **`harmonia jsonb`** — a
   technical/on-page/content-structure/UX audit of the scanned business's
   own website, computed by `shared/harmonia.mjs`'s `analyzeHarmonia()` and
   kicked off in parallel with (not serialized into) the sequential LLM-call
@@ -235,11 +240,31 @@ gap this update fixes rather than something built this session.
   end-to-end with a real delivered test email to a non-owner address the
   same day it shipped, not just the sandbox-restricted
   `onboarding@resend.dev` address. (Migrated here from root `CLAUDE.md` on
-  2026-08-20 via `/doctor`.)
+  2026-08-20 via `/doctor`.) Added 2026-08-23: `started_at timestamptz`
+  written by the claim `UPDATE` (`now()`, atomic with the `pending`→
+  `running` transition) — the DB's own authoritative scan-start timestamp,
+  used both for `scanStartTime` (previously a `Date.now()` captured ~230
+  lines later, now sourced from this column instead to avoid any
+  function-container-vs-Neon clock skew) and for the "scan completed in Xm
+  Ys" duration shown in `ScanDetail.vue` (`generated_at - started_at`,
+  computed downstream, not persisted as a third column). Also added the
+  same day: `CONCURRENCY_LIMIT` (flat, 1) replaced with
+  `CONCURRENCY_LIMIT_BY_PROVIDER` (`{openai: 1, anthropic: 3, google: 3,
+  xai: 2}` + a `DEFAULT_PROVIDER_CONCURRENCY = 1` fallback) — `openai`
+  (the Perplexity gateway lane) is untouched, still 1, per its three
+  documented incidents above; `anthropic`/`google`/`xai` raised since they
+  call independent provider APIs directly (2026-08-15 migration) with no
+  shared-gateway history of trouble. Reasoned, not yet live-verified with a
+  real timed scan — do one live-triggered scan (not `proof-script`) and
+  check `scans.failures` for a 429 spike vs. historical baseline before
+  treating this as validated; roll a provider back toward 1 immediately if
+  one appears, same discipline as this file's three prior incidents.
 - **`scan-status.mts`** — GET `/scans/:id`, auth + ownership-scoped (join
   through `companies`), polled by the frontend. Returns `progress` (the
-  live `{completed, total, currentModel}` object, added 2026-08-17)
-  alongside `status`/`errorMessage` on every poll, not just once the scan
+  live `{completed, total, currentModel}` object, added 2026-08-17) and
+  `startedAt` (added 2026-08-23, for a live elapsed-time ticker while a
+  scan is still `running`) alongside `status`/`errorMessage` on every poll,
+  not just once the scan
   finishes.
 - **`generate-deep-advice.mts`** — POST `/scans/:id/deep-advice`, see
   `shared/CLAUDE.md`'s "Deep advice" section.

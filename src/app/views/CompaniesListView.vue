@@ -314,7 +314,7 @@ onMounted(loadCompanies);
 <style scoped>
 main { max-width: var(--page-max); margin: 0 auto; padding: var(--space-2xl) var(--space-md) var(--space-xl); }
 .head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--space-md); margin-bottom: 28px; }
-h1 { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.01em; margin: 0 0 4px; }
+h1 { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.01em; margin: 0 0 4px; }
 p.sub { color: var(--muted); margin: 0; }
 .head-actions { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .head-row button {

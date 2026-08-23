@@ -57,7 +57,8 @@ async function handleSignOut() {
 }
 .wordmark {
   display: flex; align-items: center; gap: 8px;
-  font-weight: 700; font-size: 1rem; letter-spacing: -0.005em; color: var(--fg);
+  font-family: var(--font-display);
+  font-weight: 700; font-size: 1.05rem; letter-spacing: -0.005em; color: var(--fg);
   text-decoration: none;
 }
 .wordmark :deep(.icon) { color: var(--accent); }

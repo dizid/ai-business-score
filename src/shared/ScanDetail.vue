@@ -1,8 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { scoreBand, PROMPT_LABELS, PROMPT_CATEGORIES } from '../../shared/aivis-core.mjs';
-import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceId, type Rank } from './scanPayload';
+import { scoreBand, PROMPT_LABELS } from '../../shared/aivis-core.mjs';
+import { asNonNegativeInt, asShortString, type ValidatedPayload, type Rank } from './scanPayload';
 import CollapsibleSection from './CollapsibleSection.vue';
+import {
+  SENTIMENT_LABEL, BAND_LABEL, BAND_EXPLAIN, ADVICE_HEADING, CHECK_BADGE_LABEL,
+} from './scanLabels';
+import Icon from './Icon.vue';
+import {
+  sentimentKey, deriveSentimentByKey, deriveSentimentSummaryRows, deriveCategoryBreakdown, deriveSentimentAdvice,
+  deriveRank1Count, deriveBeatenCount, deriveHeadlineKind, deriveScoreboardRows, scoreboardRowPct,
+  deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveVisibleAdvice,
+  deriveHarmoniaPillars, deriveHarmoniaBand, cwvRating, formatSeconds, deriveScanDurationLabel,
+  type ScoreboardRow,
+} from './scanDerived';
+import { buildScanReportMarkdown, downloadMarkdown } from './scanReport';
 
 // Shared between result/App.vue (a shareable, standalone page) and
 // CompanyDetailView.vue's detail pane (master-detail dashboard) — same
@@ -18,6 +30,14 @@ import CollapsibleSection from './CollapsibleSection.vue';
 // (old shareable links are static, decode-only), so it never sets either
 // allow* prop — only CompanyDetailView.vue does, and it owns the actual
 // authenticated fetch calls, keeping this component itself auth-agnostic.
+//
+// theme (2026-08-23 dashboard redesign): same shape of exception, one more
+// time. Defaults to 'legacy' — the pre-redesign visual treatment — so
+// result/App.vue (old shareable links, which brand/BRAND.md still promises
+// stay "calm, muted, professional" unchanged) needs zero code changes and
+// is provably unaffected by default. CompanyDetailView.vue passes
+// theme="dashboard" explicitly to opt into the new palette/graphics, all
+// gated behind a `.theme-dashboard` class on the component root below.
 const props = withDefaults(
   defineProps<{
     payload: ValidatedPayload;
@@ -28,112 +48,31 @@ const props = withDefaults(
     // or null — a per-check loading state rather than one global boolean,
     // since a user could plausibly have two checks expanded at once.
     sentimentJudgeLoadingKey?: string | null;
+    theme?: 'dashboard' | 'legacy';
   }>(),
-  { allowDeepAdvice: false, deepAdviceLoading: false, allowSentimentJudge: false, sentimentJudgeLoadingKey: null }
+  { allowDeepAdvice: false, deepAdviceLoading: false, allowSentimentJudge: false, sentimentJudgeLoadingKey: null, theme: 'legacy' }
 );
 defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string] }>();
 
-const SENTIMENT_LABEL: Record<string, string> = {
-  recommended: 'Recommended',
-  neutral: 'Neutral',
-  negative: 'Negative',
-  'comparison-only': 'Comparison only',
-};
-
-function sentimentKey(promptIndex: number, model: string) {
-  return `${promptIndex}:${model}`;
-}
-const sentimentByKey = computed(() => {
-  const map = new Map<string, { classification: string; reasoning: string }>();
-  for (const j of props.payload.sentimentJudgments) {
-    map.set(sentimentKey(j.promptIndex, j.model), { classification: j.classification, reasoning: j.reasoning });
-  }
-  return map;
-});
-
+// Sentiment/category/scoreboard/check-breakdown aggregation logic lives in
+// scanDerived.ts (imported above) — shared verbatim with scanReport.ts so
+// the downloadable report and this UI can never independently drift on the
+// same numbers. Each computed() below is a thin wrapper around a derive*()
+// function, unchanged in behavior from before this file was split.
+const sentimentByKey = computed(() => deriveSentimentByKey(props.payload));
 // Overview-tab summary (2026-08-20): sentiment is now auto-judged for most
 // mentions during the scan itself (see run-scan-background.mts), so it's
 // no longer worth burying entirely in the per-check Details accordion —
-// this rollup gives an at-a-glance read without expanding anything. Fixed
-// classification order so the pills don't reshuffle scan to scan; only
-// non-zero counts render, and the whole row is absent for scans with no
-// judgments yet (pre-2026-08-20 scans, or ones the auto-pass ran out of
-// deadline budget for before covering every mention).
-const SENTIMENT_SUMMARY_ORDER = ['recommended', 'neutral', 'comparison-only', 'negative'] as const;
-interface SentimentSummaryRow { classification: string; label: string; count: number; }
-const sentimentSummaryRows = computed<SentimentSummaryRow[]>(() => {
-  const counts = new Map<string, number>();
-  for (const j of props.payload.sentimentJudgments) {
-    counts.set(j.classification, (counts.get(j.classification) ?? 0) + 1);
-  }
-  return SENTIMENT_SUMMARY_ORDER.filter((c) => (counts.get(c) ?? 0) > 0).map((c) => ({
-    classification: c,
-    label: SENTIMENT_LABEL[c],
-    count: counts.get(c)!,
-  }));
-});
+// this rollup gives an at-a-glance read without expanding anything.
+const sentimentSummaryRows = computed(() => deriveSentimentSummaryRows(props.payload));
 
 // "Performance by query type" (Overview tab): computeScore already weights
-// each check by its prompt category (PROMPT_CATEGORIES: high-intent 3x,
-// comparison 2x, informational 1x, see aivis-core.mjs's DEFAULT_QUERY_WEIGHTS)
-// but that breakdown was never surfaced — the single 0-100 score and the
-// competitor bar chart don't explain *why* it's what it is (e.g. "strong on
-// high-intent queries, invisible on comparison queries"), leaving that
-// pattern only discoverable by reading the flat Details check-by-check list
-// by hand. Also folds in the sentiment mix per category (reusing
-// sentimentByKey above) rather than building a second, near-duplicate
-// breakdown just for that.
-const CATEGORY_LABEL: Record<string, string> = {
-  'high-intent': 'High-intent',
-  comparison: 'Comparison',
-  informational: 'Informational',
-};
-const CATEGORY_ORDER = ['high-intent', 'comparison', 'informational'] as const;
-interface CategoryRow {
-  category: string;
-  label: string;
-  total: number;
-  ranked1: number;
-  beaten: number;
-  notMentioned: number;
-  presencePct: number;
-  sentimentCounts: SentimentSummaryRow[];
-}
-const categoryBreakdown = computed<CategoryRow[]>(() => {
-  const byCategory = new Map<string, { rank: Rank; promptIndex: number; model: string }[]>();
-  props.payload.rawResponses.forEach((r, i) => {
-    const rank = props.payload.perPromptRank[i]?.rank ?? 'not-mentioned';
-    const category = PROMPT_CATEGORIES[r.promptIndex] ?? 'informational';
-    if (!byCategory.has(category)) byCategory.set(category, []);
-    byCategory.get(category)!.push({ rank, promptIndex: r.promptIndex, model: r.model });
-  });
-  return CATEGORY_ORDER.filter((c) => byCategory.has(c)).map((category) => {
-    const entries = byCategory.get(category)!;
-    const total = entries.length;
-    const ranked1 = entries.filter((e) => e.rank === 'ranked-1').length;
-    const beaten = entries.filter((e) => ['ranked-2', 'ranked-3', 'mentioned', 'beaten'].includes(e.rank)).length;
-    const notMentioned = total - ranked1 - beaten;
-    const sentimentCounts = new Map<string, number>();
-    for (const e of entries) {
-      const s = sentimentByKey.value.get(sentimentKey(e.promptIndex, e.model));
-      if (s) sentimentCounts.set(s.classification, (sentimentCounts.get(s.classification) ?? 0) + 1);
-    }
-    return {
-      category,
-      label: CATEGORY_LABEL[category] ?? category,
-      total,
-      ranked1,
-      beaten,
-      notMentioned,
-      presencePct: total > 0 ? Math.round(((ranked1 + beaten) / total) * 100) : 0,
-      sentimentCounts: SENTIMENT_SUMMARY_ORDER.filter((c) => (sentimentCounts.get(c) ?? 0) > 0).map((c) => ({
-        classification: c,
-        label: SENTIMENT_LABEL[c],
-        count: sentimentCounts.get(c)!,
-      })),
-    };
-  });
-});
+// each check by its prompt category (high-intent 3x, comparison 2x,
+// informational 1x, see aivis-core.mjs's DEFAULT_QUERY_WEIGHTS) but that
+// breakdown was never surfaced — the single 0-100 score and the competitor
+// bar chart don't explain *why* it's what it is. Also folds in the
+// sentiment mix per category rather than building a second breakdown.
+const categoryBreakdown = computed(() => deriveCategoryBreakdown(props.payload));
 
 // Sentiment-aware advice card (Overview tab): computed client-side, not
 // added to the server-side selectAdvice() output, because sentiment
@@ -141,19 +80,8 @@ const categoryBreakdown = computed<CategoryRow[]>(() => {
 // and a user can also judge more checks later via the manual "Judge
 // sentiment" button in the Details tab — a client-side computed prop stays
 // live and correct in both cases without touching the scan-completion
-// backend code path at all. No threshold tuning: any negative or
-// comparison-only judgment is worth flagging, since presence-only detection
-// alone would have silently counted those same checks as a plain "cited."
-interface SentimentAdvice { unfavorable: number; negative: number; comparisonOnly: number; total: number; }
-const sentimentAdvice = computed<SentimentAdvice | null>(() => {
-  const judgments = props.payload.sentimentJudgments;
-  if (judgments.length === 0) return null;
-  const negative = judgments.filter((j) => j.classification === 'negative').length;
-  const comparisonOnly = judgments.filter((j) => j.classification === 'comparison-only').length;
-  const unfavorable = negative + comparisonOnly;
-  if (unfavorable === 0) return null;
-  return { unfavorable, negative, comparisonOnly, total: judgments.length };
-});
+// backend code path at all.
+const sentimentAdvice = computed(() => deriveSentimentAdvice(props.payload));
 
 // Mention highlighting (Details tab, check-by-check raw text): segment-based
 // rendering (not v-html) so there's no HTML-injection surface even though
@@ -189,42 +117,6 @@ function highlightMentions(text: string, terms: string[]): TextSegment[] {
   return segments;
 }
 
-const BAND_LABEL: Record<string, string> = {
-  leading: 'Leading', visible: 'Visible, often beaten',
-  weak: 'Weak presence', invisible: 'Invisible', unavailable: 'Score unavailable',
-};
-const BAND_EXPLAIN: Record<string, string> = {
-  leading: 'Consistently the first brand AI mentions.',
-  visible: 'AI knows this brand, but doesn’t always lead with it.',
-  weak: 'Rarely comes up — mostly beaten or skipped.',
-  invisible: 'Never came up in any completed check.',
-  unavailable: 'Not enough checks completed to give a reliable score. This is likely a temporary issue with the AI providers. Please try again.',
-};
-// Milestone A6: was keyed by `tone`, which collapsed multiple distinct
-// insights onto one shared label — 'mixed' and 'top-rival' both use
-// tone 'neutral', so a scan with both cards showed two identically-labeled
-// "ALSO WORTH NOTING" cards (real, reported bug, read as a duplicate/
-// glitch). Keying by `id` instead gives every distinct insight branch in
-// selectAdvice() its own heading — id has always been part of the payload
-// shape, so this is backward compatible with every already-persisted scan.
-const ADVICE_HEADING: Record<AdviceId, string> = {
-  'no-data': 'No data',
-  'zero-citations': 'Priority',
-  'consistently-beaten': 'Watch this',
-  leading: 'Working well',
-  mixed: 'Mixed results',
-  'top-rival': 'Top competitor',
-};
-const CHECK_BADGE_LABEL: Record<Rank, string> = {
-  'ranked-1': 'Mentioned first',
-  'ranked-2': 'Mentioned 2nd',
-  'ranked-3': 'Mentioned 3rd',
-  mentioned: 'Mentioned, not top 3',
-  'not-mentioned': 'Not mentioned',
-  // legacy value, see the Rank type comment in scanPayload.ts
-  beaten: 'Mentioned, but beaten',
-};
-
 const band = computed(() => scoreBand(props.payload.score));
 
 const RING_R = 54;
@@ -234,93 +126,27 @@ const ringOffset = computed(() =>
   props.payload.score !== null ? ringCircumference * (1 - props.payload.score / 100) : 0
 );
 
-const rank1Count = computed(() => props.payload.perPromptRank.filter((r) => r.rank === 'ranked-1').length);
-const beatenCount = computed(() =>
-  props.payload.perPromptRank.filter((r) => ['ranked-2', 'ranked-3', 'mentioned', 'beaten'].includes(r.rank)).length
-);
+const rank1Count = computed(() => deriveRank1Count(props.payload));
+const beatenCount = computed(() => deriveBeatenCount(props.payload));
+const headlineKind = computed(() => deriveHeadlineKind(props.payload));
 
-const headlineKind = computed<'none' | 'zero' | 'beaten' | 'good'>(() => {
-  if (props.payload.completedCalls === 0) return 'none';
-  if (props.payload.citedCount === 0) return 'zero';
-  if (beatenCount.value > 0) return 'beaten';
-  return 'good';
-});
-
-interface ScoreboardRow { name: string; isYou: boolean; mentionCount: number; beatBrandCount: number; ambiguous: boolean; }
-const scoreboardRows = computed<ScoreboardRow[]>(() => {
-  if (props.payload.completedCalls === 0) return [];
-  const rivals = [...props.payload.competitorTallies].sort((a, b) => b.mentionCount - a.mentionCount);
-  return [
-    // The brand's own row already gets the top-level "common word" warning
-    // banner above (payload.ambiguousBrandFlag) — never flag it again here.
-    { name: props.payload.brand, isYou: true, mentionCount: props.payload.citedCount, beatBrandCount: 0, ambiguous: false },
-    ...rivals.map((r) => ({ ...r, isYou: false })),
-  ];
-});
-
+const scoreboardRows = computed(() => deriveScoreboardRows(props.payload));
 function rowPct(row: ScoreboardRow) {
-  if (props.payload.completedCalls === 0) return 0;
-  return Math.min(100, Math.round((row.mentionCount / props.payload.completedCalls) * 100));
+  return scoreboardRowPct(props.payload, row);
 }
 
-// rawResponses[i] and perPromptRank[i] describe the same completed call —
-// both are built by mapping over aggregateProspect()'s `completed` array in
-// the same order, with no filtering/reordering in between — so zipping by
-// index is safe. Grouped by promptIndex so each prompt template
-// shows its 2 model outcomes together, answering "which prompt, which
-// model, did it show up" directly instead of leaving it to a flat raw-text
-// dump the reader has to cross-reference by hand.
-interface CheckRow { model: string; rank: Rank; text: string; citations: { url: string; title: string }[]; }
-interface CheckGroup { promptIndex: number; label: string; checks: CheckRow[]; }
-const checkBreakdown = computed<CheckGroup[]>(() => {
-  const byPrompt = new Map<number, CheckRow[]>();
-  props.payload.rawResponses.forEach((r, i) => {
-    const rank = props.payload.perPromptRank[i]?.rank ?? 'not-mentioned';
-    if (!byPrompt.has(r.promptIndex)) byPrompt.set(r.promptIndex, []);
-    byPrompt.get(r.promptIndex)!.push({ model: r.model, rank, text: r.text, citations: r.citations || [] });
-  });
-  return [...byPrompt.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([promptIndex, checks]) => ({
-      promptIndex,
-      label: PROMPT_LABELS[promptIndex] || `Prompt ${promptIndex + 1}`,
-      checks,
-    }));
-});
+const checkBreakdown = computed(() => deriveCheckBreakdown(props.payload));
 
 // Per-call failure detail (Milestone A3 — restores what commit 522eb63
-// shipped and 74afa41 accidentally deleted the next day). Joins each
-// failure's promptIndex against PROMPT_LABELS for a human-readable
-// description, same pattern checkBreakdown above already uses.
-interface FailureRow { model: string; promptLabel: string; error: string; }
-const failureRows = computed<FailureRow[]>(() =>
-  props.payload.failures.map((f) => ({
-    model: f.model,
-    promptLabel: PROMPT_LABELS[f.promptIndex] || `Prompt ${f.promptIndex + 1}`,
-    error: f.error,
-  }))
-);
+// shipped and 74afa41 accidentally deleted the next day).
+const failureRows = computed(() => deriveFailureRows(props.payload));
 
 // Citation-URL attribution (Milestone F): which of the company's own pages
 // an AI model actually cited, grouped by prompt so "which check drew from
 // which page" reads directly instead of a flat unlabeled URL list.
-interface OwnCitationRow { url: string; title: string; model: string; promptLabel: string; }
-const ownSiteCitationRows = computed<OwnCitationRow[]>(() =>
-  props.payload.ownSiteCitations.map((c) => ({
-    url: c.url,
-    title: c.title || c.url,
-    model: c.model,
-    promptLabel: PROMPT_LABELS[c.promptIndex] || `Prompt ${c.promptIndex + 1}`,
-  }))
-);
+const ownSiteCitationRows = computed(() => deriveOwnSiteCitationRows(props.payload));
 
-// Only 'top-rival' can produce an empty body (when no valid competitor
-// name survives re-validation) — the other advice ids always render
-// something, mirroring the original ADVICE_COPY behavior where an empty
-// body caused the whole card to be skipped.
-const visibleAdvice = computed(() =>
-  props.payload.advice.filter((c) => c.id !== 'top-rival' || asShortString(c.params.name))
-);
+const visibleAdvice = computed(() => deriveVisibleAdvice(props.payload));
 
 // ---- Overview/Details tab split (REPORTPLAN.md) ----
 const viewMode = ref<'overview' | 'details'>('overview');
@@ -336,49 +162,34 @@ const detailsEmpty = computed(
   () => !props.payload.harmonia && ownSiteCitationRows.value.length === 0 && checkBreakdown.value.length === 0
 );
 
-// ---- Harmonia: technical/on-page/content-structure/UX audit of the
-// scanned site — a SEPARATE, secondary score from the AI Visibility Score
-// above, never blended into it (see shared/harmonia.mjs). Pillar/overall
-// scores reuse scoreBand()'s exact thresholds and good/warning/serious/
-// critical status colors so this reads as the same system as the AI score
-// ring, not a second, differently-calibrated color language. -->
-const HARMONIA_PILLAR_LABELS = {
-  technicalSeo: 'Technical SEO',
-  onPageSeo: 'On-Page SEO',
-  contentStructure: 'Content Structure',
-  uxSignals: 'UX Signals',
-} as const;
-interface HarmoniaPillarView { key: keyof typeof HARMONIA_PILLAR_LABELS; label: string; score: number | null; band: string; checks: { id: string; label: string; passed: boolean }[]; }
-const harmoniaPillars = computed<HarmoniaPillarView[]>(() => {
-  const h = props.payload.harmonia;
-  if (!h) return [];
-  return (Object.keys(HARMONIA_PILLAR_LABELS) as (keyof typeof HARMONIA_PILLAR_LABELS)[]).map((key) => {
-    const pillar = h.pillars[key];
-    return { key, label: HARMONIA_PILLAR_LABELS[key], score: pillar.score, band: scoreBand(pillar.score), checks: pillar.checks };
-  });
-});
-const harmoniaBand = computed(() => scoreBand(props.payload.harmonia?.harmoniaScore ?? null));
+// Site Health (formerly "Harmonia" internally — renamed in the UI
+// 2026-08-23): technical/on-page/content-structure/UX audit of the scanned
+// site — a SEPARATE, secondary score from the AI Visibility Score above,
+// never blended into it (see shared/harmonia.mjs). Pillar/overall scores
+// reuse scoreBand()'s exact thresholds and good/warning/serious/critical
+// status colors so this reads as the same system as the AI score ring.
+const harmoniaPillars = computed(() => deriveHarmoniaPillars(props.payload));
+const harmoniaBand = computed(() => deriveHarmoniaBand(props.payload));
 
-const CWV_THRESHOLDS = { lcpMs: [2500, 4000], clsScore: [0.1, 0.25], inpMs: [200, 500] } as const;
-function cwvRating(metric: keyof typeof CWV_THRESHOLDS, value: number | null): 'good' | 'needs-improvement' | 'poor' | null {
-  if (value === null) return null;
-  const [good, needsImprovement] = CWV_THRESHOLDS[metric];
-  if (value <= good) return 'good';
-  if (value <= needsImprovement) return 'needs-improvement';
-  return 'poor';
-}
-function formatSeconds(ms: number | null) {
-  return ms === null ? '—' : `${(ms / 1000).toFixed(2)}s`;
+const scanDurationLabel = computed(() => deriveScanDurationLabel(props.payload));
+
+// Download report (Markdown) — pure client-side, no server call. Mirrors
+// this component's own Overview/Details structure via the same
+// scanLabels.ts/scanDerived.ts building blocks, so the report and the UI
+// can't independently drift on wording or numbers.
+function downloadReport() {
+  downloadMarkdown(buildScanReportMarkdown(props.payload), props.payload);
 }
 </script>
 
 <template>
-  <div class="scan-detail">
+  <div class="scan-detail" :class="{ 'theme-dashboard': theme === 'dashboard' }">
     <h1>{{ payload.brand }}</h1>
     <div class="meta">
       <a v-if="payload.safeWebsiteHref" :href="payload.safeWebsiteHref" target="_blank" rel="noopener">{{ payload.website }}</a>
       <template v-else>{{ payload.website }}</template>
       &middot; checked {{ payload.generatedAtDate.toLocaleString() }}
+      <template v-if="scanDurationLabel">&middot; completed in {{ scanDurationLabel }}</template>
     </div>
 
     <!-- Overview/Details tabs (REPORTPLAN.md) -->
@@ -387,6 +198,7 @@ function formatSeconds(ms: number | null) {
       <button type="button" role="tab" :aria-selected="viewMode === 'details'" :class="{ active: viewMode === 'details' }" @click="viewMode = 'details'">
         Details<template v-if="totalChecksCount"> &middot; {{ totalChecksCount }} check{{ totalChecksCount === 1 ? '' : 's' }}</template>
       </button>
+      <button type="button" class="download-report-button" @click="downloadReport">Download report</button>
     </div>
 
     <template v-if="viewMode === 'overview'">
@@ -540,19 +352,36 @@ function formatSeconds(ms: number | null) {
            full pillar breakdown, schema opportunities, and Core Web
            Vitals detail live in the Details tab. -->
       <template v-if="payload.harmonia">
-        <h2>Harmonia score</h2>
+        <h2>Site Health score</h2>
         <div class="card harmonia-summary-card">
           <div class="harmonia-summary-head">
             <span class="harmonia-overall-score" :class="`band-text-${harmoniaBand}`">{{ payload.harmonia.harmoniaScore ?? '—' }}<span class="of100">/ 100</span></span>
             <span class="harmonia-summary-label">Technical, on-page, content-structure, and UX health of {{ payload.website }} — not part of the AI Visibility Score.</span>
           </div>
-          <div class="harmonia-bar-row" v-for="p in harmoniaPillars" :key="p.key">
-            <div class="harmonia-bar-label">
-              <span>{{ p.label }}</span>
-              <span class="board-count">{{ p.score ?? '—' }}</span>
+          <!-- Dashboard theme: donut gauges (a deliberately different chart
+               form from the AI-score ring above and the scoreboard's bars
+               below — bars compare an open-ended list of named entities,
+               a gauge shows one closed value's completion toward 100, so
+               the two data shapes get two different chart forms). Legacy
+               theme (old shareable links) keeps the original flat bars,
+               byte-for-byte unchanged. -->
+          <div class="harmonia-gauge-grid" v-if="theme === 'dashboard'">
+            <div class="harmonia-gauge" v-for="p in harmoniaPillars" :key="p.key">
+              <div class="harmonia-gauge-ring" :class="`band-fill-${p.band}`" :style="{ '--pct': p.score ?? 0 }">
+                <span class="harmonia-gauge-score">{{ p.score ?? '—' }}</span>
+              </div>
+              <span class="harmonia-gauge-label">{{ p.label }}</span>
             </div>
-            <div class="board-track"><div class="board-fill" :class="`band-fill-${p.band}`" :style="{ width: (p.score ?? 0) + '%' }"></div></div>
           </div>
+          <template v-else>
+            <div class="harmonia-bar-row" v-for="p in harmoniaPillars" :key="p.key">
+              <div class="harmonia-bar-label">
+                <span>{{ p.label }}</span>
+                <span class="board-count">{{ p.score ?? '—' }}</span>
+              </div>
+              <div class="board-track"><div class="board-fill" :class="`band-fill-${p.band}`" :style="{ width: (p.score ?? 0) + '%' }"></div></div>
+            </div>
+          </template>
           <button type="button" class="harmonia-details-link" @click="viewMode = 'details'">See full breakdown &rarr;</button>
         </div>
       </template>
@@ -563,7 +392,7 @@ function formatSeconds(ms: number | null) {
            copy-paste JSON-LD snippets, Core Web Vitals detail. -->
       <CollapsibleSection
         v-if="payload.harmonia"
-        title="Harmonia: technical & SEO audit"
+        title="Site Health: technical & SEO audit"
         :status-text="payload.harmonia.harmoniaScore !== null ? `${payload.harmonia.harmoniaScore}/100` : 'unavailable'"
         default-open
       >
@@ -575,7 +404,7 @@ function formatSeconds(ms: number | null) {
           <div class="board-track" v-if="p.score !== null"><div class="board-fill" :class="`band-fill-${p.band}`" :style="{ width: p.score + '%' }"></div></div>
           <ul class="harmonia-checklist" v-if="p.checks.length">
             <li v-for="c in p.checks" :key="c.id" :class="c.passed ? 'passed' : 'failed'">
-              <span class="check-icon">{{ c.passed ? '✓' : '✗' }}</span> {{ c.label }}
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="c.passed ? 'check' : 'x'" /><template v-else>{{ c.passed ? '✓' : '✗' }}</template></span> {{ c.label }}
             </li>
           </ul>
           <p class="harmonia-pillar-empty" v-else>Not available for this scan.</p>
@@ -589,7 +418,7 @@ function formatSeconds(ms: number | null) {
           <h3>Security headers</h3>
           <ul class="harmonia-checklist">
             <li v-for="h in payload.harmonia.securityHeaders" :key="h.header" :class="h.present ? 'passed' : 'failed'">
-              <span class="check-icon">{{ h.present ? '✓' : '✗' }}</span> {{ h.header }}
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="h.present ? 'check' : 'x'" /><template v-else>{{ h.present ? '✓' : '✗' }}</template></span> {{ h.header }}
             </li>
           </ul>
         </div>
@@ -607,7 +436,7 @@ function formatSeconds(ms: number | null) {
           <h3>Schema.org detected</h3>
           <ul class="schema-list">
             <li v-for="(n, i) in payload.harmonia.schema.detected" :key="i" :class="n.valid ? 'passed' : 'failed'">
-              <span class="check-icon">{{ n.valid ? '✓' : '✗' }}</span> {{ n.type || 'Unrecognized type' }}
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="n.valid ? 'check' : 'x'" /><template v-else>{{ n.valid ? '✓' : '✗' }}</template></span> {{ n.type || 'Unrecognized type' }}
               <span class="schema-issues" v-if="n.issues.length">— {{ n.issues.join('; ') }}</span>
             </li>
           </ul>
@@ -987,6 +816,16 @@ h2:first-of-type { margin-top: 0; }
 }
 .tabbar button:hover { color: var(--fg); }
 .tabbar button.active { color: var(--fg); border-bottom-color: var(--accent); }
+.download-report-button {
+  margin-left: auto; margin-right: 0 !important;
+  align-self: center;
+  padding: 6px 14px !important;
+  font-size: 0.8rem !important; font-weight: 600;
+  border: 1px solid var(--border) !important; border-radius: 999px;
+  color: var(--muted) !important;
+  transition: border-color 0.15s ease, color 0.15s ease !important;
+}
+.download-report-button:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
 
 /* ---- status-band text/fill helpers (shared by score ring bands and
    Harmonia's pillar bars, so both read as the same color language) ---- */
@@ -1060,4 +899,80 @@ h2:first-of-type { margin-top: 0; }
 .harmonia-unavailable, .details-empty { color: var(--muted); font-size: 0.88rem; padding: 8px 0; }
 
 footer { margin-top: 28px; color: var(--faint); font-size: 0.78rem; }
+
+/* ==== Dashboard redesign (2026-08-23) ====
+   Everything below only ever applies inside .theme-dashboard — the legacy
+   (default) rendering above is completely untouched, so old shareable
+   links (result.html, theme="legacy") render byte-for-byte as before. See
+   ScanDetail.vue's `theme` prop comment for why. */
+.theme-dashboard h1,
+.theme-dashboard h2,
+.theme-dashboard .score-ring-number .value,
+.theme-dashboard .harmonia-overall-score {
+  font-family: var(--font-display);
+}
+
+/* Score ring: a restrained, band-colored glow — the one place this
+   redesign spends its "signature element" budget, per the frontend-design
+   skill's "spend your boldness in one place" guidance. Not a page-wide
+   glow (that's the marketing site's motif, deliberately kept off the
+   dashboard) — scoped tightly to the ring itself. */
+.theme-dashboard .band-leading .score-ring-fill { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--good) 55%, transparent)); }
+.theme-dashboard .band-visible .score-ring-fill { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--warning) 55%, transparent)); }
+.theme-dashboard .band-weak .score-ring-fill { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--serious) 55%, transparent)); }
+.theme-dashboard .band-invisible .score-ring-fill { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--critical) 55%, transparent)); }
+
+/* Performance-by-query-type: --accent-3 (teal) instead of the same blue
+   used everywhere else — gives this section its own identity instead of
+   visually duplicating the scoreboard immediately above it. */
+.theme-dashboard .category-row .board-fill.you { background: var(--accent-3); }
+
+/* Site Health gauges: --accent-2 (violet) is this section's identity
+   color — see theme.css's token comment for the "status color vs.
+   identity color" split this relies on. */
+.harmonia-gauge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 18px;
+}
+@media (min-width: 480px) {
+  .harmonia-gauge-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.harmonia-gauge { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.harmonia-gauge-ring {
+  --pct: 0;
+  --gauge-color: var(--accent-2);
+  position: relative;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: conic-gradient(var(--gauge-color) calc(var(--pct) * 1%), var(--gridline) 0);
+}
+.harmonia-gauge-ring::before {
+  content: '';
+  position: absolute; inset: 6px;
+  border-radius: 50%;
+  background: var(--card);
+}
+.harmonia-gauge-score {
+  position: relative; z-index: 1;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-variant-numeric: proportional-nums;
+}
+.harmonia-gauge-label { font-size: 0.72rem; color: var(--muted); line-height: 1.2; }
+.harmonia-gauge-ring.band-fill-leading { --gauge-color: var(--good); }
+.harmonia-gauge-ring.band-fill-visible { --gauge-color: var(--warning); }
+.harmonia-gauge-ring.band-fill-weak { --gauge-color: var(--serious); }
+.harmonia-gauge-ring.band-fill-invisible { --gauge-color: var(--critical); }
+.harmonia-gauge-ring.band-fill-unavailable { --gauge-color: var(--faint); }
+
+/* Site Health's own overall-score numeral picks up --accent-2 too — ties
+   the summary number back to the gauges below it instead of reusing the
+   AI score's status-band coloring for both scores at once. */
+.theme-dashboard .harmonia-summary-card .harmonia-overall-score { color: var(--accent-2); }
+
+.theme-dashboard .check-icon { display: inline-flex; align-items: center; }
 </style>

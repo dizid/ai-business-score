@@ -33,5 +33,8 @@ export function toScanPayload(row: Record<string, any>) {
     // harmonia is new (technical/on-page/content-structure/UX audit of the
     // scanned site) — same null default for pre-migration rows.
     harmonia: row.harmonia ?? null,
+    // started_at is new (scan timing) — same null default for pre-migration
+    // rows and any scan still `pending`/`running`.
+    startedAt: row.started_at ?? null,
   };
 }

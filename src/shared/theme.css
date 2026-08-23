@@ -57,6 +57,25 @@
   --radius-lg: 12px;
   --page-max: 800px;
   --page-max-wide: 1100px;
+
+  /* Dashboard redesign (2026-08-23) — additive tokens only, gated behind
+     `.theme-dashboard` in ScanDetail.vue/app views. Inert everywhere else,
+     including result.html, which never references them. --accent stays the
+     AI Visibility Score's own color; --accent-2 gives the separate Site
+     Health score its own identity instead of visually duplicating it;
+     --accent-3 differentiates the "Performance by query type" categories,
+     which previously rendered as three identical flat blue bars. None of
+     these three are reused from the marketing site's gold/blue (brand/BRAND.md
+     keeps that palette off the dashboard) and none collide with the
+     --good/--warning/--serious/--critical status colors below, which are
+     semantic (how good) and must stay untouched — --accent/--accent-2/--accent-3
+     are identity colors (which thing), a separate axis on purpose.
+     --font-display reuses the marketing site's Space Grotesk for headings
+     only (loaded in app.html) — body/data text stays system-ui for density. */
+  --accent-2: #7c5cff;
+  --accent-2-ink: #ffffff;
+  --accent-3: #0b8793;
+  --font-display: 'Space Grotesk', -apple-system, "Segoe UI", system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
@@ -70,6 +89,9 @@
     --gridline: #2c2c2a;
     --accent: #7c96ff;
     --accent-ink: #0c0b09;
+    --accent-2: #b3a1ff;
+    --accent-2-ink: #0c0b09;
+    --accent-3: #5eead4;
     --debar: #3c3b37;
     --good: #0ca30c;
     --warning: #fab219;
@@ -90,6 +112,9 @@
   --gridline: #2c2c2a;
   --accent: #7c96ff;
   --accent-ink: #0c0b09;
+  --accent-2: #b3a1ff;
+  --accent-2-ink: #0c0b09;
+  --accent-3: #5eead4;
   --debar: #3c3b37;
   --good: #0ca30c;
   --warning: #fab219;

@@ -80,6 +80,7 @@ export interface ValidatedPayload {
   sentimentJudgments: SentimentJudgment[];
   failures: FailureItem[];
   generatedAtDate: Date;
+  startedAtDate: Date | null;
   deepAdvice: DeepAdvice | null;
   deepAdviceGeneratedAtDate: Date | null;
   harmonia: HarmoniaResult | null;
@@ -399,6 +400,16 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     if (!Number.isNaN(d.getTime())) deepAdviceGeneratedAtDate = d;
   }
 
+  // startedAt is new (scan timing) — same lenient degrade-to-null treatment
+  // as deepAdviceGeneratedAt above: missing (pre-migration scans) or
+  // malformed never rejects the whole payload, it just means no duration
+  // can be shown for this scan.
+  let startedAtDate: Date | null = null;
+  if (typeof raw.startedAt === 'string') {
+    const d = new Date(raw.startedAt);
+    if (!Number.isNaN(d.getTime())) startedAtDate = d;
+  }
+
   // href-safety: only http(s) links get rendered as clickable — anything
   // else (javascript:, data:, etc.) is dropped rather than escaped, since
   // HTML-escaping a URL does not neutralize a javascript: scheme.
@@ -423,6 +434,7 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     sentimentJudgments,
     failures,
     generatedAtDate,
+    startedAtDate,
     deepAdvice,
     deepAdviceGeneratedAtDate,
     harmonia: raw.harmonia !== undefined ? asHarmonia(raw.harmonia) : null,

@@ -1,5 +1,30 @@
 # Foreground brand design
 
+**2026-08-23: the CEO explicitly reversed the "dashboard stays calm,
+always" rule below — for the authenticated dashboard specifically, not
+the legacy shareable-link page.** The CEO found the dashboard (in
+particular `ScanDetail.vue`'s scan-results view) boring and asked for real
+color, more graphics, and clearer visual structure, overriding this
+document's prior "no radial glow or score-ring flourish on `ScanDetail.vue`"
+stance. **What changed:** `src/app/**` and `ScanDetail.vue` (when rendered
+with its new `theme="dashboard"` prop) now have their own expanded
+palette — `--accent-2` (violet, `#7c5cff` light / `#b3a1ff` dark, the Site
+Health score's identity color), `--accent-3` (teal, `#0b8793` light /
+`#5eead4` dark, for categorical chart differentiation), Space Grotesk
+headings (reused from the marketing typography below, for cross-surface
+consistency), a restrained band-colored glow on the AI score ring, and
+donut-gauge charts for the Site Health pillars instead of flat bars — all
+defined in `src/shared/theme.css` and gated behind `.theme-dashboard` in
+`ScanDetail.vue`. **What did NOT change:** this is still not a copy of the
+marketing palette below — no gold, no page-wide glow, no mascot — a
+deliberately distinct, more restrained direction for a data-dense tool.
+**What's still unchanged and still governed by the original 2026-08-10/17
+decision:** `result.html` (the pre-pivot shareable-link page). It renders
+`ScanDetail.vue` with `theme="legacy"` (the default), so it stays exactly
+as calm/muted/professional as this document originally promised — the
+reversal above applies to the authenticated dashboard only. See "Why this
+scales" at the bottom, revised the same day to reflect this three-way split.
+
 Written 2026-08-10. Original version anchored the CEO's "AI scoring = more
 sales!!" positioning into a generic blue/violet SaaS visual identity. That
 day, the CEO approved a jungle/mascot direction — **Top Banana** — pitched
@@ -27,19 +52,19 @@ line motifs — none of those had a name-collision problem, only the words
 muted) duality maps onto the exact same visual system the "lit vs. offstage"
 duality already used.
 
-**Critical boundary, unchanged:** this brand direction governs the four
-static marketing entry points only — `index.html`, `how-it-works.html`,
-`privacy.html`, `terms.html` — plus their shared stylesheet and OG/favicon
-assets. It does **not** govern `src/app/**` (including `LoginView.vue` /
-`SignupView.vue`), `result.html`, or `src/shared/theme.css` — the
-authenticated app dashboard and the pre-pivot legacy shareable-link page
-are deliberately unaffected and stay exactly as they are today: calm,
-muted, professional. (The 2026-08-18 rename does update the *product name
+**Critical boundary:** this *specific* gold/graphite/radial-glow/mascot-free
+brand direction governs the four static marketing entry points only —
+`index.html`, `how-it-works.html`, `privacy.html`, `terms.html` — plus
+their shared stylesheet and OG/favicon assets. It still does **not** govern
+`src/app/**` or `result.html` — see the 2026-08-23 note at the top of this
+document: the authenticated dashboard now has its *own*, separately-defined
+expanded palette (not this one), while `result.html` stays on the original
+calm/muted/professional treatment this section describes below applying
+only to marketing. (The 2026-08-18 rename does update the *product name
 text* inside `src/app/**` — titles, the nav wordmark — since that's a
 plain find-replace of what the app is called, not an application of this
 document's visual direction to the dashboard.) See "Why this scales" below
-for the reasoning that justifies the visual split, which predates Top
-Banana, Spotlight, and this rename alike.
+for the reasoning that justifies the three-way visual split.
 
 ## The world
 
@@ -107,17 +132,32 @@ the light"; now "foreground," "background," "cited"):
 
 ## Color palette
 
-Two palettes coexist, scoped to different surfaces — unchanged split from
-every prior version of this document:
+Three surfaces, three palettes, as of 2026-08-23 (was two before that
+date — see the note at the top of this document):
 
-- **In-app dashboard** (`src/shared/theme.css`) — deliberately calm and
-  utilitarian, muted grays, one blue accent, plus the existing score-band
-  colors (`--good`/`--warning`/`--serious`/`--critical`). **Unchanged by
-  this document.** Nothing in `theme.css` is edited here or implied to
-  change.
 - **Marketing (the four static entry points)** — the palette below,
   unchanged in hex values from the Spotlight version; only the row labels
   are renamed to match the foreground/background naming.
+- **Authenticated dashboard** (`src/app/**`, `ScanDetail.vue` rendered with
+  `theme="dashboard"`) — its own intentional, expanded palette, defined in
+  `src/shared/theme.css`: the original neutrals and single blue `--accent`
+  stay (still the AI Visibility Score's own color), plus new identity
+  colors layered on top — `--accent-2` (violet, `#7c5cff` light /
+  `#b3a1ff` dark, the Site Health score's own identity, distinct from the
+  AI score) and `--accent-3` (teal, `#0b8793` light / `#5eead4` dark, for
+  categorical chart differentiation) — and Space Grotesk for headings
+  only, reusing the marketing typeface below for cross-surface
+  consistency without adopting marketing's motifs. Deliberately **not** a
+  copy of the marketing palette: no gold, no page-wide glow, no mascot —
+  the score-band colors (`--good`/`--warning`/`--serious`/`--critical`)
+  are untouched, since they're semantic ("how good") and a separate axis
+  from the new identity colors ("which score/category"). The one
+  restrained motif borrowed at all is a soft, band-colored glow on the AI
+  score ring itself — not a page-wide effect.
+- **Legacy shareable-link page** (`result.html`, `ScanDetail.vue` rendered
+  with its default `theme="legacy"`) — still exactly the original
+  calm/muted/utilitarian treatment this document has always promised for
+  it, completely unaffected by the dashboard palette above.
 
 **Dark-first, deliberately:** the site defaults to this dark theme
 directly — `color-scheme: dark` set outright in the shared stylesheet, not
@@ -227,13 +267,28 @@ claims about competitors.
 ## Why this scales
 
 The marketing surface can afford to be more visually confident than the
-product; the product stays calm and mascot-free on purpose. These are
-different jobs. A first-time visitor needs a hook strong enough to make an
-abstract 0-100 visibility metric feel like something worth caring about —
-the foreground/background contrast does that without needing a character
-to sell it. A signed-in user checking their actual score, though, is doing
-repeat-use, trust-sensitive work — they need the dashboard to read as
-accurate and serious, not staged. Putting a radial glow or a score-ring
-flourish on `ScanDetail.vue` would undercut the very credibility the score
-needs to be useful. Same logic that justified a marketing-only palette in
-every prior version of this doc.
+product; the product stays mascot-free on purpose (unchanged — no mascot
+anywhere in this rename, no mascot in the 2026-08-23 dashboard palette
+either). These are different jobs. A first-time visitor needs a hook
+strong enough to make an abstract 0-100 visibility metric feel like
+something worth caring about — the foreground/background contrast does
+that without needing a character to sell it.
+
+**Revised 2026-08-23** for the dashboard/legacy split specifically: a
+signed-in user checking their actual score is doing repeat-use,
+trust-sensitive work — they need the dashboard to read as accurate and
+serious, not staged. That's still true, and it's exactly why the
+2026-08-23 dashboard redesign borrows none of marketing's specific
+motifs (no gold, no page-wide radial glow, no mascot) even though the CEO
+explicitly asked for more color and graphics there. The claim this
+document originally made was narrower than "the dashboard must stay
+gray": it was "don't reuse the *marketing* palette on the dashboard." A
+signed-in, repeat-use dashboard can have its own real, intentional visual
+identity — organized, color-coded, graphical — and still read as more
+serious than a landing page, precisely *because* it's a distinct identity
+rather than marketing's "you're chosen" gold showing up somewhere it
+would just look like an ad. The legacy `result.html` page is a different
+case again: it's a static, unowned, one-time link with no login and no
+repeat-use relationship to protect, which is why it alone keeps the
+original untouched treatment rather than picking up either surface's
+newer identity.

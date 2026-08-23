@@ -350,6 +350,7 @@ watch(() => route.params.id, load);
             <ScanDetail
               v-if="selectedPayload"
               :payload="selectedPayload"
+              theme="dashboard"
               :allow-deep-advice="true"
               :deep-advice-loading="deepAdviceLoading"
               :allow-sentiment-judge="true"
@@ -369,7 +370,7 @@ watch(() => route.params.id, load);
 main { max-width: var(--page-max-wide); margin: 0 auto; padding: var(--space-2xl) var(--space-md) var(--space-xl); }
 .head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--space-md); margin-bottom: 24px; }
 .head-row > div:first-child { min-width: 0; }
-h1 { font-size: var(--text-xl); font-weight: 700; margin: 0 0 4px; }
+h1 { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; margin: 0 0 4px; }
 .legacy-tag {
   font-size: 0.7rem; font-weight: 600; color: var(--muted);
   border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: middle;

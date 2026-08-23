@@ -82,7 +82,7 @@ export default async (req: Request) => {
   // this scanId was already picked up, whether by a legitimate retry or a
   // duplicate trigger.
   const claimed = await db`
-    UPDATE public.scans SET status = 'running', progress = '{"completed":0,"total":0,"currentModels":[]}'
+    UPDATE public.scans SET status = 'running', started_at = now(), progress = '{"completed":0,"total":0,"currentModels":[]}'
     WHERE id = ${scanId} AND status = 'pending'
     RETURNING *
   `;
@@ -208,18 +208,38 @@ export default async (req: Request) => {
   // 2026-08-15 direct-provider migration (aivis-core.mjs's callModel
   // comment), anthropic/google/xai each call their own independent provider
   // API and no longer share that key or its rate limit — only
-  // openai/gpt-5-mini still goes through the Perplexity gateway. This
-  // constant now means "concurrency limit *within* one provider's lane," not
-  // "global concurrency limit": tasks are partitioned by provider below and
-  // each provider's own lane still runs at this limit (1, unchanged, same
-  // proven-safe behavior), but the lanes themselves now run in parallel
-  // with each other via Promise.all — no single provider's key ever sees
-  // more than CONCURRENCY_LIMIT concurrent requests, so none of the three
-  // incidents above can recur, while wall-clock time drops from "sum of all
-  // providers' calls" to roughly "the slowest provider's own sequential
-  // chain." Not yet live-verified with a real timed scan — do that once,
-  // same discipline as every other change in this file's history.
-  const CONCURRENCY_LIMIT = 1;
+  // openai/gpt-5-mini still goes through the Perplexity gateway. Tasks are
+  // partitioned by provider below and each provider's own lane runs at its
+  // own limit (no single provider's key ever sees more than its own lane's
+  // concurrent requests), while the lanes themselves run in parallel with
+  // each other via Promise.all.
+  //
+  // 2026-08-23: went from one flat CONCURRENCY_LIMIT to a per-provider map.
+  // `openai` stays 1, unchanged — this is the Perplexity gateway lane,
+  // proven fragile across all three incidents above; not touched by this
+  // change. `anthropic`/`google` bumped to 3 — both call independent,
+  // directly-provisioned APIs with no shared-gateway history of trouble;
+  // reasoned relative to typical per-project rate-limit tiers, not
+  // confirmed against this project's actual configured-key tier. `xai`
+  // bumped to only 2 (not 3) — Grok is documented elsewhere in this file as
+  // structurally slower (30-50s+/call, agentic multi-round search) and has
+  // the shortest production track record of the three direct-API lanes; a
+  // smaller bump limits how many simultaneously-open, long-running requests
+  // are in flight if something goes wrong mid-request. `DEFAULT_PROVIDER_CONCURRENCY`
+  // covers any provider added to MODELS later without an explicit entry —
+  // defaults to the proven-safe value (1) rather than assuming a new
+  // provider can handle more. None of this is live-verified with a real
+  // timed scan yet — see this file's own "verify live before trusting"
+  // discipline; do one live-triggered scan (not proof-script) and check
+  // scans.failures for a 429 spike before treating this as validated, and
+  // roll a provider back toward 1 immediately if one appears.
+  const DEFAULT_PROVIDER_CONCURRENCY = 1;
+  const CONCURRENCY_LIMIT_BY_PROVIDER: Record<string, number> = {
+    openai: 1,
+    anthropic: 3,
+    google: 3,
+    xai: 2,
+  };
   // Was 100000, then 120000 (same-day intermediate fix, see above). Raised
   // further to 600000 (10 min) for fully-sequential 20-call scans — at
   // ~15-25s/call happy-path that's ~5-8 min, plus real headroom for
@@ -275,8 +295,8 @@ export default async (req: Request) => {
   // scan itself, same "don't let a nice-to-have break the actual work"
   // pattern as the scan-complete email below.
   //
-  // Now that provider lanes run concurrently (see CONCURRENCY_LIMIT above),
-  // more than one call can be in flight at once, so `currentModel: string`
+  // Now that provider lanes run concurrently (see CONCURRENCY_LIMIT_BY_PROVIDER
+  // above), more than one call can be in flight at once, so `currentModel: string`
   // became `currentModels: string[]`, and `completed` can no longer be a
   // plain JS counter written into a client-computed snapshot — two lanes'
   // writes could reach the DB out of order and a later write carrying a
@@ -306,18 +326,21 @@ export default async (req: Request) => {
     }
   }
 
-  // Captured here (not at the very top of the handler) so it lines up with
-  // exactly what SCAN_DEADLINE_MS has always bounded — the claim/company-
-  // lookup/harmonia-kickoff steps above take negligible time and were never
-  // part of that budget either.
-  const scanStartTime = Date.now();
+  // Sourced from the DB's own `started_at` (set atomically by the claim
+  // UPDATE above via `now()`), not a fresh `Date.now()` here — avoids any
+  // clock-skew between this function container's clock and Neon's server
+  // clock, and doubles as the persisted timestamp `ScanDetail.vue` uses to
+  // show "scan completed in Xm Ys" once the scan finishes. Still lines up
+  // with exactly what SCAN_DEADLINE_MS has always bounded — the claim/
+  // company-lookup/harmonia-kickoff steps above take negligible time.
+  const scanStartTime = new Date(scanRow.started_at).getTime();
   const deadline = new AbortController();
   const deadlineTimer = setTimeout(() => deadline.abort(), SCAN_DEADLINE_MS);
   // Partition into one lane per provider (the string before "/" in each
   // model id — "openai", "google", "anthropic", "xai") so each provider's
-  // own calls stay strictly sequential (CONCURRENCY_LIMIT, unchanged) while
-  // the lanes themselves run in parallel via Promise.all below — see
-  // CONCURRENCY_LIMIT's comment above for why this is safe. Grouping by
+  // own calls stay bounded by its own CONCURRENCY_LIMIT_BY_PROVIDER entry
+  // while the lanes themselves run in parallel via Promise.all below — see
+  // that constant's comment above for why this is safe. Grouping by
   // provider rather than by exact model string future-proofs this against
   // a provider ever gaining a second model in MODELS.
   const tasksByProvider = new Map<string, typeof tasks>();
@@ -362,7 +385,9 @@ export default async (req: Request) => {
   let callResults;
   try {
     const perLaneResults = await Promise.all(
-      Array.from(tasksByProvider.values()).map((providerTasks) => runWithConcurrency(providerTasks, CONCURRENCY_LIMIT, worker))
+      Array.from(tasksByProvider.entries()).map(([provider, providerTasks]) =>
+        runWithConcurrency(providerTasks, CONCURRENCY_LIMIT_BY_PROVIDER[provider] ?? DEFAULT_PROVIDER_CONCURRENCY, worker)
+      )
     );
     callResults = perLaneResults.flat();
   } finally {
@@ -411,7 +436,11 @@ export default async (req: Request) => {
       const sentimentDeadline = new AbortController();
       const sentimentTimer = setTimeout(() => sentimentDeadline.abort(), sentimentRemainingMs);
       try {
-        await runWithConcurrency(sentimentTargets, CONCURRENCY_LIMIT, async (target: { promptIndex: number; model: string; text: string }) => {
+        // Pinned to the openai lane's own limit regardless of which
+        // provider produced the original mention — this pass always calls
+        // openai/gpt-5-mini (below) via the Perplexity gateway, the one
+        // lane CONCURRENCY_LIMIT_BY_PROVIDER deliberately leaves at 1.
+        await runWithConcurrency(sentimentTargets, CONCURRENCY_LIMIT_BY_PROVIDER.openai, async (target: { promptIndex: number; model: string; text: string }) => {
           if (sentimentDeadline.signal.aborted) return;
           try {
             const prompt = buildSentimentJudgePrompt(prospect.brand, target.text);
@@ -453,6 +482,12 @@ export default async (req: Request) => {
         generated_at = now()
       WHERE id = ${scanId}
     `;
+    // Operator-visible duration line (Netlify function logs) — a JS-side
+    // approximation, fine for a log line but not the source of truth. The
+    // authoritative, persisted duration is always `generated_at - started_at`
+    // (both DB timestamps), computed downstream in scanRow.mts/ScanDetail.vue
+    // rather than stored a third time here.
+    console.log(`run-scan-background: scan ${scanId} completed in ${((Date.now() - scanStartTime) / 1000).toFixed(1)}s`);
   } catch (err) {
     finalStatus = 'failed';
     console.error(`run-scan-background: failed to finalize scan ${scanId}:`, err);

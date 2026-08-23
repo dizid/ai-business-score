@@ -45,6 +45,10 @@ export default async (req: Request, context: Context) => {
       // that are still pending (not claimed yet) or finalized before this
       // column existed. See the `progress` column comment for the shape.
       progress: row.progress ?? null,
+      // Surfaced alongside progress (not only inside the completed payload)
+      // so the polling UI can show a live elapsed-time ticker while a scan
+      // is still `running`, before toScanPayload() has anything to return.
+      startedAt: row.started_at ?? null,
       scan: row.status === 'completed' ? toScanPayload(row) : null,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } }
