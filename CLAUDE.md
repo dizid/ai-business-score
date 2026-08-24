@@ -219,7 +219,9 @@ automatically only when a session touches that directory: `shared/CLAUDE.md`
 `src/shared/CLAUDE.md` (`scanPayload.ts` + `ScanDetail.vue`), and
 `proof-script/CLAUDE.md`. Nothing was deleted, just relocated.
 
-### `vite.config.ts` — two entries
+### `vite.config.ts` — six entries (corrected 2026-08-24; this section had
+drifted out of date since the marketing-push pivot re-added `index.html`
+under a different role than the paragraph below used to describe)
 
 - **`result.html`** — the pre-pivot shareable result page, kept alive
   indefinitely so old links never break. Thin Vite shell; `src/result/App.vue`
@@ -236,14 +238,49 @@ automatically only when a session touches that directory: `shared/CLAUDE.md`
   `netlify.toml`'s `[[redirects]]` rule (`/app/* → /app.html`, 200) makes
   direct navigation/refresh on nested routes like `/app/companies/123`
   resolve correctly.
+- **`index.html`, `how-it-works.html`, `privacy.html`, `terms.html`** — plain
+  static HTML/CSS, not Vue mounts, sharing `public/marketing-theme.css`.
+  `index.html` was retired in Milestone 5 (the passphrase-gated scan form,
+  described below) but **reintroduced later as a different page** for the
+  monetization/marketing push: the public landing page at `/`, since
+  several major AI crawlers (GPTBot, PerplexityBot, ClaudeBot) don't
+  execute client-side JS and the pitch has to exist as real HTML.
+  `how-it-works.html`/`privacy.html`/`terms.html` were converted from
+  `app.html` SPA routes to static entries the same way, for the same
+  crawlability reason — see `vite.config.ts`'s own header comment for the
+  full per-file rationale, which is more current than this file on this
+  specific point.
 
-`index.html` and `history.html` (the old passphrase-gated scan form and
-history list) were **retired** in Milestone 5 once the authenticated app
-shell covered the same ground — deleted along with their
-`src/index`/`src/history` Vue apps and the then-fully-redundant
+The old passphrase-gated scan form and history list (the original,
+different `index.html` + `history.html`) were **retired** in Milestone 5
+once the authenticated app shell covered the same ground — deleted along
+with their `src/index`/`src/history` Vue apps and the then-fully-redundant
 `netlify/functions/history.mts` (superseded by `GET /companies` +
 `GET /companies/:id`). If you're looking for the "why not a SPA" reasoning
 that used to live here, it only ever applied to those retired pages and
 `result.html` — read `src/app/router.ts`'s own comment for why `app.html`
 doesn't have that constraint.
+
+### `/blog` — a seventh, non-Vite content mechanism (added 2026-08-24)
+
+Not a `vite.config.ts` entry — `scripts/build-blog.mjs` runs as a
+**post**-`vite build` step (`package.json`'s `build` script:
+`vue-tsc --noEmit && vite build && node scripts/build-blog.mjs`), reading
+markdown+frontmatter from `content/blog/*.md` and writing plain static
+`dist/blog/<slug>/index.html` pages plus `dist/blog/index.html`, styled by
+the new `public/blog-theme.css` (extends `marketing-theme.css`'s tokens,
+no new palette). Folder+`index.html` output means Netlify serves clean
+`/blog/<slug>/` URLs with zero `netlify.toml` redirects needed, unlike the
+four pages above. Also appends each post's URL into `dist/sitemap.xml` at
+build time. **Important operational gap**: because this only runs as part
+of `npm run build`, `/blog` is NOT served by `npm run dev` — testing it
+locally means building and serving `dist/` with a static file server, not
+the usual dev-server workflow. `content/blog/*.md` are repurposed,
+web-article versions of the original `content/articles/*.md` drafts
+(LinkedIn/Substack + X-thread format, still there unchanged for social
+posting) — the blog versions drop the X-thread section and swap the
+"link in the comments" sign-off for direct on-site links. **The essay
+content itself was still marked "needs Marc's read before posting" in the
+source drafts** — building the pipeline and converting the copy doesn't
+imply the content has been reviewed.
 

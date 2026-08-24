@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Privacy Policy — Foreground</title>
-<meta name="description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Neon, Netlify) involved." />
+<meta name="description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Resend, Neon, Netlify) involved." />
 <link rel="canonical" href="https://aivis-scan.netlify.app/privacy" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -15,12 +15,12 @@
 <meta name="theme-color" content="#0a0a0d" />
 <meta property="og:type" content="article" />
 <meta property="og:title" content="Privacy Policy — Foreground" />
-<meta property="og:description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Neon, Netlify) involved." />
+<meta property="og:description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Resend, Neon, Netlify) involved." />
 <meta property="og:url" content="https://aivis-scan.netlify.app/privacy" />
 <meta property="og:image" content="https://aivis-scan.netlify.app/og-image.png" />
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="Privacy Policy — Foreground" />
-<meta name="twitter:description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Neon, Netlify) involved." />
+<meta name="twitter:description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Resend, Neon, Netlify) involved." />
 <meta property="twitter:image" content="https://aivis-scan.netlify.app/og-image.png" />
 <!-- Self-contained @graph: this page is a separate HTTP document from
      index.html, so the WebPage node's isPartOf/publisher @id references
@@ -50,7 +50,7 @@
       "@id": "https://aivis-scan.netlify.app/privacy#webpage",
       "url": "https://aivis-scan.netlify.app/privacy",
       "name": "Privacy Policy — Foreground",
-      "description": "What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Neon, Netlify) involved.",
+      "description": "What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Resend, Neon, Netlify) involved.",
       "isPartOf": { "@id": "https://aivis-scan.netlify.app/#website" },
       "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" }
     }
@@ -82,18 +82,16 @@
     <a class="back" href="/">← Back to Foreground</a>
 
     <h1>Privacy Policy</h1>
-    <p class="draft-note">
-      Draft — have this reviewed before relying on it for compliance.
-    </p>
-    <p class="updated">Last updated: 2026-08-17</p>
+    <p class="updated">Last updated: 2026-08-24</p>
 
     <section>
       <h2>Overview</h2>
       <p>
-        Foreground ("we", "us") is a small, self-serve tool that checks whether AI
-        search tools like ChatGPT, Gemini, Claude, and Grok mention your
-        business, and tracks that over time. This policy explains what we
-        collect, why, and how it's handled.
+        Foreground ("we", "us") is operated by Dizid Web Development. It's a
+        small, self-serve tool that checks whether AI search tools like
+        ChatGPT, Gemini, Claude, and Grok mention your business, and tracks
+        that over time. This policy explains what we collect, why, and how
+        it's handled.
       </p>
     </section>
 
@@ -148,10 +146,26 @@
           the four AI checks that make up a scan.</li>
         <li><strong>Stripe</strong> — handles all payment processing for paid plans. Foreground never
           stores your card number or full payment details.</li>
+        <li><strong>Resend</strong> — sends the scan-complete email to your account's email address.</li>
         <li><strong>Neon</strong> — hosts our database and authentication (login/session) system.</li>
         <li><strong>Netlify</strong> — hosts the application and runs its backend functions.</li>
       </ul>
       <p>We don't share your data with anyone else, and never for advertising purposes.</p>
+      <p>
+        These providers are based outside your country (most are US-based),
+        so using Foreground involves your data being processed
+        internationally. Each provider maintains its own safeguards for
+        that transfer under its applicable privacy/data-processing terms.
+      </p>
+    </section>
+
+    <section>
+      <h2>Cookies</h2>
+      <p>
+        Foreground uses one essential cookie, set by Neon Auth, to keep you
+        logged in between visits. We don't use tracking or advertising
+        cookies.
+      </p>
     </section>
 
     <section>
@@ -205,7 +219,7 @@
   <footer>
     &copy; 2026 Foreground. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
     · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
-    · <a href="/how-it-works">How this works</a>
+    · <a href="/how-it-works">How this works</a> · <a href="/blog/">Blog</a>
     · <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
   </footer>
 </div>

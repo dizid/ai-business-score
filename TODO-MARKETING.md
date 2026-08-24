@@ -1,5 +1,27 @@
 # TODO-MARKETING
 
+## STATUS 2026-08-24: `content/articles/` repurposed into an on-site `/blog` — pipeline SHIPPED, content still unreviewed
+
+**Trigger:** Marc asked to make the app "best of breed," including "more
+SEO, possibly." Full plan: `~/.claude/plans/ethereal-waddling-globe.md`.
+Directly follows up on the entry below, which had already found
+`content/articles/`'s 4 drafts and flagged them as the PR/thought-leadership
+angle the marketing plan wanted, but unbuilt.
+
+**What shipped:** the 4 drafts are now web articles at `content/blog/*.md`,
+rendered by a new build pipeline (`scripts/build-blog.mjs`) into a real
+`/blog` on the site, indexed in `sitemap.xml`. See `TODOS.md`'s 2026-08-24
+"On-site `/blog` pipeline" entry and `CLAUDE.md`'s "`/blog`" architecture
+section for the technical detail. The original `content/articles/*.md`
+files (LinkedIn/Substack + X-thread format) are untouched — still usable
+for the social posting the entry below was scoped for; the blog gives the
+same underlying essays a second, on-site distribution channel.
+
+**Not resolved by this**: the content is still Marc's original draft,
+explicitly marked "needs Marc's read before posting" — nothing here
+changes that. The analytics gap (zero tracking on the site, noted below)
+and the PR-pitch angle are also still open.
+
 ## STATUS 2026-08-24: real pricing set + monetization/marketing plan drafted — pricing copy SHIPPED, most marketing work still open
 
 **Trigger:** Marc asked for "alot of improvements to monetize and market

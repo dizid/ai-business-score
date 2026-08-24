@@ -184,8 +184,8 @@ version of this palette used. In the shared stylesheet
 tokens** (`--gold` / `--accent`) specifically so implementers don't
 default every interactive element to gold out of convenience — gold
 appears only where something has actually been chosen (CTA buttons, the
-cited-name highlight, the Pro plan's border, the score-ring), while blue
-carries the rest of the UI (links, focus outlines, secondary numerals).
+Pro plan's border, the score-ring), while blue carries the rest of the UI
+(links, focus outlines, secondary numerals).
 **No CSS token names or hex values changed in this rename** — only this
 document's prose labels for them.
 
@@ -235,15 +235,11 @@ needed, unchanged in implementation from the Spotlight version:
   behind the hero headline and layered into the final CTA band's
   background. Implemented as a `background-image` layer in
   `public/marketing-theme.css`, not a separate illustrated asset.
-- **The "cited" highlight** — `mark.cited-name` in the hero's dissolve demo
-  glows gold (a soft radial tint plus a subtle gold text-shadow) — this
-  name is in the foreground.
 - **Score-ring dial** — a small gold-arc-over-graphite-track circle
   (CSS `conic-gradient` + a mask, no SVG file needed), reused as a
-  decorative badge in two spots: the corner of the "AI answer" panel in
-  the hero dissolve demo, and the corner of the Pro plan card. Ties
-  directly to the product's actual 0-100 score rather than being pure
-  decoration.
+  decorative badge in two spots: next to the "0-100" figure in the hero's
+  fact strip, and the corner of the Pro plan card. Ties directly to the
+  product's actual 0-100 score rather than being pure decoration.
 - **Stage-line dividers** — section boundaries that used to be a flat
   `border-top: 1px solid var(--line)` are a horizontal gradient line
   (transparent → line-bright → transparent) painted as a 1px background

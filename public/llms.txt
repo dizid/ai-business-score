@@ -50,3 +50,4 @@ Paid ("Pro"): $199/month — unlimited companies, 20 scans/month (fair use, top-
 - Product: https://aivis-scan.netlify.app/
 - How it works: https://aivis-scan.netlify.app/how-it-works
 - Sign up: https://aivis-scan.netlify.app/app/signup
+- Blog: https://aivis-scan.netlify.app/blog/

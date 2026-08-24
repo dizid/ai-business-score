@@ -5,6 +5,32 @@ researching root causes but not yet implemented (another session was
 mid-implementation on something else at the time this was written, so
 this was deliberately left as a plan rather than started).
 
+## STATUS 2026-08-24: 4 of 6 items resolved, verified against current code
+
+Commit `e2bde88` (2026-08-22) shipped **#1** (mobile nav CSS), **#4**
+(how-it-works.html sentiment mention), and the visible half of **#3**
+(hides the "No scans yet" empty state when a scan error is showing,
+instead of stacking both messages — a narrower fix than #3a's original
+ask below, see that item's note). **#2**'s redundancy concern is also
+resolved: the hero eyebrow and H1 no longer restate each other (current
+text: "No page 1. Just foreground or background." / "AI search gives one
+answer, not a results page..."), per that same commit's "tighten the hero
+headline/lead."
+
+**#6 (demo declutter) is superseded, not shipped-as-written**: the
+`.serp-row` markup this item's fix targeted no longer exists — the demo
+section was rebuilt into a `.demo-grid`/`.demo-card` structure (4 cards,
+each a short title + one sentence) as part of a later marketing pass. The
+underlying complaint (too much text, too little info) reads resolved by
+that redesign, but nobody edited `.serp-row` per this item's literal
+instructions, since it's gone.
+
+**Still open: #3a's actual ask (the `load()`-before-terminal-error
+resync — a scan that completed server-side can still dead-end the UI),
+#3b (root-cause confirmation via live Netlify logs), and #5 (gpt-5-mini
+direct API migration — confirmed still gateway-routed, no
+`OPENAI_API_KEY` exists as of this check).**
+
 ## Context
 
 Marc did a mobile QA pass (Android Chrome) over two days (2026-08-19,

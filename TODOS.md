@@ -1,5 +1,35 @@
 # TODOs
 
+## STATUS 2026-08-24: On-site `/blog` pipeline — SHIPPED, content not yet reviewed
+
+**Trigger:** Marc asked for a plan to make the app "best of breed" (easier
+to use, clearer scan results, more SEO). Full plan at
+`~/.claude/plans/ethereal-waddling-globe.md` — 4 phases (quick fixes,
+scan-result clarity, on-site blog, lower-priority cleanup). **Only the
+blog phase shipped this round** — the scan-result clarity phase was
+deferred because another live session was concurrently editing
+`ScanDetail.vue`/`CompanyDetailView.vue`/`company.mts` for the single-scan
+SKU above; re-check `git status` before picking that phase up.
+
+**What shipped:** `scripts/build-blog.mjs`, a post-`vite build` Node step
+that renders `content/blog/*.md` (frontmatter + markdown) into static
+`dist/blog/<slug>/index.html` pages + a `/blog` index, styled by new
+`public/blog-theme.css`, and appends the new URLs into `dist/sitemap.xml`.
+Four posts, repurposed from the pre-existing `content/articles/*.md`
+LinkedIn/Substack drafts (which are untouched — still there for social
+posting). See `CLAUDE.md`'s new "`/blog` — a seventh, non-Vite content
+mechanism" section for the technical detail, including the "not served by
+`npm run dev`" gap.
+
+**Not done:** the shared header/footer partial `index.html`/
+`how-it-works.html`/`privacy.html`/`terms.html` still duplicate (blog
+pages match that existing duplication rather than fixing it); a `/blog`
+nav link on those four pages. **Most importantly: the essay content
+itself is still Marc's original draft**, explicitly marked "needs Marc's
+read before posting" in the source frontmatter — the pipeline and format
+conversion are done, the actual read-through is not, regardless of
+whether this entry says "shipped."
+
 ## STATUS 2026-08-24: Deep-advice gating + $19 single-scan SKU + real Pro pricing — SHIPPED and live
 
 **Trigger:** Marc asked for a full monetization + marketing/PR/sales plan
