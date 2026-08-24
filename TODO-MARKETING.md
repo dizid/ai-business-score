@@ -1,5 +1,41 @@
 # TODO-MARKETING
 
+## STATUS 2026-08-24: real pricing set + monetization/marketing plan drafted — pricing copy SHIPPED, most marketing work still open
+
+**Trigger:** Marc asked for "alot of improvements to monetize and market
+this app," wanting a low one-time scan fee plus subscriptions/Pro, and a
+marketing/PR/sales strategy. Full plan:
+`~/.claude/plans/we-need-alot-of-transient-floyd.md`.
+
+**Pricing decided and shipped**: Pro subscription **$199/month** (a
+deliberate premium position, above Otterly's $29 and Peec AI's $95 entry
+points per the existing competitor research — no longer "cheapest in
+category," a real repositioning), one-time single scan **$19**. Synced
+across `index.html` (pricing cards, JSON-LD, FAQ), `llms.txt`,
+`README.md`, `terms.html`, and the app itself (deep advice now actually
+Pro-gated — see `TODOS.md`'s 2026-08-24 entry for the engineering side).
+The Stripe Price behind the old subscription was found to actually charge
+$29/mo (a stale placeholder) — corrected the same day.
+
+**Marketing/PR/sales — planned, mostly not executed**: the plan's Part B
+covers positioning for the new premium price (lean on the 4-model breadth,
+sentiment+citation attribution, the candid "limitations" page as a trust
+signal), an analytics gap (confirmed zero tracking exists anywhere on the
+site — recommended Netlify Analytics or Plausible, not yet added), a PR
+angle (a `proof-script`-generated "state of AI visibility" stat, pitched to
+GEO-beat trade press; the honesty page as its own contrarian hook), and
+repointing `proof-script/OUTREACH.md`'s cold-outreach sequence at
+Foreground itself instead of Site Improver (see `NEXT-STEPS.md`'s
+2026-08-24 update). **None of that Part-B work is built yet** — this
+status entry is pricing/copy only.
+
+**Also found, unrelated to this plan**: a 4-part content article series
+(`content/articles/`, LinkedIn/Substack/Facebook + X-thread versions each,
+marked "draft — needs Marc's read before posting") already exists,
+apparently from a separate concurrent session — covers exactly the
+data-driven/thought-leadership PR angle the plan called for. Not written
+or reviewed as part of this session's work.
+
 ## STATUS 2026-08-18: renamed AIVis → Foreground — SHIPPED and pushed
 
 **Trigger:** asked to start planning a real custom domain for AIVis.

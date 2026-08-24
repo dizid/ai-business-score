@@ -133,11 +133,9 @@ Grouped by what they'd actually move.
   access today.
 
 ### Revenue
-- **Gate deep advice.** It's free and unlimited today
-  (`generate-deep-advice.mts`) despite costing roughly 2x normal Perplexity
-  spend per use — a deliberate deferral (Milestone E in
-  `PLAN_NEXT_PHASE.md`, waiting on a manual sales validation step), but a
-  real leak once usage grows past that test.
+- ~~**Gate deep advice.**~~ **Shipped 2026-08-24** — `generate-deep-advice.mts`
+  now requires Pro or a $19 single-scan purchase; see `TODOS.md`'s
+  2026-08-24 entry.
 
 ### Reliability
 - **An ops/failure-rate view across scans.** The only reason the
@@ -162,7 +160,7 @@ Grouped by what they'd actually move.
 3. Scheduled scans + regression alerts — biggest product-value lever for
    retention/subscription justification.
 4. Competitor-benchmarking view — biggest lever for new-customer conviction.
-5. Gate deep advice — revenue, once usage justifies it.
+5. ~~Gate deep advice~~ — shipped 2026-08-24.
 6. Team/agency access — opens a new buyer segment, bigger lift (invite
    flow, permission checks on top of the existing schema scaffold).
 7. Ops/failure-rate visibility + automated tests — not glamorous, but the

@@ -1,5 +1,90 @@
 # TODOs
 
+## STATUS 2026-08-24: Deep-advice gating + $19 single-scan SKU + real Pro pricing — SHIPPED and live
+
+**Trigger:** Marc asked for a full monetization + marketing/PR/sales plan
+("we need alot of improvements to monetize and market this app"). Full plan
+at `~/.claude/plans/we-need-alot-of-transient-floyd.md` — reconciles a
+prior monetization draft against the actual current code, decides pricing
+directly with Marc ($199/mo Pro, $19 one-time scan) rather than waiting on
+the never-run E0 manual sales test from `PLAN_NEXT_PHASE.md` (explicitly
+waived this round), and adds a marketing/PR/sales section (positioning,
+analytics gap, repointing `proof-script/OUTREACH.md` at Foreground itself,
+a PR angle, the growth-loop badge — none of the marketing-side items are
+built yet, only planned).
+
+**Milestone 1 — deep advice gating, shipped:**
+`generate-deep-advice.mts` now requires `isPro(planTier)` (or a matching
+`single_scan_purchases` row, once Milestone 2 landed same day), returning
+`402 {error, upgradeRequired: true}` instead of generating for free —
+previously any authenticated owner of a completed scan could generate it
+unlimited times. `ScanDetail.vue` gained a `deepAdviceLocked` prop
+rendering an upgrade CTA in place of the button instead of hiding the
+section outright; `company.mts`'s `GET /companies/:id` gained a missing
+`profile` field so `CompanyDetailView.vue` can compute the gate from the
+real `plan_tier`.
+
+**Milestone 2 — $19 one-time single-scan SKU, shipped:** a new purchase
+path serving both an anonymous lead-gen visitor (email+website → Stripe
+Checkout → webhook enriches the site via the same helpers `enrich.mts`
+wraps, creates an ownerless `companies`+`scans` row, emails a claim link)
+and a logged-in free-tier user out of scans who doesn't want to subscribe.
+New `single_scan_purchases` table (doubles as the deep-advice entitlement
+record, the free-cap-bypass record, and — for anonymous buyers — the
+pending-claim record); `companies.owner_user_id` is now nullable
+(explicitly signed off by Marc — doesn't reopen the 2026-08-03 "single
+owner per company" decision, a company is just transiently ownerless until
+claimed). New public routes: `/app/scan` (`PublicScanView.vue`),
+`single-scan-status.mts`, `claim-single-scan.mts`,
+`create-single-scan-checkout-session.mts` (the one function in this repo
+with *optional* auth). A landing form on `index.html` posts directly to
+the checkout function via a small inline `<script>` — the only interactive
+JS on that otherwise-static page.
+
+**Pricing sync, shipped:** `index.html` (pricing cards + JSON-LD `Offer`s +
+FAQ), `llms.txt`, `README.md`, `terms.html` (new single-scan billing
+terms), and both nested `CLAUDE.md` files updated from the old "One flat
+price /month" placeholder to the real $199/$19 numbers.
+
+**Stripe/ops, shipped same day (previously flagged as needing Marc's
+action, done directly instead once asked):** a direct Stripe API check
+found the existing `STRIPE_PRICE_ID` actually charged **$29/month**, not
+the intended amount — corrected by creating a new Price at $199/mo and
+swapping the env var (Stripe Prices are immutable, can't edit in place).
+Also created and set `STRIPE_TOPUP_PRICE_ID` (unblocking the 2026-08-23
+top-up pack, previously 500ing) and the new
+`STRIPE_SINGLE_SCAN_PRICE_ID`. All three verified live post-deploy via
+direct curl to the checkout-session functions (no more "Server
+misconfigured" 500s), and the single-scan one additionally verified by
+completing a real anonymous Checkout-session request and confirming the
+resulting Stripe session's `amount_total`/metadata match what the webhook
+expects. **Real finding, not yet acted on**: `STRIPE_SECRET_KEY` is a
+test-mode key (`sk_test_...`) — every Checkout this app has ever
+completed, including the previously-"live" Pro plan, has been fake money.
+Going live needs Stripe live-mode activation (business/banking details)
+plus live-mode equivalents of all three Prices — a bigger step, Marc's
+call, not done this session.
+
+**Verified:** `npm run build` clean throughout (multiple passes across the
+session). Manual DB-backed browser verification of Milestone 1 was
+attempted but blocked by this specific sandbox's local dev-DB-proxy
+connectivity (same class of environment limitation as this file's own
+2026-08-12 entry) — worked around for Milestone 1 by inserting synthetic
+test data directly via Neon MCP and confirming the code path by trace; a
+throwaway test account/company/scan from that pass (`claude-test-m1-...@example.com`)
+is still sitting in the live DB, cleanup deferred to Marc's call. Milestone
+2's Stripe-level verification (above) is real and live, not synthetic —
+no live end-to-end webhook-triggered scan was run (would spend real
+Perplexity money; deliberately not done without asking first).
+
+**Not done this session, open for a follow-up**: the marketing/PR/sales
+side of the plan (Part B) — pricing copy is synced, but analytics still
+doesn't exist anywhere on the site, `proof-script/OUTREACH.md` still
+targets Site Improver rather than Foreground, no PR outreach has happened,
+and the growth-loop badge (Milestone G of `PLAN_NEXT_PHASE.md`) is still
+unbuilt. Engineering Milestones 3 (scheduled rescans) and 4 (team/agency
+access) from the same plan are also unbuilt.
+
 ## STATUS 2026-08-23: Pro scan top-up packs — SHIPPED, but not yet live (Stripe Price not created)
 
 Triggered by a CEO screenshot: a Pro user hitting the 20-scans/month

@@ -79,6 +79,20 @@ pipeline; this always-loaded root file no longer restates that detail
 (trimmed 2026-08-20 via `/doctor` — it had grown substantially redundant
 with both nested files by then).
 
+**Privacy Policy / Terms of Service (`privacy.html`, `terms.html`):**
+shipped 2026-08-11 as deliberate drafts carrying a "Draft — have this
+reviewed before relying on it for compliance" banner. That banner was
+removed 2026-08-24 after Marc requested finalizing the pages, alongside a
+founder-led hardening pass — added an operator-identity line ("operated
+by Dizid Web Development"), an international-data-transfer note, a
+Cookies section (Neon Auth's one essential session cookie, no
+tracking/ads), and fixed a real gap where Resend (scan-complete email)
+was missing from the "who we share it with" list. **This is not a
+substitute for formal legal counsel** — no lawyer has reviewed either
+page; ask before assuming these pages are compliance-verified if that
+matters for a future decision (e.g. entering a new jurisdiction, an
+enterprise deal requiring a DPA).
+
 ## Deployment
 
 - **Netlify site:** `aivis-scan`, site ID `70e29675-6562-4245-831a-7a3392e51980`,
@@ -119,12 +133,34 @@ with both nested files by then).
   next auto-deploy. `STRIPE_SECRET_KEY`/`STRIPE_PRICE_ID`/
   `STRIPE_WEBHOOK_SECRET` (Pro subscription billing, shipped commit
   `5f47127`) were missing from this list until now — a pre-existing doc gap
-  backfilled here, not a change to the vars themselves. **Added
-  2026-08-23, not yet set:** `STRIPE_TOPUP_PRICE_ID` — a new one-time
-  ($19) Stripe Price for Pro scan top-up packs (see
-  `netlify/functions/CLAUDE.md`'s "Billing (Stripe)" section); until this
-  is created in the Stripe dashboard and set, `create-topup-checkout-session.mts`
-  500s with "Server misconfigured."
+  backfilled here, not a change to the vars themselves.
+  **`STRIPE_SECRET_KEY` is a Stripe *test-mode* key
+  (`sk_test_...`), confirmed 2026-08-24** — every Checkout/subscription
+  this app has ever completed, including the "live in production" Pro
+  plan, has been fake money. Nobody can pay a real dollar until this
+  switches to a live-mode key (requires activating live mode on the Stripe
+  account — business details, banking — then re-creating live-mode
+  equivalents of every Price below and swapping them in). Not done as part
+  of this session; a deliberate CEO decision, not an oversight.
+  **`STRIPE_PRICE_ID` corrected 2026-08-24**: a direct Stripe API check
+  found the existing Price actually charged **$29/month**, not the
+  intended amount — a stale placeholder from whenever the subscription
+  checkout was first built. Stripe Prices are immutable, so a new Price
+  (`price_1U7s8r8gBja0qkMxwx4bqoSD`) was created at the now-decided
+  **$199/month** and the env var swapped to it (verified live via a direct
+  curl to `create-checkout-session`'s sibling function pattern — see
+  `netlify/functions/CLAUDE.md`'s "Billing (Stripe)" section).
+  **`STRIPE_TOPUP_PRICE_ID`** (added 2026-08-23) — **created and set
+  2026-08-24**: `price_1U7s9K8gBja0qkMx9TV9czH4`, $19/10 scans.
+  **`STRIPE_SINGLE_SCAN_PRICE_ID`** (new 2026-08-24, Milestone 2 of
+  `~/.claude/plans/we-need-alot-of-transient-floyd.md`) — `price_1U7s9C8gBja0qkMxi4bLhk3X`,
+  $19 one-time. All three Price creations and the env var updates were
+  followed by a fresh manual deploy (`netlify build && netlify deploy
+  --prod`) and verified live: curled all three checkout-session functions
+  post-deploy (none 500 anymore), and for the single-scan one, completed a
+  full valid anonymous request and fetched the resulting Checkout session
+  back from Stripe's API to confirm `amount_total: 1900` and the correct
+  webhook-matching metadata shape.
 
 ## Commands
 

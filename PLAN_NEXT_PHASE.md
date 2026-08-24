@@ -9,8 +9,8 @@
 | C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13**, confirmed live in production 2026-08-14 via a real end-to-end scan — but that same live scan found a new cascading-timeout reliability gap (15/20 calls lost on one scan), not yet fixed. See `TODOS.md`'s 2026-08-14 entry and Milestone C below. C3 (locale-aware prompts) not started. |
 | D — Product depth & trust surfaces | **D3 (footer/legal) and D4 (technical SEO) shipped.** D1 (raw data — likely already satisfied by A3, needs Marc's confirmation) and D2 (competitor click-through) not started. |
 | F — Differentiation | **Both picks shipped** (row updated 2026-08-20). Citation-URL attribution shipped 2026-08-15 (Milestone F1). Sentiment-aware judge shipped 2026-08-15 as on-demand-only, then extended 2026-08-20 to auto-run on every scan — see `shared/CLAUDE.md`'s "Sentiment judge" entry for the full history. |
-| E — Monetization | Not started. E0 (manual sales test) is Marc's task, not engineering — see "The assignment" below. |
-| G — Growth loop | Not started, gated on E0. |
+| E — Monetization | **Superseded 2026-08-24** by `~/.claude/plans/we-need-alot-of-transient-floyd.md` — Marc explicitly waived E0 (the manual sales test below never ran) and decided pricing directly ($199/mo Pro, $19 one-time scan) instead. Deep-advice gating (E2/E3 below) and a one-time purchase SKU (E1, though shaped as a $19 single-scan product, not the €499 report this section originally proposed) both shipped 2026-08-24 — see `TODOS.md`'s entry that date. E4 ("book a call" CTA) not built. |
+| G — Growth loop | Not started. No longer strictly gated on E0 (waived), but still sensibly gated on a first *real* payment — and `STRIPE_SECRET_KEY` is a test-mode key as of 2026-08-24 (see root `CLAUDE.md`), so no real payment can land yet regardless. |
 
 ## Context
 
@@ -364,7 +364,21 @@ no per-company public/private toggle to maintain; each badge is a static
 asset the site owner controls on their own page. Gated on E0 deliberately:
 no point building a growth loop around a product nobody's paid for yet.
 
-### Milestone E — Monetization — not started
+### Milestone E — Monetization — superseded 2026-08-24
+
+**Update 2026-08-24**: this milestone's actual execution diverged from the
+plan below in a few concrete ways, superseded by
+`~/.claude/plans/we-need-alot-of-transient-floyd.md` — kept below as
+historical record of the original reasoning, not current fact. What
+actually shipped: E0 (the manual €499 sales test) was explicitly waived by
+Marc rather than run; pricing was decided directly instead ($199/mo Pro,
+$19 one-time scan, not the €499/$299 report figure hypothesized below); the
+one-time SKU shipped as a $19 **single scan** (bundling deep advice for
+that scan), not a separate "Full AI Visibility Report" product layered on
+top of an already-completed scan; and E4 ("book a call" CTA) was not
+built. E2 (gate deep advice) and E3 (frontend gating) shipped as described
+below, mechanically accurate to what was built. See `TODOS.md`'s
+2026-08-24 entry for the full shipping log.
 
 **Guardrail — Pro fair-use cap. ✅ SHIPPED 2026-08-13, alongside Milestone
 C1.** A CFO-style pass on this plan (not asked for, but worth flagging)

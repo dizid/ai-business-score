@@ -14,15 +14,27 @@ domain redirect).
   (see `TODOS.md`'s 2026-08-12 entry and `PLAN_NEXT_PHASE.md` for the
   active roadmap, including a planned one-time report SKU still gated on
   a manual sales test). Kept below as the original framing for context.
+  **Update 2026-08-24**: fully superseded now — Foreground is renamed (see
+  root `CLAUDE.md`), the price *is* set ($199/mo Pro, $19 one-time scan,
+  Marc decided directly rather than running the manual sales test), and
+  deep advice *is* plan-gated. See `TODOS.md`'s 2026-08-24 entry and
+  `~/.claude/plans/we-need-alot-of-transient-floyd.md`.
 - ~~Not the revenue product itself — `plan_tier` on `user_profiles`
-  exists but pricing is unresolved and unused.~~ Pro exists and gates
+  exists but pricing is unresolved and unused.~~ ~~Pro exists and gates
   company/scan limits; the *price* itself is still unset, and deep advice
-  (arguably the real value prop) isn't plan-gated yet.
+  (arguably the real value prop) isn't plan-gated yet.~~ Both resolved
+  2026-08-24 — see the update note above.
 - **The actual close is Site Improver** (Dizid's website-rebuild offer).
   AIVis is the cold-outreach hook: proof a prospect's business is invisible
   to AI search, then pitch the rebuild that fixes it. Full sequence in
   `proof-script/OUTREACH.md` (5 touches over ~18 days, subject lines,
-  merge fields, all written).
+  merge fields, all written). **Update 2026-08-24**: this framing is
+  planned to change, not yet executed — Marc decided the sales sequence
+  should close on Foreground itself (Pro/$19 scan) rather than Site
+  Improver going forward (see Part B.3 of
+  `~/.claude/plans/we-need-alot-of-transient-floyd.md`), partly because it
+  sidesteps the unresolved Site Improver quality risk noted below.
+  `OUTREACH.md` itself hasn't been rewritten yet.
 - **The gap: no real prospect has gone through the pipeline yet.**
   `proof-script/prospects.json` doesn't exist — only `prospects.example.json`.
   Every row in `proof-script/tracking.csv` and every file in

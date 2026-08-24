@@ -104,6 +104,18 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
     resolve to nothing (deleted 2026-08-12); a company's detail page should
     show no "+ Add URL" / multi-URL chip selector and no public-leaderboard
     toggle (also removed 2026-08-12).
+12. **$19 single-scan purchase (since 2026-08-24)** — from `index.html`'s
+    pricing section, fill in the "Single scan" form (email + website) and
+    submit; you should land on Stripe test-mode Checkout (real card numbers
+    won't work — `STRIPE_SECRET_KEY` is a test key, see `CLAUDE.md`'s
+    Deployment section). On a completed test payment, the webhook creates
+    an ownerless company + scan and redirects to `/app/scan?session_id=…`,
+    which polls until the scan finishes and shows the result with no login
+    — confirm the "create a free account" banner appears, and that signing
+    up from it (`?claim=<token>`) lands you on the now-owned company. Also
+    test the logged-in path: as a free-tier account at its scan cap, "Run
+    new scan" should show a "Buy one scan — $19" option next to "Upgrade to
+    Pro."
 
 ### Known quirks (expected, not bugs)
 
