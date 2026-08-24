@@ -25,15 +25,45 @@ root `CLAUDE.md` for overall project context.
   works, "Made by Dizid" (external), a `dev@dizid.com` contact line, and a
   one-line data-handling note. Renders on every authenticated and
   unauthenticated app page alike, since it's in the shell, not per-view.
-- **`views/PrivacyView.vue` / `TermsView.vue` / `HowItWorksView.vue`** —
-  added 2026-08-12, plain static content, no DB/API calls. Privacy and
-  Terms both carry a "Draft — have this reviewed before relying on it for
-  compliance" notice; How This Works is real polished product content
-  (accurately describes the 5-prompt × 4-model / 20-check scan mechanism
-  and the actual score bands, not generic filler — updated 2026-08-13 when
-  the model expansion changed those numbers).
+- **`views/PrivacyView.vue` / `TermsView.vue`** — added 2026-08-12, then
+  **deleted 2026-08-14** (commit `555e3f4`) and converted to standalone
+  static HTML at the repo root (`privacy.html`, `terms.html`) because
+  `app.html` carries a blanket `noindex` and requires JS to render, so AI
+  crawlers (GPTBot/ClaudeBot/PerplexityBot) never saw that content as Vue
+  views. `App.vue`'s footer links to `/privacy`/`/terms` with plain `<a>`
+  tags now, not `router-link`. Both pages shipped with a "Draft — have
+  this reviewed before relying on it for compliance" notice that was
+  removed 2026-08-24 after a founder-led hardening pass (operator
+  identity, international-transfer note, cookie disclosure, a missing
+  Resend disclosure fix) — still not a substitute for formal legal
+  counsel, should that be wanted later.
+- **`views/HowItWorksView.vue`** — also deleted 2026-08-14 for the same
+  crawler reason, converted to static `how-it-works.html`. Real polished
+  product content (accurately describes the 5-prompt × 4-model / 20-check
+  scan mechanism and the actual score bands, not generic filler — updated
+  2026-08-13 when the model expansion changed those numbers). Never
+  carried the draft notice.
 - **`views/LoginView.vue` / `SignupView.vue`** — plain email/password forms
-  against `lib/auth.ts`'s `signIn`/`signUp`.
+  against `lib/auth.ts`'s `signIn`/`signUp`. **`SignupView.vue` extended
+  2026-08-24**: reads `?claim=<access_token>` (set by `PublicScanView.vue`'s
+  "create a free account" CTA) and calls `POST /claim-single-scan` right
+  after a successful signup, before navigating on — best-effort, a claim
+  failure still lands the new user on `/app` rather than blocking signup.
+- **`views/PublicScanView.vue`** — added 2026-08-24 (Milestone 2 of the
+  monetization plan), route `/app/scan`, `meta: {requiresAuth: false}` — the
+  one page in this app shell a signed-out visitor can see real scan data
+  on. Landed on either via `?session_id=` (straight off a $19 single-scan
+  Stripe Checkout redirect, before an `access_token` is known yet) or
+  `?token=` (the emailed receipt link). Polls `GET /single-scan-status`
+  (public, unauthenticated) the same way `CompanyDetailView.vue`'s
+  `pollScan()` polls `/scans/:id`, tolerant of a `purchaseStatus:
+  'processing'` state since the webhook that creates the purchase row runs
+  asynchronously relative to the Checkout redirect. Once resolved: renders
+  the completed scan via the shared `ScanDetail.vue` (same component
+  `result.html`/`CompanyDetailView.vue` use); auto-calls
+  `POST /claim-single-scan` if the visitor is already signed in, otherwise
+  shows a persistent "create a free account" banner linking to
+  `/app/signup?claim=<token>`.
 - **`views/CompaniesListView.vue`** — lists the caller's companies
   (`GET /companies`), each with `scan_count`/`latest_score` computed
   server-side via correlated subqueries; a two-step "+ New company" form —

@@ -14,7 +14,14 @@ See the root `CLAUDE.md` for overall project context.
 - **`companies`** — a tracked business, `owner_user_id` FK to
   `user_profiles`. Single owner per company (CEO decision, 2026-08-03) —
   extending to team/agency shared access later is a pure additive migration
-  (a `company_members` join table), not a breaking one. `is_legacy_import`
+  (a `company_members` join table), not a breaking one. **`owner_user_id`
+  became nullable 2026-08-24** (Milestone 2 of the monetization plan,
+  explicitly signed off by Marc): an anonymous $19 single-scan purchase
+  creates a company before any account exists to own it. This doesn't
+  reopen "single owner" — a company is never owned by more than one user,
+  just transiently zero until `claim-single-scan.mts` attaches it — and
+  every existing `WHERE owner_user_id = $userId` check stays safe by
+  construction (`NULL` never matches a real UUID). `is_legacy_import`
   flags companies created by the one-off Blobs backfill (Milestone 3) —
   those are the founder's own prospect-research history (scans of *other*
   businesses for outbound), not "the user's own company," labeled honestly
@@ -126,6 +133,19 @@ See the root `CLAUDE.md` for overall project context.
   before 2026-08-13, so inferring historical overage from `scans` would
   misfire for any Pro user active before that date — this table only ever
   looks at its own `purchased_at`, never at scan history.
+- **`single_scan_purchases`** — added 2026-08-24, backs the $19 one-time
+  single-scan SKU (Milestone 2 of the monetization plan, see "Billing
+  (Stripe)" below). `email text not null`, `stripe_checkout_session_id text
+  unique not null` (idempotency guard, same `ON CONFLICT ... DO NOTHING`
+  pattern as `scan_credit_purchases`), `stripe_payment_intent_id`,
+  `amount_cents`, `company_id`/`scan_id`/`user_id` all nullable FKs,
+  `access_token text unique` (the unguessable lookup key for anonymous
+  buyers — `null` for the logged-in "topup" mode, which is looked up by
+  `scan_id` instead), `purchased_at`. One row per purchase, doubles as: the
+  deep-advice entitlement record for that scan (`generate-deep-advice.mts`
+  checks `EXISTS (... WHERE scan_id = $scanId)`), the free-cap-bypass
+  record, and — for anonymous purchases — the pending-claim record until
+  `claim-single-scan.mts` sets `user_id`.
 
 Schema and Neon Auth were provisioned via the Neon MCP tools
 (`create_project`, `provision_neon_auth`, `prepare_database_migration` →
@@ -215,11 +235,20 @@ gap this update fixes rather than something built this session.
   "Upgrade to Pro" CTA (`CompaniesListView.vue`/`CompanyDetailView.vue`).
   The Pro-cap 402 additionally returns `topupAvailable` (added 2026-08-23)
   so `CompanyDetailView.vue` can render a "Buy more scans" CTA instead once
-  a Pro user is capped. **Nothing else is plan-gated** — deep advice is
-  free for anyone today (see `shared/CLAUDE.md`'s "Deep advice" section),
-  and the Pro subscription price itself is still unset in both Stripe and
-  the landing page copy (`index.html`'s pricing card intentionally says
-  "One flat price /month" — not finalized).
+  a Pro user is capped. **Since 2026-08-24** (Milestone 1 of the
+  monetization plan): `generate-deep-advice.mts` also gates on
+  `isPro(planTier)`, returning `402 {error, upgradeRequired: true}` — the
+  frontend (`CompanyDetailView.vue`/`ScanDetail.vue`'s new
+  `deepAdviceLocked` prop) shows an "Upgrade to Pro" CTA in place of the
+  generate button for non-Pro users instead of hiding the section outright.
+  The Pro subscription price is now decided: **$199/month**, reflected in
+  `index.html`'s pricing card, FAQ, and JSON-LD `Offer`, and `llms.txt`.
+  **Not yet confirmed**: whether the live Stripe Price behind the existing
+  `STRIPE_PRICE_ID` actually charges $199 — Stripe Prices are immutable
+  once created, so if the original Price was provisioned at a different or
+  placeholder amount, a new Price + env var swap is needed to make the
+  real charge match this now-public number. Verify directly in the Stripe
+  dashboard before treating this as fully live.
 - **Scan top-up packs** (added 2026-08-23) — Pro users who hit the
   monthly cap can buy a one-time $19/10-scan pack instead of waiting for
   the reset. See the `scan_credit_purchases` schema entry above for the
@@ -230,10 +259,17 @@ gap this update fixes rather than something built this session.
   500s. This is a distinct SKU from the still-unbuilt one-time report
   purchase below — same architectural shape (separate one-time Stripe
   Price + additive purchases table), different product.
-- **Not yet built**: a one-time "Full AI Visibility Report" purchase SKU
-  (separate from the subscription) and gating deep advice behind
-  Pro-or-purchased — both are Milestone E of `PLAN_NEXT_PHASE.md`, gated on
-  Marc's manual sales test (E0) actually landing a real payment first.
+- **Single-scan purchase — shipped 2026-08-24** (Milestone 2 of
+  `~/.claude/plans/we-need-alot-of-transient-floyd.md`): a $19 one-time
+  scan, serving both an anonymous lead-gen entry point and a logged-in
+  free-tier fallback for a user out of scans who doesn't want to
+  subscribe, bundling deep advice for that one scan. **Not yet fully
+  live**: `STRIPE_SINGLE_SCAN_PRICE_ID` has not been created in Stripe/set
+  as an env var yet — until it is,
+  `create-single-scan-checkout-session.mts` 500s, same pattern as the
+  top-up pack above. The E0 manual-sales-validation gate from
+  `PLAN_NEXT_PHASE.md` was explicitly waived by Marc for this round;
+  pricing was decided directly instead ($199/mo Pro, $19 one-time).
 
 ### `netlify/functions/` — one function per file, all auth-scoped except `enrich`
 
@@ -304,11 +340,17 @@ gap this update fixes rather than something built this session.
   (the Perplexity gateway lane) is untouched, still 1, per its three
   documented incidents above; `anthropic`/`google`/`xai` raised since they
   call independent provider APIs directly (2026-08-15 migration) with no
-  shared-gateway history of trouble. Reasoned, not yet live-verified with a
-  real timed scan — do one live-triggered scan (not `proof-script`) and
-  check `scans.failures` for a 429 spike vs. historical baseline before
-  treating this as validated; roll a provider back toward 1 immediately if
-  one appears, same discipline as this file's three prior incidents.
+  shared-gateway history of trouble. **Live-verified 2026-08-23**: the
+  first real scan run after this change deployed (id `e462fb2d...`)
+  completed in 233.5s (3m 54s) — down from the historical 5-8 min baseline
+  — with `completed_calls: 20, failed_calls: 0, failures: []`, no 429s on
+  any provider. One data point, not a full soak test — keep watching
+  `scans.failures` on subsequent scans (query in this file's own history
+  above), and roll a provider back toward 1 immediately if a 429 spike
+  ever appears, same discipline as this file's three prior incidents. Also
+  confirms the `openai`/Perplexity lane (still capped at 1, untouched by
+  this change) remains the wall-clock bottleneck — 233.5s is real
+  improvement but still over the 2-minute goal, exactly as expected.
 - **`scan-status.mts`** — GET `/scans/:id`, auth + ownership-scoped (join
   through `companies`), polled by the frontend. Returns `progress` (the
   live `{completed, total, currentModel}` object, added 2026-08-17) and
@@ -329,6 +371,27 @@ gap this update fixes rather than something built this session.
   stateless research helper with no DB/company concept). Always returns 200
   even on internal failure (`{ ok: false, error }`); nothing here is
   persisted.
+- **`create-single-scan-checkout-session.mts`** — added 2026-08-24, POST
+  `/create-single-scan-checkout-session`. The one function in this repo
+  with *optional* auth rather than hard-`requireAuth` or fully public — a
+  valid bearer + owned `company_id` in the body promotes the request to a
+  logged-in top-up purchase; anything else falls back to the anonymous
+  `{email, website}` path. See "Billing (Stripe)" above for the full
+  purchase-flow design.
+- **`single-scan-status.mts`** — added 2026-08-24, GET
+  `/single-scan-status?token=…` or `?session_id=…`, fully public (no auth
+  at all — the token is the access control). Polled by
+  `PublicScanView.vue`; returns `{purchaseStatus: 'processing'}` if the
+  webhook hasn't landed yet rather than a 404, since an immediate
+  post-Checkout request commonly arrives first.
+- **`claim-single-scan.mts`** — added 2026-08-24, POST `/claim-single-scan`,
+  `{access_token}`, auth-gated. Atomically attaches an anonymous purchase's
+  ownerless `companies` row to the caller's account
+  (`UPDATE ... WHERE owner_user_id IS NULL`, same claim idiom
+  `run-scan-background.mts` uses for claiming pending scans). Called from
+  `SignupView.vue` (right after signup, via `?claim=`) and
+  `PublicScanView.vue` (auto-claim if already signed in when visiting the
+  link).
 - **`backfill-legacy-scans.mts`** — one-off Milestone 3 import of the
   pre-pivot `aivis-scans` Blobs store into Postgres (any authenticated
   caller becomes the owner of everything imported; idempotent, skips

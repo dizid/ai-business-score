@@ -31,6 +31,14 @@ export const SCAN_CREDIT_PACK_PRICE_USD = 19;
 // rate-limit incidents, so nothing should let one account monopolize it.
 export const MAX_CREDIT_PACKS_PER_MONTH = 3;
 
+// One-time single-scan purchase, added 2026-08-24 (Milestone 2 of the
+// monetization plan) — a full scan + deep advice for one company, no
+// subscription required. Distinct SKU from SCAN_CREDIT_PACK_* above (that
+// one is Pro-only, bulk, extends the monthly cap); this one is for
+// anonymous lead-gen visitors and logged-in free-tier users who don't want
+// to subscribe.
+export const SINGLE_SCAN_PRICE_USD = 19;
+
 export function isPro(planTier: string | null | undefined): boolean {
   return planTier === 'pro';
 }

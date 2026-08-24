@@ -45,23 +45,15 @@
   /* Two distinct accents, deliberately not interchangeable:
      --accent (signal blue) is the workhorse — links, focus rings, icons,
      secondary numerals. --gold (spotlight gold) marks a "you're chosen"
-     moment only — CTAs, the cited-name highlight, the Pro plan's border,
-     the score-ring. Never default a new element to --gold out of
-     convenience; see brand/BRAND.md's color palette section. */
+     moment only — CTAs, the Pro plan's border, the score-ring. Never
+     default a new element to --gold out of convenience; see
+     brand/BRAND.md's color palette section. */
   --accent: var(--signal-blue);
   --accent-ink: var(--stage-black); /* text color placed on a filled gold/blue surface */
   --gold: var(--spotlight-gold);
 
   --cited: var(--gold);
   --cited-soft: rgba(255, 184, 48, 0.14);
-  --ghost: var(--offstage);
-
-  /* Old-school SERP colors in the "how search used to work" demo panel —
-     deliberately NOT brand tokens. These recreate real Google search
-     result coloring (blue title, green URL) so the "before" panel reads
-     as an authentic screenshot, independent of the Spotlight palette. */
-  --serp-blue: #8ab4f8;
-  --serp-green: #81c995;
 
   --good: var(--gold);
   --warning: #e8a33d;
@@ -141,77 +133,30 @@ nav.top .links a.cta {
 }
 .hero p.lead { color: var(--muted); font-size: clamp(1.05rem, 1rem + 0.3vw, 1.2rem); margin: 0 0 30px; max-width: 52ch; }
 
-/* ---------- Dissolve signature visual ---------- */
-.dissolve { margin: 56px 0 8px; display: grid; gap: 10px; }
-.dissolve-label {
-  display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--faint); margin-bottom: 10px;
+/* ---------- Hero fact strip ---------- */
+.hero-facts {
+  margin: 48px 0 8px; display: flex; flex-wrap: wrap; gap: 32px 40px;
+  padding-top: 28px;
+  background-image: linear-gradient(90deg, var(--line-bright) 0%, var(--line-bright) 40%, transparent 40%);
+  background-repeat: no-repeat; background-size: 100% 1px; background-position: top left;
 }
-.dissolve-panel.old {
-  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-  padding: 20px 22px; box-shadow: var(--shadow);
+.hero-fact { display: flex; flex-direction: column; gap: 6px; max-width: 220px; }
+.hero-fact-num {
+  font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--gold);
 }
-.serp-row { padding: 10px 0; border-bottom: 1px dashed var(--line); opacity: 0.35; filter: grayscale(0.5); }
-.serp-row:last-child { border-bottom: none; }
-.serp-title { color: var(--serp-blue); font-size: 0.98rem; font-weight: 600; text-decoration: line-through; text-decoration-color: var(--ghost); }
-.serp-url { color: var(--serp-green); font-size: 0.78rem; margin: 2px 0; }
-.serp-snippet { color: var(--faint); font-size: 0.85rem; }
-.dissolve-arrow {
-  text-align: center; color: var(--faint); font-size: 1.3rem; line-height: 1; margin: 2px 0;
-}
-.dissolve-panel.new {
-  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-  padding: 22px 24px; box-shadow: var(--shadow); position: relative;
-  overflow: hidden;
-}
+.hero-fact-label { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
 /* Motif: score-ring dial (gold arc over graphite track), reused as a small
-   decorative badge — here, and again on .plan-card.pro below. CSS
-   conic-gradient + mask, no SVG file. */
-.dissolve-panel.new::after {
+   decorative badge next to the score fact — here, and again on
+   .plan-card.pro below. CSS conic-gradient + mask, no SVG file. */
+.hero-fact.score-ring .hero-fact-num {
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.hero-fact.score-ring .hero-fact-num::before {
   content: "";
-  position: absolute; top: 16px; right: 16px;
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 20px; height: 20px; border-radius: 50%; flex: none;
   background: conic-gradient(var(--gold) 0deg 252deg, var(--offstage) 252deg 360deg);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
-          mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
-}
-.answer-tag {
-  display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
-  color: var(--faint); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-bottom: 14px;
-}
-.answer-text { margin: 0; font-size: 1.04rem; color: var(--ink); max-width: 62ch; }
-mark.cited-name {
-  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--gold) 26%, transparent), transparent 72%);
-  color: var(--gold); font-weight: 700;
-  padding: 1px 6px; border-radius: 4px; font-style: normal;
-  text-shadow: 0 0 16px color-mix(in srgb, var(--gold) 45%, transparent);
-}
-.cursor {
-  display: inline-block; width: 2px; height: 1em; background: var(--accent);
-  margin-left: 2px; vertical-align: text-bottom;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .serp-row {
-    animation: ghost-out 0.6s ease forwards;
-    animation-delay: calc(var(--d) * 0.1s);
-    opacity: 1; filter: none;
-  }
-  @keyframes ghost-out {
-    from { opacity: 1; filter: grayscale(0); }
-    to { opacity: 0.35; filter: grayscale(0.5); }
-  }
-  .dissolve-panel.new { opacity: 0; animation: rise-in 0.7s ease forwards; animation-delay: 0.55s; }
-  @keyframes rise-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  mark.cited-name { animation: pulse 1.4s ease 1.4s; }
-  @keyframes pulse {
-    0%, 100% { background: radial-gradient(ellipse at center, color-mix(in srgb, var(--gold) 26%, transparent), transparent 72%); }
-    35% { background: radial-gradient(ellipse at center, color-mix(in srgb, var(--gold) 55%, transparent), transparent 72%); }
-  }
-  .cursor { animation: blink 1s step-end infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
 }
 
 /* ---------- Sections ---------- */
@@ -255,19 +200,15 @@ section p.section-sub { color: var(--muted); text-align: center; margin: 0 auto 
 .step h3 { font-size: 1.05rem; margin: 0 0 8px; font-weight: 700; }
 .step p { color: var(--muted); font-size: 0.94rem; margin: 0; }
 
-/* ---------- Cited / invisible demo ---------- */
-.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; max-width: 900px; margin: 0 auto; }
+/* ---------- USP cards ---------- */
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; max-width: 900px; margin: 0 auto; }
 .demo-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 24px; box-shadow: var(--shadow); }
-.demo-card p { font-size: 0.98rem; color: var(--ink); margin: 0 0 18px; }
-.demo-verdict { display: flex; align-items: center; gap: 9px; font-size: 0.88rem; font-weight: 700; }
-.demo-verdict svg { flex: none; width: 18px; height: 18px; }
-.verdict-good { color: var(--gold); }
-.verdict-bad { color: var(--muted); }
-.demo-card.ghosted { background: color-mix(in srgb, var(--offstage) 22%, var(--card)); }
-.demo-card.ghosted p { color: var(--muted); }
+.demo-card h3 { font-size: 1.05rem; margin: 0 0 8px; font-weight: 700; }
+.demo-card p { font-size: 0.94rem; color: var(--muted); margin: 0; }
+.section-cta { text-align: center; margin-top: 36px; }
 
 /* ---------- Pricing ---------- */
-.pricing { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 760px; margin: 0 auto; }
+.pricing { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 1080px; margin: 0 auto; }
 .plan-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 30px; box-shadow: var(--shadow); position: relative; }
 .plan-card.pro { border-color: var(--gold); border-width: 1.5px; }
 /* Motif: score-ring badge reused here — the Pro plan is the "chosen" tier. */
@@ -290,6 +231,15 @@ section p.section-sub { color: var(--muted); text-align: center; margin: 0 auto 
   border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-weight: 600; font-size: 0.92rem;
 }
 .plan-card.pro .btn-secondary { border-color: var(--gold); color: var(--gold); }
+.single-scan-form { display: grid; gap: 10px; }
+.single-scan-form input {
+  width: 100%; padding: 10px 12px; font-size: 0.92rem; font-family: inherit;
+  border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink);
+}
+.single-scan-form input::placeholder { color: var(--faint); }
+.single-scan-form input:focus { outline: none; border-color: var(--accent); }
+.single-scan-form .btn-secondary { width: 100%; cursor: pointer; font: inherit; background: none; }
+.single-scan-status { min-height: 1.1em; font-size: 0.82rem; color: var(--muted); text-align: center; }
 
 /* ---------- FAQ ---------- */
 .faq { max-width: 700px; margin: 0 auto; }
@@ -320,12 +270,6 @@ footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-siz
 .legal .back:hover { text-decoration: underline; }
 .legal h1 { font-size: 1.7rem; margin: 0 0 8px; }
 .legal .lead { color: var(--muted); font-size: 1.02rem; margin: 0 0 32px; }
-.legal .draft-note {
-  font-size: 0.88rem; font-weight: 600; color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
-  border: 1px solid var(--warning); border-radius: 8px; padding: 10px 14px;
-  margin: 0 0 8px; display: inline-block;
-}
 .legal .updated { font-size: 0.82rem; color: var(--faint); margin: 0 0 32px; }
 .legal section { margin-bottom: 28px; background: none; padding: 0; }
 .legal h2 { font-size: 1.15rem; margin: 0 0 10px; }
@@ -337,7 +281,8 @@ footer { padding: 32px 0 60px; text-align: center; color: var(--faint); font-siz
 @media (max-width: 640px) {
   .hero { padding: 32px 0 12px; }
   section { padding: 48px 0; }
-  .dissolve-panel.old, .dissolve-panel.new, .demo-card, .plan-card { padding: 18px; }
+  .demo-card, .plan-card { padding: 18px; }
+  .hero-facts { gap: 22px 28px; }
   nav.top { padding: 14px 16px; }
   nav.top .logo { font-size: 1.05rem; }
   nav.top .links { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }

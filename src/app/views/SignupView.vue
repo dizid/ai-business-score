@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { signUp } from '../lib/auth';
+import { useRoute, useRouter } from 'vue-router';
+import { signUp, authFetch } from '../lib/auth';
 import Icon from '../../shared/Icon.vue';
 
+const route = useRoute();
 const router = useRouter();
 
 const name = ref('');
@@ -17,6 +18,27 @@ async function onSubmit() {
   error.value = '';
   try {
     await signUp(email.value.trim(), password.value, name.value.trim());
+    // Arriving here from a $19 single-scan purchase's "create a free
+    // account" link (PublicScanView.vue) — claim that scan's company into
+    // the new account before landing on the companies list. A claim
+    // failure shouldn't block a successful signup, so it's best-effort.
+    const claimToken = route.query.claim as string | undefined;
+    if (claimToken) {
+      try {
+        const res = await authFetch('/claim-single-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token: claimToken }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          router.push(`/app/companies/${data.companyId}`);
+          return;
+        }
+      } catch {
+        // fall through to the normal /app landing below
+      }
+    }
     router.push('/app');
   } catch (err) {
     error.value = (err as Error).message;

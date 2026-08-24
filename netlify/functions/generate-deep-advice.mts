@@ -8,6 +8,7 @@ import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { toScanPayload } from './_shared/scanRow.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
+import { isPro } from './_shared/plan.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
@@ -30,8 +31,8 @@ export default async (req: Request, context: Context) => {
     throw err;
   }
 
-  const scanId = context.params.id;
   const db = sql();
+  const scanId = context.params.id;
 
   const rows = await db`
     SELECT scans.* FROM public.scans
@@ -45,6 +46,23 @@ export default async (req: Request, context: Context) => {
     });
   }
   const scanRow = rows[0];
+
+  // Entitled via Pro, or via a $19 one-time single-scan purchase covering
+  // this exact scan (Milestone 2 of the 2026-08-24 monetization plan) —
+  // that SKU bundles deep advice for the one scan it paid for.
+  const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
+  if (!isPro(profiles[0]?.plan_tier)) {
+    const purchases = await db`
+      SELECT id FROM public.single_scan_purchases WHERE scan_id = ${scanId}
+    `;
+    if (purchases.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Deep advice is a Pro feature.', upgradeRequired: true }),
+        { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+      );
+    }
+  }
+
   if (scanRow.status !== 'completed') {
     return new Response(JSON.stringify({ error: 'Scan is not completed yet' }), {
       status: 400,

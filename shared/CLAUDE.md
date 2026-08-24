@@ -207,17 +207,17 @@ The single source of truth, imported by every consumer:
   block this is described on `selectAdvice` above, and no longer applies to
   this one). Deliberately on-demand (a "Generate deeper advice" button on a
   completed scan, not automatic) — it roughly doubles Perplexity spend per
-  scan. Free/Pro plan limits now exist (see "Billing (Stripe)" in
-  `netlify/functions/CLAUDE.md`), but deep advice itself is **not yet
-  plan-gated** — any authenticated owner of a completed scan can generate
-  it, unlimited times, regardless of plan. Gating it behind Pro/a one-time
-  report purchase is Milestone E of `PLAN_NEXT_PHASE.md`, not yet built —
-  deliberately deferred until Marc's manual outbound sales test (Milestone
-  E0) shows someone will actually pay for it. Not to be confused with the
-  unrelated one-time SKU that **did** ship 2026-08-23 — Pro scan top-up
-  packs (`scan_credit_purchases`, see `netlify/functions/CLAUDE.md`'s
-  "Billing (Stripe)" section) extend the monthly *scan count* cap, they
-  don't touch deep-advice access at all. `buildDeepAdvicePrompt`
+  scan. **Since 2026-08-24, plan-gated** (Milestone 1 of
+  `~/.claude/plans/we-need-alot-of-transient-floyd.md`):
+  `generate-deep-advice.mts` requires `isPro(planTier)` OR a matching
+  `single_scan_purchases` row for that exact scan (the $19 one-time SKU,
+  Milestone 2, shipped the same day — see "Billing (Stripe)" in
+  `netlify/functions/CLAUDE.md`), returning `402 {error, upgradeRequired:
+  true}` otherwise. `ScanDetail.vue`'s `deepAdviceLocked` prop renders an
+  upgrade CTA in place of the button for non-entitled users rather than
+  hiding the section outright. The E0 manual-sales-validation step this
+  used to be gated on was explicitly waived by Marc for this round — pricing
+  ($199/mo Pro, $19 one-time) was decided directly instead. `buildDeepAdvicePrompt`
   grounds the prompt in the actual scan data (citation rate, competitor
   tallies) rather than generic SEO advice; `parseDeepAdviceResponse`
   follows the same lenient-JSON-extraction, always-safe-shape pattern as

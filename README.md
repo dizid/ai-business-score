@@ -82,9 +82,9 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
 6. **Generate deep advice** — the "Generate deeper advice" button on a
    completed scan. This is a second, on-demand live Perplexity call
    (another 15-20s wait) — only trigger it a few times while testing, it
-   roughly doubles the Perplexity spend for that scan. Free for any
-   signed-in owner today — not yet plan-gated (see `CLAUDE.md`'s Billing
-   section).
+   roughly doubles the Perplexity spend for that scan. **Since 2026-08-24,
+   Pro-gated**: a free-tier account sees a locked "Upgrade to Pro" CTA
+   instead of the button (see `CLAUDE.md`'s Billing section).
 7. **Run a second scan on the same company** — once you have 2+ scans,
    `CompanyProgressChart.vue` renders a score-over-time line on the
    company detail page. With only 1 scan, no chart shows (by design — a

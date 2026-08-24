@@ -23,7 +23,13 @@ interface CompanyRow {
   is_legacy_import: boolean;
 }
 
+interface Profile {
+  plan_tier: string;
+  subscription_status: string | null;
+}
+
 const company = ref<CompanyRow | null>(null);
+const profile = ref<Profile>({ plan_tier: 'free', subscription_status: null });
 const scans = ref<Record<string, unknown>[]>([]);
 const loading = ref(true);
 const loadError = ref('');
@@ -37,6 +43,8 @@ const upgrading = ref(false);
 const scanTopupAvailable = ref(false);
 const toppingUp = ref(false);
 const topupBanner = ref<'success' | 'cancelled' | ''>('');
+const startingSingleScan = ref(false);
+const singleScanBanner = ref<'success' | 'cancelled' | ''>('');
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
 const deepAdviceLoading = ref(false);
@@ -63,6 +71,7 @@ async function load() {
       return;
     }
     company.value = data.company;
+    profile.value = data.profile || { plan_tier: 'free', subscription_status: null };
     scans.value = data.scans;
     // Scans come back newest-first (see CompanyProgressChart's own sort
     // comment) — auto-selecting index 0 shows the latest report immediately
@@ -217,6 +226,32 @@ async function startTopupCheckout() {
   }
 }
 
+// A $19 one-time scan for a free-tier user out of scans who doesn't want to
+// subscribe (Milestone 2 of the 2026-08-24 monetization plan) — same shape
+// as startCheckout/startTopupCheckout above, kept duplicated for the same
+// reason.
+async function startSingleScanCheckout() {
+  if (!company.value) return;
+  startingSingleScan.value = true;
+  try {
+    const res = await authFetch('/create-single-scan-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company_id: company.value.id }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      scanError.value = data.error || 'Failed to start checkout.';
+      startingSingleScan.value = false;
+      return;
+    }
+    window.location.href = data.url;
+  } catch (err) {
+    scanError.value = (err as Error).message;
+    startingSingleScan.value = false;
+  }
+}
+
 const scanTrend = computed(() =>
   scans.value.map((s, index) => ({
     id: keyOf(s, index),
@@ -234,6 +269,12 @@ const selectedScan = computed(() =>
   selectedIndex.value === null ? null : scans.value[selectedIndex.value] ?? null
 );
 const selectedPayload = computed(() => (selectedScan.value ? validatePayload(selectedScan.value) : null));
+
+// Deep advice is Pro-gated (Milestone 1 of the monetization plan) — locked
+// means "signed in, has a completed scan, but not entitled," distinct from
+// simply not being allowed at all (result.html's unauthenticated context).
+const allowDeepAdvice = computed(() => profile.value.plan_tier === 'pro');
+const deepAdviceLocked = computed(() => !allowDeepAdvice.value && !selectedPayload.value?.deepAdvice);
 
 async function runDeepAdvice() {
   if (selectedIndex.value === null || !selectedPayload.value) return;
@@ -314,6 +355,26 @@ onMounted(async () => {
     delete cleanedQuery.topup;
     router.replace({ query: cleanedQuery });
   }
+  // Landed back here from a $19 single-scan Checkout redirect
+  // (?singlescan=success or ?singlescan=cancelled) — same strip-after-read
+  // pattern as ?topup above. Unlike a top-up (which just raises a quota,
+  // nothing new to show), a success here means the webhook creates a real
+  // new scan — retry load() a few times so it appears without a manual
+  // refresh, since the webhook runs asynchronously relative to this redirect.
+  if (route.query.singlescan === 'success' || route.query.singlescan === 'cancelled') {
+    singleScanBanner.value = route.query.singlescan;
+    const cleanedQuery = { ...route.query };
+    delete cleanedQuery.singlescan;
+    router.replace({ query: cleanedQuery });
+    if (singleScanBanner.value === 'success') {
+      const baselineCount = scans.value.length;
+      for (let i = 0; i < 5; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await load();
+        if (scans.value.length > baselineCount) break;
+      }
+    }
+  }
 });
 onUnmounted(stopPolling);
 watch(() => route.params.id, load);
@@ -347,6 +408,14 @@ watch(() => route.params.id, load);
             Checkout cancelled — no charge was made.
             <button type="button" class="dismiss" @click="topupBanner = ''">Dismiss</button>
           </div>
+          <div class="scan-status topup-banner" v-if="singleScanBanner === 'success'">
+            Purchase received — your scan is starting.
+            <button type="button" class="dismiss" @click="singleScanBanner = ''">Dismiss</button>
+          </div>
+          <div class="scan-status" v-else-if="singleScanBanner === 'cancelled'">
+            Checkout cancelled — no charge was made.
+            <button type="button" class="dismiss" @click="singleScanBanner = ''">Dismiss</button>
+          </div>
           <button type="button" :disabled="scanning" @click="runNewScan">
             {{ scanning ? 'Scanning…' : 'Run new scan' }}
           </button>
@@ -356,6 +425,9 @@ watch(() => route.params.id, load);
             <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="upgrading" @click="startCheckout">
               Upgrade to Pro
             </button>
+            <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="startingSingleScan" @click="startSingleScanCheckout">
+              Buy one scan — $19
+            </button>
             <button type="button" class="inline-upgrade" v-if="scanTopupAvailable" :disabled="toppingUp" @click="startTopupCheckout">
               Buy more scans
             </button>
@@ -363,7 +435,7 @@ watch(() => route.params.id, load);
         </div>
       </div>
 
-      <p class="empty" v-if="scans.length === 0 && !scanError">
+      <p class="empty" v-if="scans.length === 0 && !scanError && !scanning">
         No scans yet for this company — click "Run new scan" to check its AI search visibility.
       </p>
 
@@ -404,12 +476,14 @@ watch(() => route.params.id, load);
               v-if="selectedPayload"
               :payload="selectedPayload"
               theme="dashboard"
-              :allow-deep-advice="true"
+              :allow-deep-advice="allowDeepAdvice"
+              :deep-advice-locked="deepAdviceLocked"
               :deep-advice-loading="deepAdviceLoading"
               :allow-sentiment-judge="true"
               :sentiment-judge-loading-key="sentimentJudgeLoadingKey"
               @generate-deep-advice="runDeepAdvice"
               @judge-sentiment="runSentimentJudge"
+              @upgrade="startCheckout"
             />
             <p class="empty" v-else>This record couldn't be rendered — its stored data doesn't match the expected format.</p>
           </template>

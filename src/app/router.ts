@@ -27,6 +27,19 @@ const routes = [
     component: () => import('./views/BillingSuccessView.vue'),
     meta: { requiresAuth: true, title: 'Billing — Foreground' },
   },
+  {
+    // Public landing spot for the $19 one-time single-scan purchase
+    // (Milestone 2 of the 2026-08-24 monetization plan) — reached either
+    // via ?session_id= (straight off the Stripe Checkout redirect, before
+    // the buyer has an access_token yet) or ?token= (the emailed receipt
+    // link, or the URL after PublicScanView.vue swaps session_id for the
+    // real token). No auth required — this is the one page in the app
+    // shell a signed-out visitor can see real scan data on.
+    path: '/app/scan',
+    name: 'public-scan',
+    component: () => import('./views/PublicScanView.vue'),
+    meta: { title: 'Your AI visibility scan — Foreground' },
+  },
 ];
 
 const router = createRouter({

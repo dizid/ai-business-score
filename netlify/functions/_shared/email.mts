@@ -86,3 +86,49 @@ export async function sendScanCompleteEmail(params: {
     return { ok: false, error: (err as Error).message };
   }
 }
+
+// Sent once, right after an anonymous $19 single-scan purchase's webhook
+// finishes creating the ownerless company + scan (Milestone 2 of the
+// 2026-08-24 monetization plan) — the buyer has no account yet, so this
+// email is their only way back into the product until they claim it. Same
+// best-effort, never-throws contract as sendScanCompleteEmail above.
+export async function sendSingleScanReceiptEmail(params: {
+  to: string;
+  brand: string;
+  statusUrl: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = Netlify.env.get('RESEND_API_KEY');
+  const fromEmail = Netlify.env.get('RESEND_FROM_EMAIL');
+  if (!apiKey || !fromEmail) {
+    console.error('sendSingleScanReceiptEmail: RESEND_API_KEY or RESEND_FROM_EMAIL not set, skipping');
+    return { ok: false, error: 'Email not configured' };
+  }
+
+  const bodyText =
+    `Thanks for your purchase — your AI visibility scan for ${params.brand} is running now.\n\n` +
+    `View it here (no account needed): ${params.statusUrl}\n\n` +
+    `Want to keep tracking ${params.brand} over time? Create a free account from that page and this scan is saved to it automatically.`;
+
+  try {
+    const res = await fetch(RESEND_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: params.to,
+        subject: `Your AI visibility scan for ${params.brand} is on its way`,
+        text: bodyText,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      return { ok: false, error: `HTTP ${res.status}: ${body.slice(0, 300)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}

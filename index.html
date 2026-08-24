@@ -46,10 +46,10 @@
 <meta name="twitter:description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. Foreground checks whether your business gets mentioned — or a competitor does instead." />
 <meta property="twitter:image" content="https://aivis-scan.netlify.app/og-image.png" />
 
-<!-- Structured data: only the Free tier gets a machine-readable price —
-     the Pro price isn't finalized yet (see the pricing section below), and
-     shipping a JSON-LD price that doesn't match the real Stripe price
-     later would be worse than omitting it for now. FAQ answers here are
+<!-- Structured data: both plans now carry a machine-readable price — Pro
+     is $199/month, confirmed 2026-08-24 alongside Milestone 1 of the
+     monetization plan (deep advice is now actually Pro-gated in code, so
+     this page's claims match reality). FAQ answers here are
      kept string-identical to the visible <details> content below (Google's
      FAQPage guidelines require the two to match) — including the model
      lineup, which was stale (said 2 models) until this pass corrected it
@@ -81,12 +81,26 @@
       "description": "Checks whether a business is mentioned when AI search engines like ChatGPT and Gemini are asked about its category, scores the result 0-100, and tracks it over time.",
       "url": "https://aivis-scan.netlify.app/",
       "publisher": { "@id": "https://aivis-scan.netlify.app/#organization" },
-      "offers": {
-        "@type": "Offer",
-        "name": "Free plan",
-        "price": "0",
-        "priceCurrency": "USD"
-      }
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "Free plan",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        {
+          "@type": "Offer",
+          "name": "Pro plan",
+          "price": "199",
+          "priceCurrency": "USD"
+        },
+        {
+          "@type": "Offer",
+          "name": "Single scan",
+          "price": "19",
+          "priceCurrency": "USD"
+        }
+      ]
     },
     {
       "@type": "FAQPage",
@@ -122,7 +136,7 @@
           "name": "What does it cost?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Free to try — one company and three scans, no credit card required. Upgrade for more companies and up to 20 scans a month, with top-up packs available if you need more."
+            "text": "Free to try — one company and three scans, no credit card required. Just need one check? A single scan is $19, one-time, no account required. Pro is $199/month for unlimited companies, 20 scans a month (with top-up packs available), and unlimited AI-generated deep advice."
           }
         }
       ]
@@ -166,34 +180,22 @@
     <a class="btn-primary" href="/app/signup">Get in the foreground — free</a>
     <div class="hero-note">No credit card required. About a minute — see if it's you.</div>
 
-    <div class="dissolve" aria-hidden="true">
-      <div class="dissolve-panel old">
-        <span class="dissolve-label mono">How search used to work</span>
-        <div class="serp-row" style="--d:0">
-          <div class="serp-title">Acme Plumbing Rotterdam — Trusted Local Plumber</div>
-          <div class="serp-url mono">acmeplumbing.nl</div>
-          <div class="serp-snippet">24/7 emergency callouts, transparent pricing, 4.8★ average…</div>
-        </div>
-        <div class="serp-row" style="--d:1">
-          <div class="serp-title">Best Plumbers in Rotterdam — Top 10 List</div>
-          <div class="serp-url mono">top10rotterdam.nl › plumbers</div>
-          <div class="serp-snippet">We compared response time, pricing, and reviews across…</div>
-        </div>
-        <div class="serp-row" style="--d:2">
-          <div class="serp-title">Rotterdam Plumbing Directory — Reviews &amp; Pricing</div>
-          <div class="serp-url mono">tradesdirectory.nl</div>
-          <div class="serp-snippet">Browse 40+ local plumbers with verified customer reviews…</div>
-        </div>
+    <div class="hero-facts">
+      <div class="hero-fact score-ring">
+        <span class="hero-fact-num">0-100</span>
+        <span class="hero-fact-label">your visibility score</span>
       </div>
-      <div class="dissolve-arrow">↓</div>
-      <div class="dissolve-panel new">
-        <span class="dissolve-label mono">How AI search answers now — one answer, not ten links</span>
-        <span class="answer-tag mono">Example — "who's a good plumber in Rotterdam?"</span>
-        <p class="answer-text">
-          For plumbing repairs in Rotterdam, <mark class="cited-name">Acme Plumbing</mark>
-          comes up often — known for fast callouts and clear pricing, alongside a
-          couple of larger regional chains.<span class="cursor"></span>
-        </p>
+      <div class="hero-fact">
+        <span class="hero-fact-num">4</span>
+        <span class="hero-fact-label">AI models checked — GPT-5&nbsp;mini, Gemini&nbsp;3&nbsp;Flash, Claude&nbsp;Haiku&nbsp;4.5, Grok&nbsp;4.6</span>
+      </div>
+      <div class="hero-fact">
+        <span class="hero-fact-num">✓</span>
+        <span class="hero-fact-label">see who's cited instead of you</span>
+      </div>
+      <div class="hero-fact">
+        <span class="hero-fact-num">↗</span>
+        <span class="hero-fact-label">tracked over every scan, not a one-off</span>
       </div>
     </div>
   </section>
@@ -229,24 +231,28 @@
 
   <section>
     <h2>Foreground, or forgotten. There's no in between.</h2>
-    <p class="section-sub">Two real answers to the same kind of question — one in the foreground, one in the background. Foreground tells you which one you're getting.</p>
+    <p class="section-sub">Not a concept — four concrete things every scan gives you.</p>
     <div class="demo-grid">
       <div class="demo-card">
-        <span class="answer-tag mono">Example answer</span>
-        <p>"For plumbing repairs in Rotterdam, <mark class="cited-name">Acme Plumbing</mark> comes up often — known for fast callouts and clear pricing, alongside a couple of larger regional chains."</p>
-        <div class="demo-verdict verdict-good">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-          Cited — this is a Leading score
-        </div>
+        <h3>Your score, out of 100</h3>
+        <p>How often your business is the name AI actually says — not just whether you rank on page one somewhere nobody reads anymore.</p>
       </div>
-      <div class="demo-card ghosted">
-        <span class="answer-tag mono">Example answer</span>
-        <p>"For plumbing repairs in Rotterdam, the top options are generally the larger regional chains with 24/7 dispatch."</p>
-        <div class="demo-verdict verdict-bad">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m5 5 14 14"/></svg>
-          Not mentioned — this is what a 0 looks like
-        </div>
+      <div class="demo-card">
+        <h3>Four models, not one</h3>
+        <p>GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 — each grounded in live web results, so you see the real spread, not one model's opinion.</p>
       </div>
+      <div class="demo-card">
+        <h3>See who's beating you</h3>
+        <p>When you're not mentioned, Foreground shows who is — the actual competitor getting picked in your place.</p>
+      </div>
+      <div class="demo-card">
+        <h3>A trend, not a snapshot</h3>
+        <p>Every scan adds to your history, so you can watch the score move as you fix what's costing you the mention.</p>
+      </div>
+    </div>
+    <div class="section-cta">
+      <a class="btn-primary" href="/app/signup">Get in the foreground — free</a>
+      <div class="hero-note">No credit card required. About a minute — see if it's you.</div>
     </div>
   </section>
 
@@ -264,22 +270,72 @@
         </ul>
         <a class="btn-secondary" href="/app/signup">Start free</a>
       </div>
-      <!-- Pro price intentionally left unset in copy and in the JSON-LD
-           above — not finalized yet. The actual charge is whatever Price is
-           configured in Stripe; update this card's wording once that
-           number is confirmed. -->
+      <div class="plan-card">
+        <h3>Single scan</h3>
+        <div class="price">$19<span> one-time</span></div>
+        <ul>
+          <li>One full scan + AI deep advice</li>
+          <li>No account required to start</li>
+          <li>Email link to view your results</li>
+        </ul>
+        <form id="single-scan-form" class="single-scan-form">
+          <input type="email" name="email" placeholder="you@business.com" required autocomplete="email" />
+          <input type="text" name="website" placeholder="yourbusiness.com" required autocomplete="url" />
+          <button type="submit" class="btn-secondary">Get my scan — $19</button>
+          <div class="single-scan-status" aria-live="polite"></div>
+        </form>
+      </div>
       <div class="plan-card pro">
         <h3>Pro</h3>
-        <div class="price">One flat price<span> /month</span></div>
+        <div class="price">$199<span> /month</span></div>
         <ul>
           <li>Unlimited companies</li>
           <li>20 scans/month (fair use), top-ups available</li>
-          <li>Deeper, AI-generated advice</li>
+          <li>Unlimited AI-generated deep advice</li>
         </ul>
         <a class="btn-secondary" href="/app/signup">Stay in the foreground</a>
       </div>
     </div>
   </section>
+
+  <!-- Single-scan Checkout: the only interactive JS on this otherwise-static
+       page. POSTs directly to create-single-scan-checkout-session.mts
+       (public, no auth — see that function's own comment) and redirects to
+       the returned Stripe Checkout URL. Milestone 2 of the 2026-08-24
+       monetization plan. -->
+  <script>
+  (function () {
+    var form = document.getElementById('single-scan-form');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = form.email.value.trim();
+      var website = form.website.value.trim();
+      var status = form.querySelector('.single-scan-status');
+      var button = form.querySelector('button[type=submit]');
+      button.disabled = true;
+      status.textContent = 'Starting checkout…';
+      fetch('/create-single-scan-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, website: website }),
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (!data.ok) {
+            status.textContent = data.error || 'Something went wrong — try again.';
+            button.disabled = false;
+            return;
+          }
+          window.location.href = data.url;
+        })
+        .catch(function () {
+          status.textContent = 'Something went wrong — try again.';
+          button.disabled = false;
+        });
+    });
+  })();
+  </script>
 
   <section>
     <h2>FAQ</h2>

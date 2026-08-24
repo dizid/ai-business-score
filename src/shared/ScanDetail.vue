@@ -42,6 +42,12 @@ const props = withDefaults(
   defineProps<{
     payload: ValidatedPayload;
     allowDeepAdvice?: boolean;
+    // True when the caller is signed in but not entitled (not Pro, no
+    // one-time purchase) — renders an upgrade CTA in place of the button
+    // instead of hiding the whole section. Distinct from allowDeepAdvice
+    // being merely false, which is what result.html's unauthenticated
+    // context looks like and should stay silent for.
+    deepAdviceLocked?: boolean;
     deepAdviceLoading?: boolean;
     allowSentimentJudge?: boolean;
     // Key of the check currently being judged (`${promptIndex}:${model}`),
@@ -50,9 +56,16 @@ const props = withDefaults(
     sentimentJudgeLoadingKey?: string | null;
     theme?: 'dashboard' | 'legacy';
   }>(),
-  { allowDeepAdvice: false, deepAdviceLoading: false, allowSentimentJudge: false, sentimentJudgeLoadingKey: null, theme: 'legacy' }
+  {
+    allowDeepAdvice: false,
+    deepAdviceLocked: false,
+    deepAdviceLoading: false,
+    allowSentimentJudge: false,
+    sentimentJudgeLoadingKey: null,
+    theme: 'legacy',
+  }
 );
-defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string] }>();
+defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string]; 'upgrade': [] }>();
 
 // Sentiment/category/scoreboard/check-breakdown aggregation logic lives in
 // scanDerived.ts (imported above) — shared verbatim with scanReport.ts so
@@ -319,8 +332,11 @@ function downloadReport() {
         </div>
       </template>
 
-      <!-- deep advice: on-demand LLM-generated steps, Milestone 6 -->
-      <template v-if="allowDeepAdvice || payload.deepAdvice">
+      <!-- deep advice: on-demand LLM-generated steps, Milestone 6. Gated
+           behind Pro (or a one-time purchase) since Milestone 1 of the
+           monetization plan — deepAdviceLocked renders an upgrade CTA
+           instead of hiding the section outright. -->
+      <template v-if="allowDeepAdvice || payload.deepAdvice || deepAdviceLocked">
         <h2>Deeper advice</h2>
         <div class="card deep-advice-card" v-if="payload.deepAdvice">
           <ol class="deep-advice-steps">
@@ -345,6 +361,12 @@ function downloadReport() {
         >
           {{ deepAdviceLoading ? 'Generating…' : 'Generate deeper advice' }}
         </button>
+        <div class="card deep-advice-locked" v-else-if="deepAdviceLocked">
+          <p>Unlock AI-generated action steps — specific, ranked fixes based on this scan's actual results.</p>
+          <button type="button" class="deep-advice-button" @click="$emit('upgrade')">
+            Upgrade to Pro
+          </button>
+        </div>
       </template>
 
       <!-- Harmonia summary: a SEPARATE, secondary score from the AI
@@ -700,6 +722,8 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 }
 .deep-advice-button:hover:not(:disabled) { transform: translateY(-1px); }
 .deep-advice-button:disabled { opacity: 0.6; cursor: wait; }
+.deep-advice-locked { padding: 16px 20px; }
+.deep-advice-locked p { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; }
 
 h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 28px 0 10px; }
 h2:first-of-type { margin-top: 0; }

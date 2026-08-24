@@ -43,11 +43,19 @@ export default async (req: Request, context: Context) => {
     SELECT * FROM public.scans WHERE company_id = ${companyId} ORDER BY generated_at DESC NULLS LAST
   `;
 
+  // Same profile shape companies.mts's list endpoint already returns — needed
+  // here too so CompanyDetailView.vue can gate deep advice on plan_tier.
+  const profiles = await db`
+    SELECT plan_tier, subscription_status FROM public.user_profiles WHERE user_id = ${userId}
+  `;
+  const profile = profiles[0] || { plan_tier: 'free', subscription_status: null };
+
   return new Response(
     JSON.stringify({
       ok: true,
       company: companies[0],
       scans: scanRows.map(toScanPayload),
+      profile,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } }
   );
