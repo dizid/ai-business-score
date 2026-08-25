@@ -228,6 +228,7 @@ export function findBrandMention(text, prospect) {
 const PPLX_URL = 'https://api.perplexity.ai/v1/responses';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const XAI_URL = 'https://api.x.ai/v1/responses';
+const OPENAI_URL = 'https://api.openai.com/v1/responses';
 
 function providerModelId(model) {
   const i = model.indexOf('/');
@@ -360,22 +361,40 @@ export async function callModel(apiKeys, model, prompt, timeoutMs, externalSigna
       case 'xai':
         if (!apiKeys.xai) throw new Error(`No XAI_API_KEY configured for direct call to ${model}`);
         return await callPerplexityOrXai(XAI_URL, apiKeys.xai, modelId, prompt, signal);
-      default:
-        // openai/* (and anything else) — no direct key exists for these,
-        // stays on the Perplexity gateway. Anthropic models called THROUGH
-        // Perplexity (legacy path, not used by the switch above anymore)
-        // needed an explicit max_output_tokens; kept here only in case a
-        // caller ever passes an anthropic/* model without an apiKeys.anthropic
-        // entry and this default branch is reached as a fallback.
-        if (!apiKeys.perplexity) throw new Error(`No PERPLEXITY_API_KEY configured for gateway call to ${model}`);
-        return await callPerplexityOrXai(
-          PPLX_URL,
-          apiKeys.perplexity,
-          model,
-          prompt,
-          signal,
-          model.startsWith('anthropic/') ? { max_output_tokens: 2048 } : undefined
-        );
+      case 'openai':
+        // Added 2026-08-25 — written to mirror xai's call exactly, since
+        // xai's own endpoint was already confirmed live to be "the same
+        // OpenAI-Responses-API-compatible shape," implying OpenAI's own
+        // /v1/responses is the shape's origin. NOT yet live-verified with a
+        // real OPENAI_API_KEY (none existed anywhere to test against as of
+        // this write) — do the same real smoke-test call this codebase's
+        // other three direct-provider branches were each verified with
+        // before trusting this. Falls through to the Perplexity gateway
+        // below if no key is configured, so every existing caller (several
+        // of which hardcode `{ perplexity: apiKey }` for this exact model)
+        // keeps working unchanged until apiKeys.openai is actually set.
+        if (apiKeys.openai) {
+          return await callPerplexityOrXai(OPENAI_URL, apiKeys.openai, modelId, prompt, signal);
+        }
+        break;
+    }
+    {
+      // Fallback: Perplexity gateway. Reached by any provider with no
+      // dedicated case above, and by openai/* specifically until
+      // apiKeys.openai is configured (see the 'openai' case above).
+      // Anthropic models called THROUGH Perplexity (legacy path, not used
+      // by the switch above anymore) needed an explicit max_output_tokens;
+      // kept here only in case a caller ever passes an anthropic/* model
+      // without an apiKeys.anthropic entry and reaches this fallback.
+      if (!apiKeys.perplexity) throw new Error(`No PERPLEXITY_API_KEY configured for gateway call to ${model}`);
+      return await callPerplexityOrXai(
+        PPLX_URL,
+        apiKeys.perplexity,
+        model,
+        prompt,
+        signal,
+        model.startsWith('anthropic/') ? { max_output_tokens: 2048 } : undefined
+      );
     }
   } catch (err) {
     if (err.name === 'AbortError') {

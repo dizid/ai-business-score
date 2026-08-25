@@ -218,17 +218,20 @@ async function main() {
 
   // 2026-08-15 direct-provider migration (see aivis-core.mjs's callModel
   // comment): anthropic/google/xai models now call each provider's own API
-  // directly; only openai/gpt-5-mini still needs PERPLEXITY_API_KEY. At
-  // least one key must be set to do any real work.
+  // directly. openai/gpt-5-mini does too as of 2026-08-25, but only if
+  // OPENAI_API_KEY is set — callModel falls back to PERPLEXITY_API_KEY's
+  // gateway automatically otherwise. At least one key must be set to do any
+  // real work.
   const apiKeys = {
     perplexity: process.env.PERPLEXITY_API_KEY,
     anthropic: process.env.ANTHROPIC_API_KEY,
     google: process.env.GOOGLE_API_KEY,
     xai: process.env.XAI_API_KEY,
+    openai: process.env.OPENAI_API_KEY,
   };
-  if (!args.dryRun && !apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai) {
+  if (!args.dryRun && !apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai && !apiKeys.openai) {
     console.error(
-      'No model API keys set (PERPLEXITY_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY / XAI_API_KEY). ' +
+      'No model API keys set (PERPLEXITY_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY / XAI_API_KEY / OPENAI_API_KEY). ' +
       'Copy .env.example to .env and fill in at least one, or use --dry-run.'
     );
     process.exit(1);

@@ -106,17 +106,20 @@ export default async (req: Request) => {
   // 2026-08-15 direct-provider migration (see aivis-core.mjs's callModel
   // comment for the full story): anthropic/google/xai models now call each
   // provider's own API directly instead of all going through one Perplexity
-  // gateway key. openai/gpt-5-mini has no direct key available anywhere and
-  // stays on the Perplexity gateway. A single missing key no longer fails
-  // the whole scan — it fails only the calls for that one provider's model
-  // (callModel throws a clear per-model error), same "skip and count
-  // separately" shape as any other call failure. The scan only refuses to
-  // start if literally none of the 4 keys are configured.
+  // gateway key. A single missing key no longer fails the whole scan — it
+  // fails only the calls for that one provider's model (callModel throws a
+  // clear per-model error), same "skip and count separately" shape as any
+  // other call failure. The scan only refuses to start if literally none of
+  // the 5 keys are configured.
+  // openai (added 2026-08-25): direct call attempted only if OPENAI_API_KEY
+  // is actually set — callModel falls back to the Perplexity gateway
+  // automatically if not, so this is safe to ship ahead of the key existing.
   const apiKeys = {
     perplexity: Netlify.env.get('PERPLEXITY_API_KEY'),
     anthropic: Netlify.env.get('ANTHROPIC_API_KEY'),
     google: Netlify.env.get('GOOGLE_API_KEY'),
     xai: Netlify.env.get('XAI_API_KEY'),
+    openai: Netlify.env.get('OPENAI_API_KEY'),
   };
   // PageSpeed Insights, for the Harmonia audit's UX Signals pillar below.
   // Tries a dedicated key first, falls back to reusing GOOGLE_API_KEY (same
@@ -125,7 +128,7 @@ export default async (req: Request) => {
   // a missing/invalid key only nulls the UX Signals pillar — see
   // harmonia.mjs's fetchCoreWebVitals, never fails the scan.
   const psiApiKey = Netlify.env.get('GOOGLE_PAGESPEED_API_KEY') || apiKeys.google;
-  if (!apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai) {
+  if (!apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai && !apiKeys.openai) {
     await db`
       UPDATE public.scans SET status = 'failed', error_message = 'Server misconfigured: no model API keys set'
       WHERE id = ${scanId}

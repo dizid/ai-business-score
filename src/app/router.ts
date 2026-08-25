@@ -61,6 +61,19 @@ router.beforeEach(async (to) => {
 
 router.afterEach((to) => {
   document.title = (to.meta.title as string) || 'Foreground';
+
+  // app.html's own <head> script loads gtag and sends one automatic
+  // pageview on initial load — this covers every subsequent client-side
+  // route change, which gtag's automatic tracking can't see. No-ops if GA4
+  // isn't configured yet (see app.html's snippet).
+  const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
+  if (typeof gtag === 'function') {
+    gtag('event', 'page_view', {
+      page_title: document.title,
+      page_location: window.location.href,
+      page_path: to.fullPath,
+    });
+  }
 });
 
 export default router;

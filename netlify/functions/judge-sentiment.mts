@@ -96,9 +96,10 @@ export default async (req: Request, context: Context) => {
 
   try {
     const prompt = buildSentimentJudgePrompt(scanRow.brand, target.text);
-    // openai/gpt-5-mini has no direct key available (see aivis-core.mjs's
-    // callModel comment) — still routed through the Perplexity gateway.
-    const result = await callModel({ perplexity: apiKey }, 'openai/gpt-5-mini', prompt, 20000);
+    // openai/gpt-5-mini calls OpenAI directly if OPENAI_API_KEY is set
+    // (added 2026-08-25), else callModel falls back to the Perplexity
+    // gateway above — see aivis-core.mjs's callModel comment.
+    const result = await callModel({ perplexity: apiKey, openai: Netlify.env.get('OPENAI_API_KEY') }, 'openai/gpt-5-mini', prompt, 20000);
     const judgment = parseSentimentJudgeResponse(result.text);
 
     // Upsert by (promptIndex, model) into the existing array rather than

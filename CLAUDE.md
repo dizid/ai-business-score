@@ -121,8 +121,13 @@ enterprise deal requiring a DPA).
   client" under `shared/aivis-core.mjs` below) — all three are personal
   keys reused from other Dizid projects (found under `/home/marc/DEV`),
   same reuse pattern already established for `RESEND_API_KEY`, not new
-  accounts created for Foreground specifically. No `OPENAI_API_KEY` exists
-  anywhere — `openai/gpt-5-mini` stays on the Perplexity gateway.
+  accounts created for Foreground specifically. **`OPENAI_API_KEY`** — not
+  yet set, still genuinely absent from every Dizid project as of
+  2026-08-25 (checked again). Direct-call code for `openai/gpt-5-mini` was
+  written the same day (see `shared/CLAUDE.md`'s "Multi-provider model
+  client" entry) with a safe fallback to the Perplexity gateway when this
+  var is unset, so it can ship ahead of the key existing — setting this var
+  once Marc has a real key is the only remaining step to activate it.
   `GOOGLE_PAGESPEED_API_KEY` added 2026-08-19 for Harmonia's Core Web
   Vitals pillar (`shared/harmonia.mjs`) — a **dedicated new GCP project**
   (`GOOGLE_API_KEY`'s existing project doesn't have the PageSpeed Insights
@@ -161,6 +166,23 @@ enterprise deal requiring a DPA).
   full valid anonymous request and fetched the resulting Checkout session
   back from Stripe's API to confirm `amount_total: 1900` and the correct
   webhook-matching metadata shape.
+  **`VITE_GA4_MEASUREMENT_ID`** (new 2026-08-25, Google Analytics) — **not
+  yet set**. GA4 tracking code is already wired into every page
+  (`index.html`, `how-it-works.html`, `privacy.html`, `terms.html`,
+  `app.html`, and `scripts/build-blog.mjs`'s blog template), guarded to
+  no-op safely if this var is unset or doesn't start with `G-` — no broken
+  script, no data sent. Claude has no Analytics Admin API access or
+  browser/OAuth session, so it cannot create the GA4 property itself; Marc
+  needs to create one at analytics.google.com (Admin → Create Property)
+  and provide the Measurement ID before this activates. `router.ts`'s
+  `afterEach` sends a manual `page_view` on every client-side route change
+  inside `app.html` (gtag's automatic pageview only fires once on initial
+  load). `privacy.html` was updated the same day to disclose Google
+  Analytics as a data processor and its cookie use — see its "Cookies"
+  section. **Known gap, not built**: no cookie-consent mechanism exists
+  anywhere on the site, which is a real question mark for EU visitors now
+  that a non-essential tracking cookie is in play, same spirit as the
+  privacy/terms hardening pass's own disclaimer.
 
 ## Commands
 

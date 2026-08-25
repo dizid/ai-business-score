@@ -77,9 +77,10 @@ export default async (req: Request) => {
     // deadline), so the extra attempt only costs latency on this one form,
     // not scan-wide reliability. No shared scan-wide deadline to abort
     // against here, so no AbortSignal is passed.
-    // openai/gpt-5-mini has no direct key available (see aivis-core.mjs's
-    // callModel comment) — still routed through the Perplexity gateway.
-    const result = await callModelWithRetry({ perplexity: apiKey }, 'openai/gpt-5-mini', buildEnrichPrompt(normalizedWebsite), CALL_TIMEOUT_MS, 3);
+    // openai/gpt-5-mini calls OpenAI directly if OPENAI_API_KEY is set
+    // (added 2026-08-25), else callModel falls back to the Perplexity
+    // gateway above — see aivis-core.mjs's callModel comment.
+    const result = await callModelWithRetry({ perplexity: apiKey, openai: Netlify.env.get('OPENAI_API_KEY') }, 'openai/gpt-5-mini', buildEnrichPrompt(normalizedWebsite), CALL_TIMEOUT_MS, 3);
     const fields = parseEnrichmentResponse(result.text);
     return new Response(JSON.stringify({ ok: true, website: normalizedWebsite, ...fields }), {
       status: 200,

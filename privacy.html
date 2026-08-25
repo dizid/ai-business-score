@@ -66,6 +66,23 @@
      comment on this link for why this replaced a per-page inline <style>
      block (this page had drifted onto an already-retired palette). -->
 <link rel="stylesheet" href="/marketing-theme.css" />
+
+<!-- Google Analytics (GA4) — see index.html's identical snippet for the
+     no-op-until-configured guard and rationale. -->
+<script>
+(function () {
+  var GA_ID = '%VITE_GA4_MEASUREMENT_ID%';
+  if (!GA_ID || GA_ID.charAt(0) === '%' || GA_ID.indexOf('G-') !== 0) return;
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { dataLayer.push(arguments); };
+  gtag('js', new Date());
+  gtag('config', GA_ID);
+})();
+</script>
 </head>
 <body>
 
@@ -82,7 +99,7 @@
     <a class="back" href="/">← Back to Foreground</a>
 
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: 2026-08-24</p>
+    <p class="updated">Last updated: 2026-08-25</p>
 
     <section>
       <h2>Overview</h2>
@@ -156,6 +173,8 @@
         <li><strong>Resend</strong> — sends the scan-complete email to your account's email address.</li>
         <li><strong>Neon</strong> — hosts our database and authentication (login/session) system.</li>
         <li><strong>Netlify</strong> — hosts the application and runs its backend functions.</li>
+        <li><strong>Google Analytics</strong> — collects anonymized visit data (pages viewed, general location,
+          device type) so we can tell whether the site is working. See "Cookies" below.</li>
       </ul>
       <p>We don't share your data with anyone else, and never for advertising purposes.</p>
       <p>
@@ -170,8 +189,12 @@
       <h2>Cookies</h2>
       <p>
         Foreground uses one essential cookie, set by Neon Auth, to keep you
-        logged in between visits. We don't use tracking or advertising
-        cookies.
+        logged in between visits. We also use Google Analytics, which sets
+        cookies to measure site usage (which pages get visited, roughly
+        where from, general device type) — this helps us tell whether
+        changes to the site are actually working. We don't use advertising
+        cookies, and Google Analytics data isn't used to personally
+        identify you or to advertise to you elsewhere.
       </p>
     </section>
 

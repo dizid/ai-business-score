@@ -79,20 +79,34 @@ The single source of truth, imported by every consumer:
     `SCAN_DEADLINE_MS` in `run-scan-background.mts` are unchanged by this
     migration, deliberately — see below) — a real risk worth watching once
     this runs against production scan volume.
-  - **`openai/*`** (`gpt-5-mini`) — **no direct key exists anywhere** (this
-    migration searched; genuinely absent). Still routed through the
-    Perplexity gateway (`PPLX_URL`), unchanged from before. Deep advice,
-    the sentiment judge, and `enrich.mts` all hardcode this exact model, so
-    they're unaffected by everything above.
+  - **`openai/*`** (`gpt-5-mini`) — **direct call added 2026-08-25**,
+    `POST https://api.openai.com/v1/responses`, reusing `callPerplexityOrXai`
+    unchanged (written to mirror xai's call exactly, since xai's endpoint
+    was already confirmed to be "the same OpenAI-Responses-API-compatible
+    shape" — implying OpenAI's own `/v1/responses` is the shape's origin).
+    **Not yet live-verified** — no `OPENAI_API_KEY` existed anywhere to
+    smoke-test against as of this write (checked every Dizid project's
+    `.env` files, contents not just filenames — genuinely absent, confirmed
+    a second time independently of the original 2026-08-15 migration's same
+    finding). `callModel` falls back to the Perplexity gateway
+    automatically if `apiKeys.openai` isn't set, so every existing caller —
+    including the four that hardcode `{ perplexity: apiKey }` for this
+    exact model (`enrich.mts`, `stripe-webhook.mts`, `judge-sentiment.mts`,
+    `generate-deep-advice.mts`) — was updated to also pass `openai:
+    Netlify.env.get('OPENAI_API_KEY')` alongside the existing perplexity
+    key, safely inert until that env var actually exists. Do the same real
+    smoke-test call the other three direct-provider branches were each
+    verified with before trusting this in production.
   - `apiKeys` is now always an object (`{ perplexity, anthropic, google,
-    xai }`, any entry optional) rather than a single string — every caller
-    (`run-scan-background.mts`, `generate-deep-advice.mts`,
-    `judge-sentiment.mts`, `enrich.mts`, `proof-script/index.mjs`) was
-    updated. A model whose provider has no configured key throws a clear,
-    attributable per-model error rather than a confusing generic one — same
-    "skip and count separately" failure shape every other call failure
-    already used, so a single missing key degrades that one provider's
-    calls to failures instead of failing the whole scan.
+    xai, openai }`, any entry optional) rather than a single string — every
+    caller (`run-scan-background.mts`, `generate-deep-advice.mts`,
+    `judge-sentiment.mts`, `enrich.mts`, `stripe-webhook.mts`,
+    `proof-script/index.mjs`) was updated. A model whose provider has no
+    configured key (and no gateway fallback, for non-openai providers)
+    throws a clear, attributable per-model error rather than a confusing
+    generic one — same "skip and count separately" failure shape every
+    other call failure already used, so a single missing key degrades that
+    one provider's calls to failures instead of failing the whole scan.
   - **Deliberately NOT changed by this migration**: `CONCURRENCY_LIMIT`
     (still 1) and `SCAN_DEADLINE_MS` (still 600000) in
     `run-scan-background.mts` — those were tuned specifically against

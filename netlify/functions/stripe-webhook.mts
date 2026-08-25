@@ -164,7 +164,7 @@ export default async (req: Request) => {
         const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');
         if (apiKey) {
           try {
-            const result = await callModelWithRetry({ perplexity: apiKey }, 'openai/gpt-5-mini', buildEnrichPrompt(website), 45000, 3);
+            const result = await callModelWithRetry({ perplexity: apiKey, openai: Netlify.env.get('OPENAI_API_KEY') }, 'openai/gpt-5-mini', buildEnrichPrompt(website), 45000, 3);
             const fields = parseEnrichmentResponse(result.text);
             brand = fields.brand;
             category = fields.category;

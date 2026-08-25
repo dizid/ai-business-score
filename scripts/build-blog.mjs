@@ -96,6 +96,25 @@ function pageShell({ title, description, canonicalPath, ogImagePath = '/og-image
 <link rel="stylesheet" href="/marketing-theme.css" />
 <link rel="stylesheet" href="/blog-theme.css" />
 ${extraHead}
+
+<!-- Google Analytics (GA4) — mirrors the same no-op-until-configured guard
+     as index.html/how-it-works.html/privacy.html/terms.html/app.html, but
+     reads process.env directly since this script runs as plain Node after
+     vite build, not through Vite's %VITE_...% HTML replacement. -->
+<script>
+(function () {
+  var GA_ID = ${JSON.stringify(process.env.VITE_GA4_MEASUREMENT_ID || '')};
+  if (!GA_ID || GA_ID.indexOf('G-') !== 0) return;
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { dataLayer.push(arguments); };
+  gtag('js', new Date());
+  gtag('config', GA_ID);
+})();
+</script>
 </head>
 <body>
 
