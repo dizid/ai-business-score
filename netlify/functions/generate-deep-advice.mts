@@ -80,10 +80,10 @@ export default async (req: Request, context: Context) => {
 
   try {
     const prompt = buildDeepAdvicePrompt(toScanPayload(scanRow));
-    // openai/gpt-5-mini calls OpenAI directly if OPENAI_API_KEY is set
-    // (added 2026-08-25), else callModel falls back to the Perplexity
-    // gateway above — see aivis-core.mjs's callModel comment.
-    const result = await callModel({ perplexity: apiKey, openai: Netlify.env.get('OPENAI_API_KEY') }, 'openai/gpt-5-mini', prompt, 20000);
+    // Deliberately Perplexity-only, not the direct-API path — see
+    // enrich.mts's comment (a real OpenAI call measured at 30.5s live,
+    // over this regular synchronous function's execution ceiling).
+    const result = await callModel({ perplexity: apiKey }, 'openai/gpt-5-mini', prompt, 20000);
     const deepAdvice = parseDeepAdviceResponse(result.text);
 
     const updated = await db`

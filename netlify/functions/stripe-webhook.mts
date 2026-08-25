@@ -164,7 +164,10 @@ export default async (req: Request) => {
         const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');
         if (apiKey) {
           try {
-            const result = await callModelWithRetry({ perplexity: apiKey, openai: Netlify.env.get('OPENAI_API_KEY') }, 'openai/gpt-5-mini', buildEnrichPrompt(website), 45000, 3);
+            // Deliberately Perplexity-only, not the direct-API path — see
+            // enrich.mts's comment (same call, same 502-on-30s+ latency risk
+            // for a regular synchronous function, confirmed live 2026-08-25).
+            const result = await callModelWithRetry({ perplexity: apiKey }, 'openai/gpt-5-mini', buildEnrichPrompt(website), 45000, 3);
             const fields = parseEnrichmentResponse(result.text);
             brand = fields.brand;
             category = fields.category;

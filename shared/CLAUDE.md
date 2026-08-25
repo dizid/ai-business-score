@@ -85,34 +85,48 @@ The single source of truth, imported by every consumer:
     was already confirmed to be "the same OpenAI-Responses-API-compatible
     shape" — implying OpenAI's own `/v1/responses` is the shape's origin).
     `callModel` falls back to the Perplexity gateway automatically if
-    `apiKeys.openai` isn't set, so every existing caller — including the
-    four that hardcode `{ perplexity: apiKey }` for this exact model
-    (`enrich.mts`, `stripe-webhook.mts`, `judge-sentiment.mts`,
-    `generate-deep-advice.mts`) — was updated to also pass `openai:
-    Netlify.env.get('OPENAI_API_KEY')` alongside the existing perplexity
-    key.
+    `apiKeys.openai` isn't set.
     **Live-verified 2026-08-25**: `OPENAI_API_KEY` found in `DEV.md`
     (gitignored, confirmed never committed — checked full git history for
     the file, zero matches for `sk-proj`), a location the earlier
     `.env`-only searches never covered since it's a scratch notes file, not
-    an env file. Two real calls against `api.openai.com/v1/responses` with
-    `tools: [{ type: 'web_search' }]` both returned HTTP 200 with the
-    expected `gpt-5-mini` reasoning-model shape (an extra `type: "reasoning"`
-    entry in `output[]` ahead of the `type: "message"` entry, harmless since
+    an env file. Real calls against `api.openai.com/v1/responses` with
+    `tools: [{ type: 'web_search' }]` returned HTTP 200 with the expected
+    `gpt-5-mini` reasoning-model shape (an extra `type: "reasoning"` entry
+    in `output[]` ahead of the `type: "message"` entry, harmless since
     `extractText`/`extractCitations` only look for a `.text`/`.annotations`
-    field on each `content[]` item, not a specific `output[].type`). Ran the
-    actual exported `extractText`/`extractCitations` against both captured
-    responses: correctly returned `"Paris"` for a trivial factual query, and
-    8 real citations (URL + title) for a business-relevant query — matching
-    exactly what `aggregateProspect`'s `ownSiteCitations` matching expects.
+    field on each `content[]` item, not a specific `output[].type`); the
+    actual exported `extractText`/`extractCitations` correctly parsed both a
+    trivial factual answer and 8 real citations (URL + title) from a
+    business-relevant query.
+    **But a real per-call latency problem, found via an actual e2e test
+    through the deployed `enrich.mts` function (not just a raw API call)**:
+    a live OpenAI call measured **30.5s**, well over Perplexity's documented
+    ~15-20s for the same task. `enrich.mts` 502'd in production — Netlify's
+    synchronous-function execution ceiling (no override in `netlify.toml`,
+    so it's the platform default) killed the function before it could
+    return, an ungraceful crash rather than a clean timeout error, since
+    the platform's own limit fired before this call's internal
+    `CALL_TIMEOUT_MS` budget did. **Decision**: only `run-scan-background.mts`
+    (a true Background Function, ~15 min ceiling, easily absorbs this) and
+    `proof-script/index.mjs` (a local CLI, no platform limit at all) use the
+    direct openai path. `enrich.mts`, `stripe-webhook.mts`'s enrich call,
+    `judge-sentiment.mts`, and `generate-deep-advice.mts` were deliberately
+    reverted to Perplexity-only (`{ perplexity: apiKey }`, no `openai` key
+    passed) — all four are regular synchronous functions where this latency
+    is a real production risk, not a theoretical one. If a way to raise
+    those functions' timeout, or a faster non-reasoning OpenAI model,
+    becomes available later, revisit; don't just re-add the key without
+    re-testing.
     `OPENAI_API_KEY` set on the Netlify site (`envVarIsSecret: false` per
     standing rule) and `VITE_GA4_MEASUREMENT_ID` (`G-HZKLBPKH81`, see
     root `CLAUDE.md`) set the same session.
   - `apiKeys` is now always an object (`{ perplexity, anthropic, google,
-    xai, openai }`, any entry optional) rather than a single string — every
-    caller (`run-scan-background.mts`, `generate-deep-advice.mts`,
-    `judge-sentiment.mts`, `enrich.mts`, `stripe-webhook.mts`,
-    `proof-script/index.mjs`) was updated. A model whose provider has no
+    xai, openai }`, any entry optional) rather than a single string —
+    `run-scan-background.mts` and `proof-script/index.mjs` pass `openai`;
+    `enrich.mts`/`stripe-webhook.mts`/`judge-sentiment.mts`/
+    `generate-deep-advice.mts` deliberately don't (see above). A model
+    whose provider has no
     configured key (and no gateway fallback, for non-openai providers)
     throws a clear, attributable per-model error rather than a confusing
     generic one — same "skip and count separately" failure shape every

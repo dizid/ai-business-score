@@ -127,8 +127,12 @@ enterprise deal requiring a DPA).
   a location the `.env`-only searches never covered). **Set on Netlify
   2026-08-25** (`envVarIsSecret: false`) — direct-call code for
   `openai/gpt-5-mini` (see `shared/CLAUDE.md`'s "Multi-provider model
-  client" entry) is live-verified, not just written; see that entry for
-  the real smoke-test detail.
+  client" entry) is live-verified, not just written, **and deliberately
+  only wired into `run-scan-background.mts`/`proof-script`** — a real
+  30.5s-per-call latency (GPT-5 mini's reasoning overhead) 502'd
+  `enrich.mts` in production before this was caught by an actual e2e test
+  and reverted for the four synchronous-function callers; see that entry
+  for the full detail.
   `GOOGLE_PAGESPEED_API_KEY` added 2026-08-19 for Harmonia's Core Web
   Vitals pillar (`shared/harmonia.mjs`) — a **dedicated new GCP project**
   (`GOOGLE_API_KEY`'s existing project doesn't have the PageSpeed Insights

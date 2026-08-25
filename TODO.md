@@ -51,15 +51,20 @@ assuming nothing else is in flight.
       *visible* double-messaging symptom was already fixed in `e2bde88`;
       this is the deeper gap QA-FIXES-PLAN #3a originally asked for,
       still open.)
-- [x] ~~`gpt-5-mini` direct API migration~~ **Done and live-verified
-      2026-08-25** (QA-FIXES-PLAN #5). Key was in `DEV.md` (gitignored
-      scratch notes, missed by the `.env`-only searches). Real smoke-test
-      calls against `api.openai.com/v1/responses` confirmed the request
-      shape, response shape, and that `extractText`/`extractCitations`
-      parse it correctly (real citations came back for a business-relevant
-      query). `OPENAI_API_KEY` set on Netlify. All 6 call sites updated,
-      falls back to the Perplexity gateway automatically if the key is
-      ever unset.
+- [x] ~~`gpt-5-mini` direct API migration~~ **Done, live-verified, and
+      deliberately scoped down 2026-08-25** (QA-FIXES-PLAN #5). Key was in
+      `DEV.md` (gitignored scratch notes, missed by the `.env`-only
+      searches). An actual e2e test through the deployed `enrich.mts`
+      (real signup, real JWT, real HTTP call — not just a raw API smoke
+      test) caught a real problem: a live OpenAI call takes ~30.5s
+      (GPT-5 mini's reasoning overhead), which 502'd `enrich.mts` — it's a
+      regular synchronous Netlify Function, not a Background Function, and
+      Netlify's platform execution ceiling killed it before it could
+      return. Only `run-scan-background.mts` (Background Function, ~15 min
+      ceiling) and `proof-script` use the direct path now.
+      `enrich.mts`/`stripe-webhook.mts`/`judge-sentiment.mts`/
+      `generate-deep-advice.mts` were reverted to Perplexity-only on
+      purpose — re-verified `enrich.mts` works again after reverting.
 - [ ] **Build `REPORTPLAN.md` Change 2** (see Marc's priority-call item
       above — don't start until that's a yes).
 - [ ] **Shared header/footer partial** across `index.html`,
