@@ -84,19 +84,30 @@ The single source of truth, imported by every consumer:
     unchanged (written to mirror xai's call exactly, since xai's endpoint
     was already confirmed to be "the same OpenAI-Responses-API-compatible
     shape" — implying OpenAI's own `/v1/responses` is the shape's origin).
-    **Not yet live-verified** — no `OPENAI_API_KEY` existed anywhere to
-    smoke-test against as of this write (checked every Dizid project's
-    `.env` files, contents not just filenames — genuinely absent, confirmed
-    a second time independently of the original 2026-08-15 migration's same
-    finding). `callModel` falls back to the Perplexity gateway
-    automatically if `apiKeys.openai` isn't set, so every existing caller —
-    including the four that hardcode `{ perplexity: apiKey }` for this
-    exact model (`enrich.mts`, `stripe-webhook.mts`, `judge-sentiment.mts`,
+    `callModel` falls back to the Perplexity gateway automatically if
+    `apiKeys.openai` isn't set, so every existing caller — including the
+    four that hardcode `{ perplexity: apiKey }` for this exact model
+    (`enrich.mts`, `stripe-webhook.mts`, `judge-sentiment.mts`,
     `generate-deep-advice.mts`) — was updated to also pass `openai:
     Netlify.env.get('OPENAI_API_KEY')` alongside the existing perplexity
-    key, safely inert until that env var actually exists. Do the same real
-    smoke-test call the other three direct-provider branches were each
-    verified with before trusting this in production.
+    key.
+    **Live-verified 2026-08-25**: `OPENAI_API_KEY` found in `DEV.md`
+    (gitignored, confirmed never committed — checked full git history for
+    the file, zero matches for `sk-proj`), a location the earlier
+    `.env`-only searches never covered since it's a scratch notes file, not
+    an env file. Two real calls against `api.openai.com/v1/responses` with
+    `tools: [{ type: 'web_search' }]` both returned HTTP 200 with the
+    expected `gpt-5-mini` reasoning-model shape (an extra `type: "reasoning"`
+    entry in `output[]` ahead of the `type: "message"` entry, harmless since
+    `extractText`/`extractCitations` only look for a `.text`/`.annotations`
+    field on each `content[]` item, not a specific `output[].type`). Ran the
+    actual exported `extractText`/`extractCitations` against both captured
+    responses: correctly returned `"Paris"` for a trivial factual query, and
+    8 real citations (URL + title) for a business-relevant query — matching
+    exactly what `aggregateProspect`'s `ownSiteCitations` matching expects.
+    `OPENAI_API_KEY` set on the Netlify site (`envVarIsSecret: false` per
+    standing rule) and `VITE_GA4_MEASUREMENT_ID` (`G-HZKLBPKH81`, see
+    root `CLAUDE.md`) set the same session.
   - `apiKeys` is now always an object (`{ perplexity, anthropic, google,
     xai, openai }`, any entry optional) rather than a single string — every
     caller (`run-scan-background.mts`, `generate-deep-advice.mts`,

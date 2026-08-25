@@ -6,13 +6,11 @@ these already lives in `QA-FIXES-PLAN.md`, `TODO-MARKETING.md`,
 scannable action list, not a replacement for those.
 
 **Before picking anything up: run `git status` and `ListAgents` first.**
-This repo regularly has multiple concurrent sessions editing it — as of
-2026-08-25, another session has `ScanDetail.vue`, `CompanyDetailView.vue`,
-`scanDerived.ts`/`scanLabels.ts`/`scanPayload.ts`/`scanReport.ts`,
-`shared/harmonia.mjs`/`aivis-core.mjs`, and a new
-`CompetitorTrendChart.vue` all mid-edit — looks like the scan-result
-clarity + competitor-trend-chart work. Don't duplicate it; check what
-landed before starting anything below that touches those files.
+This repo regularly has multiple concurrent sessions editing it. The
+scan-result clarity + competitor-trend-chart work flagged as mid-edit
+earlier on 2026-08-25 has since landed (commit `3d12679`, "Add GEO-report
+upgrade") — that warning is resolved, but re-check current state before
+assuming nothing else is in flight.
 
 ## Marc
 
@@ -25,17 +23,11 @@ landed before starting anything below that touches those files.
       signups, has been fake money. Real payments need live mode
       activated on the Stripe account (business details, banking) plus
       live-mode Prices swapped in for all three SKUs.
-- [ ] **Create the GA4 property.** Marc chose Google Analytics over the two
-      previously-raised options (2026-08-25) — GA4 tracking code is now
-      wired into every page (guarded to no-op until configured), Privacy
-      Policy updated to disclose it. Claude has no Analytics Admin API
-      access or browser/OAuth session to create the property itself — Marc
-      needs to create one at analytics.google.com (Admin → Create Property,
-      ~2 min) and hand over the Measurement ID (`G-XXXXXXXXXX`), then set
-      it as `VITE_GA4_MEASUREMENT_ID` on the Netlify site + redeploy. See
-      `CLAUDE.md`'s Deployment section. Also still open: no cookie-consent
-      mechanism exists on the site, a real gap for EU visitors now that a
-      non-essential tracking cookie is in play — flagged, not built.
+- [x] ~~Create the GA4 property~~ **Done 2026-08-25** — Marc created it,
+      provided `G-HZKLBPKH81`, set live on Netlify, confirmed baked into
+      the deployed pages. Still open: no cookie-consent mechanism exists on
+      the site, a real gap for EU visitors now that a non-essential
+      tracking cookie is in play — flagged, not built.
 - [ ] **Netlify function log access**, so QA-FIXES-PLAN #3b (root cause of
       the scan-polling failures — suspected Netlify concurrency ceiling)
       can actually be confirmed instead of guessed at from static code.
@@ -59,22 +51,15 @@ landed before starting anything below that touches those files.
       *visible* double-messaging symptom was already fixed in `e2bde88`;
       this is the deeper gap QA-FIXES-PLAN #3a originally asked for,
       still open.)
-- [ ] **`gpt-5-mini` direct API migration — code done, blocked on a real key
-      to test with** (QA-FIXES-PLAN #5). No `OPENAI_API_KEY` exists in any
-      Dizid project's `.env` files (checked contents, not just filenames,
-      twice independently). Marc has two keys visible in the OpenAI
-      dashboard (`OpenAI001`, `OpenAI-servicekey001`) but the values are
-      masked there — can't extract from a screenshot. Written anyway: a new
-      `case 'openai'` in `callModel` (`shared/aivis-core.mjs`) calling
-      `api.openai.com/v1/responses` directly, falling back to the
-      Perplexity gateway automatically if `OPENAI_API_KEY` isn't set — so
-      it shipped safely with zero behavior change until the key exists. All
-      6 call sites updated (`run-scan-background.mts`, `enrich.mts`,
-      `stripe-webhook.mts`, `judge-sentiment.mts`,
-      `generate-deep-advice.mts`, `proof-script/index.mjs`). **Not
-      live-verified** — needs a real smoke-test call once Marc pastes a key
-      value or sets `OPENAI_API_KEY` on Netlify himself, same "verify live
-      before trusting" discipline as the other three provider migrations.
+- [x] ~~`gpt-5-mini` direct API migration~~ **Done and live-verified
+      2026-08-25** (QA-FIXES-PLAN #5). Key was in `DEV.md` (gitignored
+      scratch notes, missed by the `.env`-only searches). Real smoke-test
+      calls against `api.openai.com/v1/responses` confirmed the request
+      shape, response shape, and that `extractText`/`extractCitations`
+      parse it correctly (real citations came back for a business-relevant
+      query). `OPENAI_API_KEY` set on Netlify. All 6 call sites updated,
+      falls back to the Perplexity gateway automatically if the key is
+      ever unset.
 - [ ] **Build `REPORTPLAN.md` Change 2** (see Marc's priority-call item
       above — don't start until that's a yes).
 - [ ] **Shared header/footer partial** across `index.html`,

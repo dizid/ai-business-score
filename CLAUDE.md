@@ -121,13 +121,14 @@ enterprise deal requiring a DPA).
   client" under `shared/aivis-core.mjs` below) — all three are personal
   keys reused from other Dizid projects (found under `/home/marc/DEV`),
   same reuse pattern already established for `RESEND_API_KEY`, not new
-  accounts created for Foreground specifically. **`OPENAI_API_KEY`** — not
-  yet set, still genuinely absent from every Dizid project as of
-  2026-08-25 (checked again). Direct-call code for `openai/gpt-5-mini` was
-  written the same day (see `shared/CLAUDE.md`'s "Multi-provider model
-  client" entry) with a safe fallback to the Perplexity gateway when this
-  var is unset, so it can ship ahead of the key existing — setting this var
-  once Marc has a real key is the only remaining step to activate it.
+  accounts created for Foreground specifically. **`OPENAI_API_KEY`** — was
+  genuinely absent from every Dizid project's `.env` files (checked twice),
+  but turned up in `DEV.md` (gitignored scratch notes, never committed —
+  a location the `.env`-only searches never covered). **Set on Netlify
+  2026-08-25** (`envVarIsSecret: false`) — direct-call code for
+  `openai/gpt-5-mini` (see `shared/CLAUDE.md`'s "Multi-provider model
+  client" entry) is live-verified, not just written; see that entry for
+  the real smoke-test detail.
   `GOOGLE_PAGESPEED_API_KEY` added 2026-08-19 for Harmonia's Core Web
   Vitals pillar (`shared/harmonia.mjs`) — a **dedicated new GCP project**
   (`GOOGLE_API_KEY`'s existing project doesn't have the PageSpeed Insights
@@ -166,22 +167,28 @@ enterprise deal requiring a DPA).
   full valid anonymous request and fetched the resulting Checkout session
   back from Stripe's API to confirm `amount_total: 1900` and the correct
   webhook-matching metadata shape.
-  **`VITE_GA4_MEASUREMENT_ID`** (new 2026-08-25, Google Analytics) — **not
-  yet set**. GA4 tracking code is already wired into every page
-  (`index.html`, `how-it-works.html`, `privacy.html`, `terms.html`,
-  `app.html`, and `scripts/build-blog.mjs`'s blog template), guarded to
-  no-op safely if this var is unset or doesn't start with `G-` — no broken
-  script, no data sent. Claude has no Analytics Admin API access or
-  browser/OAuth session, so it cannot create the GA4 property itself; Marc
-  needs to create one at analytics.google.com (Admin → Create Property)
-  and provide the Measurement ID before this activates. `router.ts`'s
-  `afterEach` sends a manual `page_view` on every client-side route change
-  inside `app.html` (gtag's automatic pageview only fires once on initial
-  load). `privacy.html` was updated the same day to disclose Google
-  Analytics as a data processor and its cookie use — see its "Cookies"
-  section. **Known gap, not built**: no cookie-consent mechanism exists
-  anywhere on the site, which is a real question mark for EU visitors now
-  that a non-essential tracking cookie is in play, same spirit as the
+  **`VITE_GA4_MEASUREMENT_ID`** (new 2026-08-25, Google Analytics) — Marc
+  created the GA4 property himself (Claude has no Analytics Admin API
+  access or browser/OAuth session to do this) and provided the Measurement
+  ID, `G-HZKLBPKH81`, **set on Netlify 2026-08-25**. GA4 tracking code is
+  wired into every page (`index.html`, `how-it-works.html`, `privacy.html`,
+  `terms.html`, `app.html`, and `scripts/build-blog.mjs`'s blog template),
+  guarded to no-op safely if this var is unset or doesn't start with `G-`.
+  `router.ts`'s `afterEach` sends a manual `page_view` on every
+  client-side route change inside `app.html` (gtag's automatic pageview
+  only fires once on initial load). `privacy.html` was updated the same
+  day to disclose Google Analytics as a data processor and its cookie use
+  — see its "Cookies" section. **Deploy gotcha found the same day**: the
+  Netlify MCP's `deploy-site` operation caches by git commit, not by the
+  local `deployDirectory` contents — repeated manual deploys after setting
+  this var kept re-publishing the same stale pre-var build ("all files
+  already uploaded by a previous deploy with the same commits") until a
+  real new commit forced a genuine git-triggered rebuild. If an env var
+  change ever seems not to be taking effect on this site, push a real
+  commit rather than trusting a manual redeploy call to pick it up.
+  **Known gap, not built**: no cookie-consent mechanism exists anywhere on
+  the site, which is a real question mark for EU visitors now that a
+  non-essential tracking cookie is in play, same spirit as the
   privacy/terms hardening pass's own disclaimer.
 
 ## Commands
