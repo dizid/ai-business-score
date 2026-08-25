@@ -44,6 +44,12 @@ export interface HarmoniaCoreWebVitals {
   inpMs: number | null;
 }
 export interface HarmoniaSecurityHeader { header: string; present: boolean; }
+// Per-bot robots.txt access for the AI crawlers a GEO tool cares about
+// (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, etc.) — distinct from
+// the generic `robots` check in technicalSeo.checks, which only covers a
+// blanket `User-agent: *` disallow.
+export interface HarmoniaAiCrawlerBot { bot: string; provider: string; matched: boolean; blocked: boolean; }
+export interface HarmoniaAiCrawlerAccess { bots: HarmoniaAiCrawlerBot[]; blockedCount: number; checkedCount: number; }
 export interface HarmoniaResult {
   fetchedUrl: string;
   statusCode: number | null;
@@ -58,6 +64,18 @@ export interface HarmoniaResult {
   schema: { detected: HarmoniaSchemaNode[]; opportunities: HarmoniaSchemaOpportunity[] };
   coreWebVitals: HarmoniaCoreWebVitals | null;
   securityHeaders: HarmoniaSecurityHeader[];
+  aiCrawlerAccess: HarmoniaAiCrawlerAccess;
+  errors: string[];
+}
+
+// Entity presence: a lightweight off-site authority signal, distinct from
+// Harmonia (which only ever audits the scanned business's own site). See
+// shared/entityPresence.mjs for how this is computed.
+export interface EntityPresenceResult {
+  wikipediaFound: boolean;
+  wikipediaUrl: string | null;
+  linksToOwnSite: boolean | null;
+  checkedAtDate: Date;
   errors: string[];
 }
 
@@ -84,6 +102,7 @@ export interface ValidatedPayload {
   deepAdvice: DeepAdvice | null;
   deepAdviceGeneratedAtDate: Date | null;
   harmonia: HarmoniaResult | null;
+  entityPresence: EntityPresenceResult | null;
 }
 
 const RANKS = new Set(['ranked-1', 'ranked-2', 'ranked-3', 'mentioned', 'not-mentioned', 'beaten']);
@@ -111,6 +130,7 @@ const MAX_HARMONIA_ERRORS = 20;
 const MAX_SCHEMA_EXAMPLE_LEN = 3000;
 const MAX_ISSUE_LEN = 200;
 const MAX_ISSUES_PER_NODE = 10;
+const MAX_AI_CRAWLER_BOTS = 20;
 
 // href-safety, same rule as the website link below: only http(s) survives,
 // anything else (javascript:, data:, etc.) is dropped rather than escaped.
@@ -244,6 +264,24 @@ function asHarmonia(raw: unknown): HarmoniaResult | null {
     ? r.errors.filter((e: unknown) => typeof e === 'string').slice(0, MAX_HARMONIA_ERRORS).map((e: string) => e.slice(0, MAX_ERROR_LEN))
     : [];
 
+  // Older stored scans predate this field — degrade to an empty/zeroed
+  // result rather than dropping the whole harmonia payload, same lenient
+  // pattern as every other optional sub-field above.
+  const aiCrawlerAccess: HarmoniaAiCrawlerAccess = { bots: [], blockedCount: 0, checkedCount: 0 };
+  if (r.aiCrawlerAccess && typeof r.aiCrawlerAccess === 'object') {
+    const aca = r.aiCrawlerAccess;
+    if (Array.isArray(aca.bots)) {
+      for (const b of aca.bots.slice(0, MAX_AI_CRAWLER_BOTS)) {
+        const bot = asShortString(b && b.bot);
+        const provider = asShortString(b && b.provider);
+        if (bot === null || provider === null || typeof (b && b.matched) !== 'boolean' || typeof (b && b.blocked) !== 'boolean') continue;
+        aiCrawlerAccess.bots.push({ bot, provider, matched: b.matched, blocked: b.blocked });
+      }
+    }
+    aiCrawlerAccess.blockedCount = aiCrawlerAccess.bots.filter((b) => b.blocked).length;
+    aiCrawlerAccess.checkedCount = aiCrawlerAccess.bots.length;
+  }
+
   return {
     fetchedUrl: r.fetchedUrl.slice(0, MAX_URL_LEN),
     statusCode,
@@ -253,8 +291,27 @@ function asHarmonia(raw: unknown): HarmoniaResult | null {
     schema: { detected, opportunities },
     coreWebVitals,
     securityHeaders,
+    aiCrawlerAccess,
     errors,
   };
+}
+
+// entityPresence is a whole secondary report section — same lenient
+// degrade-on-malformed treatment as asHarmonia above (missing, null, or any
+// structural issue degrades to null rather than rejecting the whole
+// payload), since it's additive on top of the always-present AI score.
+function asEntityPresence(raw: unknown): EntityPresenceResult | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, any>;
+  if (typeof r.wikipediaFound !== 'boolean') return null;
+  const checkedAtDate = new Date(r.checkedAtDate);
+  if (Number.isNaN(checkedAtDate.getTime())) return null;
+  const wikipediaUrl = typeof r.wikipediaUrl === 'string' ? asSafeUrl(r.wikipediaUrl) : null;
+  const linksToOwnSite = typeof r.linksToOwnSite === 'boolean' ? r.linksToOwnSite : null;
+  const errors = Array.isArray(r.errors)
+    ? r.errors.filter((e: unknown) => typeof e === 'string').slice(0, MAX_HARMONIA_ERRORS).map((e: string) => e.slice(0, MAX_ERROR_LEN))
+    : [];
+  return { wikipediaFound: r.wikipediaFound, wikipediaUrl, linksToOwnSite, checkedAtDate, errors };
 }
 
 // This validator is the only thing standing between a hostile/forged
@@ -438,5 +495,6 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     deepAdvice,
     deepAdviceGeneratedAtDate,
     harmonia: raw.harmonia !== undefined ? asHarmonia(raw.harmonia) : null,
+    entityPresence: raw.entityPresence !== undefined ? asEntityPresence(raw.entityPresence) : null,
   };
 }

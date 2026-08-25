@@ -10,9 +10,11 @@
 import { asNonNegativeInt, asShortString, type ValidatedPayload, type AdviceCard } from './scanPayload';
 import {
   BAND_LABEL, BAND_EXPLAIN, SENTIMENT_LABEL, CHECK_BADGE_LABEL, ADVICE_HEADING, HARMONIA_PILLAR_LABELS,
+  CATEGORY_EXPLAIN, CITATION_TIER_LABEL,
 } from './scanLabels';
 import {
-  deriveHeadlineKind, deriveBeatenCount, deriveScoreboardRows, scoreboardRowPct, deriveCategoryBreakdown,
+  deriveHeadlineKind, deriveBeatenCount, deriveScoreboardRows, scoreboardRowPct, shareOfVoicePct, deriveCategoryBreakdown,
+  deriveExecutiveSummary,
   deriveSentimentSummaryRows, deriveSentimentAdvice, deriveVisibleAdvice, deriveHarmoniaPillars, deriveHarmoniaBand,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveScanDurationLabel, cwvRating,
   formatSeconds, sentimentKey, deriveSentimentByKey,
@@ -96,6 +98,18 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
   if (duration) push(`- **Scan duration:** ${duration}`);
   push();
 
+  // ---- Executive summary ----
+  if (payload.completedCalls > 0) {
+    const exec = deriveExecutiveSummary(payload);
+    push('## Executive summary');
+    push();
+    push(exec.verdict);
+    push();
+    if (exec.vulnerability) push(`- **Biggest vulnerability:** ${exec.vulnerability}`);
+    if (exec.quickWin) push(`- **Quick win:** ${exec.quickWin}`);
+    push();
+  }
+
   // ---- AI Visibility Score ----
   push('## AI Visibility Score');
   push();
@@ -128,14 +142,15 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
   if (scoreboardRows.length) {
     push('## Scoreboard');
     push();
-    push('| Brand | Mentions | Beat you |');
-    push('|---|---|---|');
+    push('| Brand | Mentions | Share of voice | Beat you |');
+    push('|---|---|---|---|');
     for (const row of scoreboardRows) {
       const name = mdEscapeCell(row.name) + (row.isYou ? ' (you)' : '');
       const mentions = `${row.mentionCount}/${payload.completedCalls} (${scoreboardRowPct(payload, row)}%)`;
+      const share = `${shareOfVoicePct(scoreboardRows, row)}%`;
       const beat = !row.isYou && row.beatBrandCount > 0 ? `beat you ${row.beatBrandCount}×` : '—';
-      push(`| ${name} | ${mentions} | ${beat} |`);
-      if (row.ambiguous) push(`| | *Name is a common word — this tally may undercount.* | |`);
+      push(`| ${name} | ${mentions} | ${share} | ${beat} |`);
+      if (row.ambiguous) push(`| | | *Name is a common word — this tally may undercount.* | |`);
     }
     push();
   }
@@ -150,6 +165,10 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
     for (const row of categoryBreakdown) {
       const sentiment = row.sentimentCounts.map((s) => `${s.count} ${s.label}`).join(', ') || '—';
       push(`| ${row.label} | ${row.ranked1 + row.beaten}/${row.total} | ${row.ranked1} | ${row.beaten} | ${row.notMentioned} | ${sentiment} |`);
+    }
+    push();
+    for (const row of categoryBreakdown) {
+      if (CATEGORY_EXPLAIN[row.category]) push(`*${row.label}: ${CATEGORY_EXPLAIN[row.category]}*`);
     }
     push();
   }
@@ -261,7 +280,7 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
     push('AI models cited these pages from your own site while answering:');
     push();
     for (const c of ownSiteCitationRows) {
-      push(`- [${mdEscapeCell(c.title)}](${c.url}) — ${c.model}, ${c.promptLabel}`);
+      push(`- [${mdEscapeCell(c.title)}](${c.url}) — ${c.model}, ${c.promptLabel}, ${CITATION_TIER_LABEL[c.tier]}`);
     }
     push();
   }

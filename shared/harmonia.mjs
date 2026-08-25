@@ -299,20 +299,75 @@ function robotsBlanketDisallow(text) {
   return disallowsRoot;
 }
 
+// AI crawlers relevant to a tool that specifically sells "AI visibility" —
+// checked against robots.txt's own per-bot User-agent blocks, not just the
+// generic `User-agent: *` block robotsBlanketDisallow() above already
+// covers. A site can allow `*` while still explicitly blocking GPTBot.
+const AI_CRAWLER_USER_AGENTS = [
+  { bot: 'GPTBot', provider: 'OpenAI' },
+  { bot: 'ChatGPT-User', provider: 'OpenAI' },
+  { bot: 'OAI-SearchBot', provider: 'OpenAI' },
+  { bot: 'ClaudeBot', provider: 'Anthropic' },
+  { bot: 'anthropic-ai', provider: 'Anthropic' },
+  { bot: 'PerplexityBot', provider: 'Perplexity' },
+  { bot: 'Google-Extended', provider: 'Google' },
+  { bot: 'CCBot', provider: 'Common Crawl' },
+  { bot: 'Applebot-Extended', provider: 'Apple' },
+];
+
+// Groups robots.txt into User-agent blocks — one or more consecutive
+// `User-agent:` lines share the Disallow rules that follow them, which is
+// how real robots.txt files commonly list several bots under one ruleset.
+// Same "good enough heuristic" philosophy as robotsBlanketDisallow above,
+// not a full RFC 9309 parser.
+function parseRobotsBlocks(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const blocks = [];
+  let agents = [];
+  let rules = [];
+  const flush = () => {
+    if (agents.length) blocks.push({ agents, rules });
+    agents = [];
+    rules = [];
+  };
+  for (const line of lines) {
+    const uaMatch = /^user-agent:\s*(.+)$/i.exec(line);
+    if (uaMatch) {
+      if (rules.length) flush(); // a new User-agent after rules started means a new block
+      agents.push(uaMatch[1].trim());
+      continue;
+    }
+    const disallowMatch = /^disallow:\s*(.*)$/i.exec(line);
+    if (disallowMatch) rules.push(disallowMatch[1].trim());
+  }
+  flush();
+  return blocks;
+}
+
+function checkAiCrawlerAccess(text) {
+  const blocks = parseRobotsBlocks(text);
+  return AI_CRAWLER_USER_AGENTS.map(({ bot, provider }) => {
+    const block = blocks.find((b) => b.agents.some((a) => a.toLowerCase() === bot.toLowerCase()));
+    if (!block) return { bot, provider, matched: false, blocked: false };
+    return { bot, provider, matched: true, blocked: block.rules.some((path) => path === '/') };
+  });
+}
+
 async function fetchRobotsTxt(origin) {
   const { signal, clear } = withTimeout(ROBOTS_TIMEOUT_MS);
   try {
     const res = await safeFetch(`${origin}/robots.txt`, { signal });
-    if (!res.ok) return { reachable: false, blanketDisallow: false, hasSitemapDirective: false, error: null };
+    if (!res.ok) return { reachable: false, blanketDisallow: false, hasSitemapDirective: false, aiCrawlers: [], error: null };
     const text = await res.text();
     return {
       reachable: true,
       blanketDisallow: robotsBlanketDisallow(text),
       hasSitemapDirective: /^sitemap:/im.test(text),
+      aiCrawlers: checkAiCrawlerAccess(text),
       error: null,
     };
   } catch (err) {
-    return { reachable: false, blanketDisallow: false, hasSitemapDirective: false, error: `robots.txt check failed: ${err.message}` };
+    return { reachable: false, blanketDisallow: false, hasSitemapDirective: false, aiCrawlers: [], error: `robots.txt check failed: ${err.message}` };
   } finally {
     clear();
   }
@@ -416,6 +471,7 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
       schema: { detected: [], opportunities: [] },
       coreWebVitals: null,
       securityHeaders: [],
+      aiCrawlerAccess: { bots: [], blockedCount: 0, checkedCount: 0 },
       errors: ['Invalid website URL — could not analyze'],
     };
   }
@@ -449,6 +505,7 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
     ...(page ? [{ id: 'jsonld', label: 'At least one valid JSON-LD block', passed: jsonLdNodes.some((n) => n.valid) }] : []),
     ...(page ? [{ id: 'canonical', label: 'Canonical tag present', passed: Boolean(page.canonicalUrl) }] : []),
     ...(securityHeaders.length ? [{ id: 'security-headers', label: '≥3 of 5 common security headers present', passed: securityHeaders.filter((h) => h.present).length >= 3 }] : []),
+    ...(robots.reachable ? [{ id: 'ai-crawlers', label: 'No major AI crawler (GPTBot, ClaudeBot, PerplexityBot, etc.) blocked in robots.txt', passed: robots.aiCrawlers.every((b) => !b.blocked) }] : []),
   ];
 
   const onPageSeoChecks = page ? [
@@ -487,6 +544,11 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
     schema: { detected: jsonLdNodes, opportunities },
     coreWebVitals,
     securityHeaders,
+    aiCrawlerAccess: {
+      bots: robots.aiCrawlers,
+      blockedCount: robots.aiCrawlers.filter((b) => b.blocked).length,
+      checkedCount: robots.aiCrawlers.length,
+    },
     errors,
   };
 }

@@ -45,6 +45,7 @@ const form = ref({
   region: '',
   customer_segment: '',
   competitors: '',
+  language: 'en',
 });
 
 const BAND_COLOR: Record<string, string> = {
@@ -97,7 +98,7 @@ async function startCheckout() {
 }
 
 function resetForm() {
-  form.value = { brand: '', website: '', category: '', use_case: '', region: '', customer_segment: '', competitors: '' };
+  form.value = { brand: '', website: '', category: '', use_case: '', region: '', customer_segment: '', competitors: '', language: 'en' };
   detailsRevealed.value = false;
   enrichError.value = '';
   createError.value = '';
@@ -136,6 +137,7 @@ async function onEnrich() {
         region: data.region,
         customer_segment: data.customer_segment,
         competitors: (data.competitors || []).join(', '),
+        language: data.language === 'nl' ? 'nl' : 'en',
       };
     } else {
       enrichError.value = data.error || "Couldn't auto-fill from that URL — fill in the details below.";
@@ -256,6 +258,12 @@ onMounted(loadCompanies);
         <label>Competitors <span class="hint">(comma-separated, 2-3)</span></label>
         <input type="text" v-model="form.competitors" required placeholder="Bob's Pipes, QuickFlow Plumbing" />
 
+        <label>Scan language <span class="hint">(auto-detected, editable)</span></label>
+        <select v-model="form.language">
+          <option value="en">English</option>
+          <option value="nl">Dutch</option>
+        </select>
+
         <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'GO' }}</button>
       </template>
 
@@ -345,13 +353,14 @@ p.sub { color: var(--muted); margin: 0; }
   display: block; margin: 0 0 4px; padding: 0; border: none; background: none;
   color: var(--muted); font-size: 0.85rem; text-decoration: underline; cursor: pointer;
 }
-.card input {
+.card input, .card select {
   width: 100%; padding: 11px 13px; font-size: 1rem;
   border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.card input:hover { border-color: color-mix(in srgb, var(--fg) 25%, var(--border)); }
-.card input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+.card select { background: var(--card); }
+.card input:hover, .card select:hover { border-color: color-mix(in srgb, var(--fg) 25%, var(--border)); }
+.card input:focus, .card select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .card button[type="submit"] {
   margin-top: 24px; width: 100%; padding: 12px 16px; font-size: 1rem; font-weight: 600;
   border: none; border-radius: 8px; background: var(--accent); color: var(--accent-ink); cursor: pointer;

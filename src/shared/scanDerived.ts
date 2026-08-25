@@ -6,9 +6,9 @@
 // apart. Each function here is the same logic the matching computed() in
 // ScanDetail.vue used to contain, just taking `payload` as a parameter
 // instead of closing over `props.payload`.
-import { scoreBand, PROMPT_LABELS, PROMPT_CATEGORIES } from '../../shared/aivis-core.mjs';
+import { scoreBand, PROMPT_LABELS, PROMPT_CATEGORIES, findMentions } from '../../shared/aivis-core.mjs';
 import { asShortString, type ValidatedPayload, type Rank } from './scanPayload';
-import { SENTIMENT_SUMMARY_ORDER, CATEGORY_LABEL, CATEGORY_ORDER, HARMONIA_PILLAR_LABELS, SENTIMENT_LABEL } from './scanLabels';
+import { SENTIMENT_SUMMARY_ORDER, CATEGORY_LABEL, CATEGORY_ORDER, HARMONIA_PILLAR_LABELS, SENTIMENT_LABEL, BAND_LABEL, BAND_EXPLAIN } from './scanLabels';
 
 export function sentimentKey(promptIndex: number, model: string) {
   return `${promptIndex}:${model}`;
@@ -108,6 +108,60 @@ export function deriveHeadlineKind(payload: ValidatedPayload): HeadlineKind {
   return 'good';
 }
 
+// Executive summary: a compact, skim-in-10-seconds synthesis at the top of
+// the Overview tab. Deliberately NOT a re-list of the "What to do next"
+// advice cards below (that would just duplicate them) — it surfaces the two
+// facts that otherwise stay buried until you dig: a distilled read of
+// deriveCategoryBreakdown (which query type is actually failing) and a
+// concrete quick win pulled up from the Details tab (an AI-crawler block or
+// a schema opportunity most users would never scroll to see). Pure
+// re-derivation of data already computed elsewhere — no new LLM call.
+export interface ExecutiveSummary { verdict: string; vulnerability: string | null; quickWin: string | null; }
+export function deriveExecutiveSummary(payload: ValidatedPayload): ExecutiveSummary {
+  const band = scoreBand(payload.score);
+  const verdict = payload.score !== null
+    ? `${BAND_LABEL[band]} (${payload.score}/100) — ${BAND_EXPLAIN[band]}`
+    : `${BAND_LABEL[band]} — ${BAND_EXPLAIN[band]}`;
+
+  let vulnerability: string | null = null;
+  if (payload.completedCalls === 0) {
+    vulnerability = null;
+  } else if (payload.citedCount === 0) {
+    vulnerability = `Not mentioned in any of the ${payload.completedCalls} checks — currently invisible in AI answers for ${payload.category}.`;
+  } else {
+    // Prefer a fully-missed category, in CATEGORY_ORDER's high-intent-first
+    // priority — matches the score model's own weighting, so the
+    // vulnerability called out here is the one actually costing the most
+    // score, not just the first one found.
+    const zeroCategory = deriveCategoryBreakdown(payload).find((c) => c.total > 0 && c.notMentioned === c.total);
+    if (zeroCategory) {
+      vulnerability = `Zero presence in ${zeroCategory.label.toLowerCase()} queries (${zeroCategory.notMentioned}/${zeroCategory.total} checks missed entirely).`;
+    } else {
+      const beatenCount = deriveBeatenCount(payload);
+      if (beatenCount > 0) {
+        vulnerability = `Beaten to the mention in ${beatenCount} of ${payload.completedCalls} checks — showing up, but rarely first.`;
+      }
+    }
+  }
+
+  // Quick win: an AI-crawler block beats a generic schema opportunity as
+  // the lead suggestion — it's the most direct "AI literally can't see
+  // you" fix a GEO tool can surface, and it's otherwise buried in the
+  // Details tab's Site Health breakdown.
+  let quickWin: string | null = null;
+  const aiCrawlers = payload.harmonia?.aiCrawlerAccess;
+  if (aiCrawlers && aiCrawlers.blockedCount > 0) {
+    const blockedBots = aiCrawlers.bots.filter((b) => b.blocked).map((b) => b.bot);
+    const shown = blockedBots.slice(0, 3).join(', ');
+    quickWin = `Unblock AI crawlers in robots.txt — ${shown}${blockedBots.length > 3 ? ', and others' : ''} currently blocked from indexing your site.`;
+  } else if (payload.harmonia?.schema.opportunities.length) {
+    const opp = payload.harmonia.schema.opportunities[0];
+    quickWin = `Add ${opp.type} schema markup — ${opp.reason}`;
+  }
+
+  return { verdict, vulnerability, quickWin };
+}
+
 export interface ScoreboardRow { name: string; isYou: boolean; mentionCount: number; beatBrandCount: number; ambiguous: boolean; }
 export function deriveScoreboardRows(payload: ValidatedPayload): ScoreboardRow[] {
   if (payload.completedCalls === 0) return [];
@@ -123,6 +177,41 @@ export function deriveScoreboardRows(payload: ValidatedPayload): ScoreboardRow[]
 export function scoreboardRowPct(payload: ValidatedPayload, row: ScoreboardRow) {
   if (payload.completedCalls === 0) return 0;
   return Math.min(100, Math.round((row.mentionCount / payload.completedCalls) * 100));
+}
+
+// Distinct from scoreboardRowPct (mentions ÷ completed calls — a presence
+// rate). Share of voice is mentions ÷ total mentions across brand +
+// competitors — "of everyone who got mentioned, what fraction was you."
+// Pure re-derivation of data already in competitorTallies/citedCount, no new
+// data collection.
+export function shareOfVoicePct(rows: ScoreboardRow[], row: ScoreboardRow) {
+  const totalMentions = rows.reduce((sum, r) => sum + r.mentionCount, 0);
+  if (totalMentions === 0) return 0;
+  return Math.round((row.mentionCount / totalMentions) * 100);
+}
+
+// Click-through from a Scoreboard "beat you Nx" row to the specific checks
+// that competitor won — GET /companies/:id already returns full rawResponses
+// index-aligned with perPromptRank (see the "zipping by index is safe" note
+// above), so this needs no backend join, just the same whole-word
+// mention-matching findMentions() already uses for brand detection.
+export interface CompetitorAppearance { promptIndex: number; promptLabel: string; model: string; rank: Rank; snippet: string; }
+export function deriveCompetitorAppearances(payload: ValidatedPayload, competitorName: string): CompetitorAppearance[] {
+  const appearances: CompetitorAppearance[] = [];
+  payload.rawResponses.forEach((r, i) => {
+    const match = findMentions(r.text, competitorName);
+    if (!match.mentioned) return;
+    const start = Math.max(0, match.firstIndex - 80);
+    const snippet = r.text.slice(start, start + 240).trim();
+    appearances.push({
+      promptIndex: r.promptIndex,
+      promptLabel: PROMPT_LABELS[r.promptIndex] || `Prompt ${r.promptIndex + 1}`,
+      model: r.model,
+      rank: payload.perPromptRank[i]?.rank ?? 'not-mentioned',
+      snippet,
+    });
+  });
+  return appearances;
 }
 
 // rawResponses[i] and perPromptRank[i] describe the same completed call —
@@ -158,14 +247,26 @@ export function deriveFailureRows(payload: ValidatedPayload): FailureRow[] {
   }));
 }
 
-export interface OwnCitationRow { url: string; title: string; model: string; promptLabel: string; }
+export type CitationTier = 'sole-source' | 'primary-source' | 'one-of-several';
+export interface OwnCitationRow { url: string; title: string; model: string; promptLabel: string; tier: CitationTier; totalCitations: number; }
 export function deriveOwnSiteCitationRows(payload: ValidatedPayload): OwnCitationRow[] {
-  return payload.ownSiteCitations.map((c) => ({
-    url: c.url,
-    title: c.title || c.url,
-    model: c.model,
-    promptLabel: PROMPT_LABELS[c.promptIndex] || `Prompt ${c.promptIndex + 1}`,
-  }));
+  const responseByKey = new Map(payload.rawResponses.map((r) => [sentimentKey(r.promptIndex, r.model), r]));
+  return payload.ownSiteCitations.map((c) => {
+    const response = responseByKey.get(sentimentKey(c.promptIndex, c.model));
+    // A response that carried this own-site citation always has at least
+    // that one citation on it — fall back to 1 (sole-source) only for the
+    // theoretical case where the matching response can't be found.
+    const totalCitations = response ? response.citations.length : 1;
+    const tier: CitationTier = totalCitations <= 1 ? 'sole-source' : totalCitations <= 3 ? 'primary-source' : 'one-of-several';
+    return {
+      url: c.url,
+      title: c.title || c.url,
+      model: c.model,
+      promptLabel: PROMPT_LABELS[c.promptIndex] || `Prompt ${c.promptIndex + 1}`,
+      tier,
+      totalCitations,
+    };
+  });
 }
 
 // Only 'top-rival' can produce an empty body (when no valid competitor name

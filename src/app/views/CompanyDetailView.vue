@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { validatePayload } from '../../shared/scanPayload';
 import ScanDetail from '../../shared/ScanDetail.vue';
 import CompanyProgressChart from './CompanyProgressChart.vue';
+import CompetitorTrendChart from './CompetitorTrendChart.vue';
 import Icon from '../../shared/Icon.vue';
 import Breadcrumb from '../components/Breadcrumb.vue';
 import { authFetch } from '../lib/auth';
@@ -260,6 +261,21 @@ const scanTrend = computed(() =>
   }))
 );
 
+// Same source data as scanTrend, reshaped for CompetitorTrendChart's
+// multi-series need (brand mention count + competitor tallies per scan) —
+// GET /companies/:id already returns competitorTallies on every scan row
+// via toScanPayload(), so no backend change was needed for this.
+const competitorTrend = computed(() =>
+  scans.value.map((s, index) => ({
+    id: keyOf(s, index),
+    generatedAt: typeof s.generatedAt === 'string' ? s.generatedAt : '',
+    brandMentionCount: typeof s.citedCount === 'number' ? s.citedCount : 0,
+    competitorTallies: Array.isArray(s.competitorTallies)
+      ? (s.competitorTallies as { name: string; mentionCount: number; ambiguous: boolean }[])
+      : [],
+  }))
+);
+
 function selectScanById(id: string) {
   const idx = scans.value.findIndex((s, i) => keyOf(s, i) === id);
   if (idx !== -1) selectScan(idx);
@@ -440,6 +456,7 @@ watch(() => route.params.id, load);
       </p>
 
       <CompanyProgressChart v-if="scans.length >= 2" :scans="scanTrend" @select-point="selectScanById" />
+      <CompetitorTrendChart v-if="scans.length >= 2" :scans="competitorTrend" @select-point="selectScanById" />
 
       <div class="dashboard" v-if="scans.length" :class="{ 'has-selection': selectedIndex !== null }">
         <div class="list-pane">

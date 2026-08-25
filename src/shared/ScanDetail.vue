@@ -4,12 +4,13 @@ import { scoreBand, PROMPT_LABELS } from '../../shared/aivis-core.mjs';
 import { asNonNegativeInt, asShortString, type ValidatedPayload, type Rank } from './scanPayload';
 import CollapsibleSection from './CollapsibleSection.vue';
 import {
-  SENTIMENT_LABEL, BAND_LABEL, BAND_EXPLAIN, ADVICE_HEADING, CHECK_BADGE_LABEL,
+  SENTIMENT_LABEL, BAND_LABEL, BAND_EXPLAIN, ADVICE_HEADING, CHECK_BADGE_LABEL, CATEGORY_EXPLAIN, CITATION_TIER_LABEL,
 } from './scanLabels';
 import Icon from './Icon.vue';
 import {
   sentimentKey, deriveSentimentByKey, deriveSentimentSummaryRows, deriveCategoryBreakdown, deriveSentimentAdvice,
-  deriveRank1Count, deriveBeatenCount, deriveHeadlineKind, deriveScoreboardRows, scoreboardRowPct,
+  deriveRank1Count, deriveBeatenCount, deriveHeadlineKind, deriveScoreboardRows, scoreboardRowPct, shareOfVoicePct,
+  deriveCompetitorAppearances, deriveExecutiveSummary,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveVisibleAdvice,
   deriveHarmoniaPillars, deriveHarmoniaBand, cwvRating, formatSeconds, deriveScanDurationLabel,
   type ScoreboardRow,
@@ -142,10 +143,27 @@ const ringOffset = computed(() =>
 const rank1Count = computed(() => deriveRank1Count(props.payload));
 const beatenCount = computed(() => deriveBeatenCount(props.payload));
 const headlineKind = computed(() => deriveHeadlineKind(props.payload));
+const executiveSummary = computed(() => deriveExecutiveSummary(props.payload));
 
 const scoreboardRows = computed(() => deriveScoreboardRows(props.payload));
 function rowPct(row: ScoreboardRow) {
   return scoreboardRowPct(props.payload, row);
+}
+function rowSharePct(row: ScoreboardRow) {
+  return shareOfVoicePct(scoreboardRows.value, row);
+}
+
+// Click-through from a competitor's "beat you Nx" line to the specific
+// checks they won — expand/collapse per competitor name, computed lazily
+// (only when expanded) since it re-scans rawResponses.
+const expandedCompetitors = ref<Set<string>>(new Set());
+function toggleCompetitorExpanded(name: string) {
+  const next = new Set(expandedCompetitors.value);
+  if (next.has(name)) next.delete(name); else next.add(name);
+  expandedCompetitors.value = next;
+}
+function competitorAppearances(name: string) {
+  return deriveCompetitorAppearances(props.payload, name);
 }
 
 const checkBreakdown = computed(() => deriveCheckBreakdown(props.payload));
@@ -255,6 +273,18 @@ function downloadReport() {
         {{ payload.failedCalls }} of {{ payload.completedCalls + payload.failedCalls }} checks failed to complete and are not counted above.
       </div>
 
+      <!-- executive summary: compact top-of-page synthesis, not a re-list
+           of "What to do next" below — surfaces the category-breakdown
+           insight and a Details-tab-buried quick win in one skimmable card. -->
+      <div class="card exec-summary" v-if="payload.completedCalls > 0">
+        <div class="exec-summary-label">Executive summary</div>
+        <p class="exec-summary-verdict">{{ executiveSummary.verdict }}</p>
+        <ul class="exec-summary-list">
+          <li v-if="executiveSummary.vulnerability"><strong>Biggest vulnerability:</strong> {{ executiveSummary.vulnerability }}</li>
+          <li v-if="executiveSummary.quickWin"><strong>Quick win:</strong> {{ executiveSummary.quickWin }}</li>
+        </ul>
+      </div>
+
       <!-- sentiment summary: at-a-glance rollup of the per-check sentiment
            judge (see Details tab's check-by-check breakdown for the full
            per-check badges/reasoning) -->
@@ -272,10 +302,23 @@ function downloadReport() {
           <div class="board-row" v-for="row in scoreboardRows" :key="row.name + row.isYou">
             <div class="board-label">
               <span class="board-name" :title="row.name">{{ row.name }}<span v-if="row.isYou" class="you-tag"> (you)</span></span>
-              <span class="board-count">{{ row.mentionCount }}/{{ payload.completedCalls }}</span>
+              <span class="board-count">{{ row.mentionCount }}/{{ payload.completedCalls }} · {{ rowSharePct(row) }}% share of voice</span>
             </div>
             <div class="board-track"><div class="board-fill" :class="row.isYou ? 'you' : 'rival'" :style="{ width: rowPct(row) + '%' }"></div></div>
-            <div class="board-beat" v-if="!row.isYou && row.beatBrandCount > 0">beat you {{ row.beatBrandCount }}×</div>
+            <button
+              v-if="!row.isYou && row.beatBrandCount > 0"
+              type="button"
+              class="board-beat board-beat-toggle"
+              :aria-expanded="expandedCompetitors.has(row.name)"
+              @click="toggleCompetitorExpanded(row.name)"
+            >beat you {{ row.beatBrandCount }}× <span class="board-beat-chevron">{{ expandedCompetitors.has(row.name) ? '▲' : '▼' }}</span></button>
+            <ul class="competitor-appearances" v-if="!row.isYou && expandedCompetitors.has(row.name)">
+              <li v-for="(a, i) in competitorAppearances(row.name)" :key="i">
+                <span class="citation-meta">{{ a.model }} &middot; {{ a.promptLabel }}</span>
+                <span class="competitor-snippet">&ldquo;&hellip;{{ a.snippet }}&hellip;&rdquo;</span>
+              </li>
+              <li v-if="competitorAppearances(row.name).length === 0" class="competitor-appearances-empty">No specific checks found for this name.</li>
+            </ul>
             <div class="board-ambiguous" v-if="row.ambiguous">Name is a common word — automated detection was skipped for some checks. This tally may undercount.</div>
           </div>
         </div>
@@ -295,6 +338,7 @@ function downloadReport() {
             </div>
             <div class="board-track"><div class="board-fill you" :style="{ width: row.presencePct + '%' }"></div></div>
             <div class="category-detail">{{ row.ranked1 }} first, {{ row.beaten }} beaten to it, {{ row.notMentioned }} not mentioned</div>
+            <p class="category-detail" v-if="CATEGORY_EXPLAIN[row.category]">{{ CATEGORY_EXPLAIN[row.category] }}</p>
             <div class="sentiment-summary-row" v-if="row.sentimentCounts.length">
               <span
                 v-for="s in row.sentimentCounts" :key="s.classification"
@@ -445,6 +489,20 @@ function downloadReport() {
           </ul>
         </div>
 
+        <!-- AI-crawler robots.txt detail: which AI crawlers (GPTBot,
+             ClaudeBot, PerplexityBot, Google-Extended, etc.) are explicitly
+             blocked in the target's own robots.txt. The aggregate pass/fail
+             already feeds the Technical SEO pillar's "ai-crawlers" checklist
+             line above; this is the per-bot breakdown. -->
+        <div class="harmonia-schema" v-if="payload.harmonia.aiCrawlerAccess.bots.length">
+          <h3>AI crawler access (robots.txt)</h3>
+          <ul class="harmonia-checklist">
+            <li v-for="b in payload.harmonia.aiCrawlerAccess.bots" :key="b.bot" :class="b.blocked ? 'failed' : 'passed'">
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="b.blocked ? 'x' : 'check'" /><template v-else>{{ b.blocked ? '✗' : '✓' }}</template></span> {{ b.bot }} ({{ b.provider }}) — {{ b.blocked ? 'blocked' : b.matched ? 'allowed' : 'no rule (allowed by default)' }}
+            </li>
+          </ul>
+        </div>
+
         <div class="harmonia-cwv" v-if="payload.harmonia.coreWebVitals">
           <h3>Core Web Vitals (mobile)</h3>
           <div class="cwv-row">
@@ -481,6 +539,24 @@ function downloadReport() {
         Technical/SEO audit isn't available for this scan (ran before this feature shipped, or the site couldn't be reached).
       </p>
 
+      <!-- entity presence (off-site authority signal): does a Wikipedia
+           page exist for this brand, and does it link back to the scanned
+           site? Distinct from Site Health above, which only ever audits
+           the scanned business's own site — this is the one check that
+           looks at a third-party site. -->
+      <CollapsibleSection
+        v-if="payload.entityPresence"
+        title="Entity presence"
+        :status-text="payload.entityPresence.wikipediaFound ? 'Wikipedia found' : 'No Wikipedia page'"
+      >
+        <p v-if="payload.entityPresence.wikipediaFound" class="citations-intro">
+          Wikipedia page found: <a :href="payload.entityPresence.wikipediaUrl ?? undefined" target="_blank" rel="noopener">{{ payload.entityPresence.wikipediaUrl }}</a>
+          <template v-if="payload.entityPresence.linksToOwnSite === true"> — links to this site.</template>
+          <template v-else-if="payload.entityPresence.linksToOwnSite === false"> — does not link to this site.</template>
+        </p>
+        <p v-else class="citations-intro">No Wikipedia page found for this brand — a real Wikipedia presence is a common off-site authority signal AI models draw on.</p>
+      </CollapsibleSection>
+
       <!-- citation-URL attribution (Milestone F): the exact pages on the
            company's own site an AI model actually drew its answer from,
            instead of only generic "improve your content" advice above. -->
@@ -489,7 +565,7 @@ function downloadReport() {
         <ul class="citation-list">
           <li v-for="(c, i) in ownSiteCitationRows" :key="i">
             <a :href="c.url" target="_blank" rel="noopener">{{ c.title }}</a>
-            <span class="citation-meta">{{ c.model }} &middot; {{ c.promptLabel }}</span>
+            <span class="citation-meta">{{ c.model }} &middot; {{ c.promptLabel }} &middot; {{ CITATION_TIER_LABEL[c.tier] }}</span>
           </li>
         </ul>
       </CollapsibleSection>
@@ -627,6 +703,13 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 .cited { color: var(--success-text); }
 .not-cited { color: var(--critical); }
 
+.exec-summary { padding: 18px 20px; }
+.exec-summary-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 6px; }
+.exec-summary-verdict { font-size: 1rem; font-weight: 500; margin: 0 0 10px; }
+.exec-summary-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.exec-summary-list li { font-size: 0.9rem; color: var(--text); }
+.exec-summary-list strong { color: var(--fg); }
+
 .warn {
   background: color-mix(in srgb, var(--warning) 16%, var(--card));
   border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
@@ -653,6 +736,19 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 .board-fill.you { background: var(--accent); }
 .board-fill.rival { background: var(--debar); }
 .board-beat { color: var(--serious); font-size: 0.8rem; margin-top: 2px; }
+.board-beat-toggle {
+  background: none; border: none; padding: 0; font: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.board-beat-chevron { font-size: 0.7em; }
+.competitor-appearances { list-style: none; margin: 6px 0 0; padding: 0; }
+.competitor-appearances li {
+  padding: 6px 0; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.competitor-appearances li:first-child { border-top: none; }
+.competitor-snippet { font-size: 0.85rem; color: var(--text); }
+.competitor-appearances-empty { color: var(--muted); font-style: italic; }
 .board-ambiguous { color: var(--muted); font-size: 0.78rem; margin-top: 2px; font-style: italic; }
 
 /* ---- performance by query type ---- */

@@ -4,7 +4,7 @@
 import type { Config } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
-import { normalizeUrl } from '../../shared/aivis-core.mjs';
+import { normalizeUrl, SUPPORTED_LANGUAGES } from '../../shared/aivis-core.mjs';
 import { FREE_PLAN_COMPANY_LIMIT, isPro } from './_shared/plan.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 
@@ -98,12 +98,18 @@ export default async (req: Request) => {
       .split(',')
       .map((s: string) => s.trim())
       .filter(Boolean);
+    // Bounds-checked against SUPPORTED_LANGUAGES rather than trusted
+    // verbatim, same discipline as parseEnrichmentResponse's own language
+    // field — an unrecognized value stores as NULL (treated as English by
+    // promptTemplatesForLanguage's own fallback) rather than persisting an
+    // unsupported language string a scan could never actually use.
+    const language = SUPPORTED_LANGUAGES.includes(body.language) ? body.language : null;
 
     const inserted = await db`
       INSERT INTO public.companies (
-        owner_user_id, brand, website, category, use_case, region, customer_segment, competitors
+        owner_user_id, brand, website, category, use_case, region, customer_segment, competitors, language
       ) VALUES (
-        ${userId}, ${brand}, ${normalizeUrl(website)}, ${category}, ${useCase}, ${region}, ${customerSegment}, ${competitors}
+        ${userId}, ${brand}, ${normalizeUrl(website)}, ${category}, ${useCase}, ${region}, ${customerSegment}, ${competitors}, ${language}
       )
       RETURNING *
     `;

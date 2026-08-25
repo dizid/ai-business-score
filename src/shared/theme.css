@@ -76,6 +76,22 @@
   --accent-2-ink: #ffffff;
   --accent-3: #0b8793;
   --font-display: 'Space Grotesk', -apple-system, "Segoe UI", system-ui, sans-serif;
+
+  /* Competitor trend chart (CompetitorTrendChart.vue) — up to 5 distinct
+     line colors for named competitors. dataviz-skill categorical slots
+     2-6 (slot 1/blue is skipped on purpose — reserved for --accent,
+     already used for the brand's own "you" line everywhere else in this
+     app, so competitors never compete with it for the same hue).
+     Validated via the dataviz skill's validate_palette.js against both
+     real surfaces (light #ffffff / dark #18170f): CVD ΔE 8.4-9.1,
+     normal-vision ΔE 19.3-19.6, both PASS. Light mode carries a contrast
+     WARN on 3 of 5 slots — the "relief" mitigation (visible text labels,
+     never color-alone identity) is the chart's own legend, always shown. */
+  --competitor-1: #eb6834;
+  --competitor-2: #1baf7a;
+  --competitor-3: #eda100;
+  --competitor-4: #e87ba4;
+  --competitor-5: #008300;
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
@@ -99,6 +115,11 @@
     --critical: #d03b3b;
     --success-text: #0ca30c;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 20px 40px -20px rgba(0, 0, 0, 0.6);
+    --competitor-1: #d95926;
+    --competitor-2: #199e70;
+    --competitor-3: #c98500;
+    --competitor-4: #d55181;
+    --competitor-5: #008300;
   }
 }
 :root[data-theme="dark"] {
@@ -122,6 +143,11 @@
   --critical: #d03b3b;
   --success-text: #0ca30c;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 20px 40px -20px rgba(0, 0, 0, 0.6);
+  --competitor-1: #d95926;
+  --competitor-2: #199e70;
+  --competitor-3: #c98500;
+  --competitor-4: #d55181;
+  --competitor-5: #008300;
 }
 
 * { box-sizing: border-box; }

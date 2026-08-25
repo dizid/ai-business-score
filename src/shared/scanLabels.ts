@@ -20,6 +20,26 @@ export const CATEGORY_LABEL: Record<string, string> = {
 export const CATEGORY_ORDER = ['high-intent', 'comparison', 'informational'] as const;
 export const SENTIMENT_SUMMARY_ORDER = ['recommended', 'neutral', 'comparison-only', 'negative'] as const;
 
+// Short "why this matters" copy per query category — static/templated, not
+// an LLM call, shown under each row in "Performance by query type" so the
+// percentages read as more than a bare number.
+export const CATEGORY_EXPLAIN: Record<string, string> = {
+  'high-intent': 'Buying-ready queries ("best X for Y") — AIs answer these from comparison/listicle-style content and "best for" pages, not general brand awareness.',
+  comparison: 'Direct brand-vs-brand queries — won by clear entity differentiation, not by being "quality" in the same generic way every competitor claims.',
+  informational: 'Category-overview queries ("leaders in X", "top companies in Y") — won by being named in existing roundups and definitional content, not by product pages.',
+};
+
+// Citation tier: how many total citations a response carried alongside the
+// brand's own-site citation — 1 = the brand's page was the only source used,
+// 2-3 = a primary source among a few, 4+ = one of many. Pure re-derivation
+// of citations already collected (no new LLM call), the right-sized version
+// of "citation quality" scoring.
+export const CITATION_TIER_LABEL: Record<string, string> = {
+  'sole-source': 'Sole source',
+  'primary-source': 'Primary source',
+  'one-of-several': 'One of several sources',
+};
+
 export const BAND_LABEL: Record<string, string> = {
   leading: 'Leading', visible: 'Visible, often beaten',
   weak: 'Weak presence', invisible: 'Invisible', unavailable: 'Score unavailable',

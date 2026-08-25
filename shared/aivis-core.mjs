@@ -37,6 +37,44 @@ export const PROMPT_TEMPLATES = [
   (p) => `I'm looking to switch away from ${p.competitors[0]} — what's a good ${normalizeCategory(p.category)} alternative?`,
 ];
 
+// Dutch translation of the same 10 templates, same parameterization, same
+// slot-for-slot semantics (index 0 is still "category-recommendation query"
+// in either language — PROMPT_CATEGORIES/PROMPT_LABELS below describe the
+// SLOT, not the language, and stay unchanged regardless of which set runs).
+// First-pass translation, not yet reviewed by a native speaker — flagged in
+// PLAN_NEXT_PHASE.md as a real gate before this is trusted the way the
+// English set already is: these become live grounded search queries sent to
+// production AI models, so "translated" isn't the same as "shippable"
+// without that review.
+const PROMPT_TEMPLATES_NL = [
+  (p) => `Wat is de beste optie op het gebied van ${normalizeCategory(p.category)} voor ${p.use_case}?`,
+  (p) => `Vergelijk ${p.brand} met ${p.competitors[0]} en ${p.competitors[1] ?? p.competitors[0]}.`,
+  (p) => `Ik zoek een goede optie op het gebied van ${normalizeCategory(p.category)} — wat raad je aan en waarom?`,
+  (p) => `Wat zijn toonaangevende ${p.category}-bedrijven in ${p.region}?`,
+  (p) => `Is ${p.brand} een goede keuze voor ${p.use_case}? Wat zijn de alternatieven?`,
+  (p) => `Wat wordt er gezegd over ${p.brand} in vergelijking met ${p.competitors[0]}?`,
+  (p) => `Wat is de beste ${p.category} voor ${p.customer_segment}?`,
+  (p) => `Wie zijn de marktleiders op het gebied van ${p.category}?`,
+  (p) => `Waar moet ik op letten bij het kiezen van een ${normalizeCategory(p.category)}, en welke merken doen dat goed?`,
+  (p) => `Ik wil overstappen van ${p.competitors[0]} — wat is een goed alternatief op het gebied van ${normalizeCategory(p.category)}?`,
+];
+
+// Language support is deliberately a curated, reviewed set (not live/dynamic
+// translation) — see PLAN_NEXT_PHASE.md's Milestone C3 and this file's own
+// cost/incident history above: an extra per-scan LLM call to translate
+// queries on the fly would add cost/latency risk this codebase has already
+// been burned by twice, and unreviewed live-translated search queries are a
+// real quality risk, not just a hypothetical one. Adding a new language
+// later means adding one more entry here, not a redesign.
+export const SUPPORTED_LANGUAGES = ['en', 'nl'];
+export const PROMPT_TEMPLATES_BY_LANGUAGE = {
+  en: PROMPT_TEMPLATES,
+  nl: PROMPT_TEMPLATES_NL,
+};
+export function promptTemplatesForLanguage(language) {
+  return PROMPT_TEMPLATES_BY_LANGUAGE[language] ?? PROMPT_TEMPLATES;
+}
+
 // ---------- Models (4, cheap tier, live-verified) ----------
 // Briefly grew to 6 on 2026-08-09 (4 unverified additions sourced from a web
 // search of Perplexity's changelog, since docs.perplexity.ai itself was
@@ -769,7 +807,8 @@ export function buildEnrichPrompt(website) {
   "use_case": "a concrete scenario someone in this category is trying to solve, e.g. 'a burst pipe at home'",
   "region": "the city, country, or market they primarily serve",
   "customer_segment": "who typically buys from them, e.g. 'homeowners' or 'small marketing teams'",
-  "competitors": ["2-3 real, named competing companies or brands in the same category"]
+  "competitors": ["2-3 real, named competing companies or brands in the same category"],
+  "language": "the primary language of the website's own content and target market — must be exactly \\"en\\" or \\"nl\\", pick the closer match if genuinely uncertain, default to \\"en\\""
 }
 Rules: only include a competitor if it's a real, currently-operating company distinct from ${website} itself — never list the company you're researching as its own competitor. Leave a field as an empty string (or empty array for competitors) if you can't confidently determine it from the site or can't verify it's real. Do not guess or invent facts to fill a field.`;
 }
@@ -780,7 +819,7 @@ Rules: only include a competitor if it's a real, currently-operating company dis
 // empty), so the caller can spread the result straight into form fields
 // without further null-checking.
 export function parseEnrichmentResponse(text) {
-  const empty = { brand: '', category: '', use_case: '', region: '', customer_segment: '', competitors: [] };
+  const empty = { brand: '', category: '', use_case: '', region: '', customer_segment: '', competitors: [], language: 'en' };
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return empty;
   try {
@@ -797,6 +836,12 @@ export function parseEnrichmentResponse(text) {
           .filter((c) => !brand || c.toLowerCase() !== brand.toLowerCase())
           .slice(0, 3)
       : [];
+    // language: bounds-checked against SUPPORTED_LANGUAGES rather than
+    // trusted verbatim — a model can ignore the prompt's exact-match
+    // instruction, and an unsupported value here would silently fall
+    // through to promptTemplatesForLanguage()'s own 'en' fallback anyway,
+    // so failing closed to 'en' here just makes that explicit.
+    const language = SUPPORTED_LANGUAGES.includes(parsed.language) ? parsed.language : 'en';
     return {
       brand,
       category: typeof parsed.category === 'string' ? parsed.category.trim() : '',
@@ -804,6 +849,7 @@ export function parseEnrichmentResponse(text) {
       region: typeof parsed.region === 'string' ? parsed.region.trim() : '',
       customer_segment: typeof parsed.customer_segment === 'string' ? parsed.customer_segment.trim() : '',
       competitors,
+      language,
     };
   } catch {
     return empty;
@@ -871,6 +917,48 @@ function summarizePerPromptRank(perPromptRank) {
     .join('\n');
 }
 
+// ---------- Deep advice excerpt selection ----------
+// Grounds buildDeepAdvicePrompt in what competitors are ACTUALLY cited for,
+// not just tallies/ranks — the difference between "Rival Co beat you 4x" and
+// "Rival Co beat you 4x, and here's the actual sentence citing them for
+// same-day delivery." toScanPayload() already carries the full rawResponses
+// array into this prompt builder's input; this was the only piece not yet
+// reading it. No new LLM call, no new data collection — pure re-derivation
+// of data the scan already produced, so it carries none of the cost/latency
+// risk that automatic (non-on-demand) additions to this file have a real
+// documented incident history around.
+const MAX_DEEP_ADVICE_EXCERPTS = 4;
+const MAX_EXCERPT_CHARS = 500;
+const TOP_COMPETITORS_FOR_EXCERPTS = 2;
+
+function selectDeepAdviceExcerpts(scan) {
+  const topCompetitors = [...(scan.competitorTallies || [])]
+    .filter((c) => !c.ambiguous)
+    .sort((a, b) => b.mentionCount - a.mentionCount)
+    .slice(0, TOP_COMPETITORS_FOR_EXCERPTS);
+  if (topCompetitors.length === 0) return [];
+
+  const rankByCall = new Map(
+    (scan.perPromptRank || []).map((r, i) => [i, r.rank])
+  );
+  const excerpts = [];
+
+  outer: for (const competitor of topCompetitors) {
+    for (let i = 0; i < (scan.rawResponses || []).length; i++) {
+      if (excerpts.length >= MAX_DEEP_ADVICE_EXCERPTS) break outer;
+      const response = scan.rawResponses[i];
+      if (rankByCall.get(i) === 'ranked-1') continue; // brand already winning this check
+      const match = findMentions(response.text, competitor.name);
+      if (!match.mentioned) continue;
+      const start = Math.max(0, match.firstIndex - 100);
+      const snippet = response.text.slice(start, start + MAX_EXCERPT_CHARS).trim();
+      const label = PROMPT_LABELS[response.promptIndex] || `prompt ${response.promptIndex}`;
+      excerpts.push(`- [${competitor.name}, ${label}]: "...${snippet}..."`);
+    }
+  }
+  return excerpts;
+}
+
 // ---------- Deep advice (on-demand, live LLM call) ----------
 // Milestone 6 of the SaaS-pivot plan: unlike selectAdvice() above, this DOES
 // make a live grounded Perplexity call — safe to add now specifically
@@ -884,6 +972,7 @@ export function buildDeepAdvicePrompt(scan) {
     .map((c) => `- ${c.name}: mentioned in ${c.mentionCount}/${scan.completedCalls} checks, beat ${scan.brand} in ${c.beatBrandCount}`)
     .join('\n');
   const perPromptLines = summarizePerPromptRank(scan.perPromptRank);
+  const excerptLines = selectDeepAdviceExcerpts(scan).join('\n');
 
   return `You are a world-class SEO and AI-search-visibility strategist. A brand called "${scan.brand}" (${scan.website}, category: "${scan.category}") was just checked for how often it comes up when AI assistants (ChatGPT, Gemini) are asked about their category.
 
@@ -893,14 +982,14 @@ ${competitorLines || '(no named competitors)'}
 
 Breakdown by query type:
 ${perPromptLines || '(no per-query data)'}
-
+${excerptLines ? `\nActual excerpts where a competitor was cited and ${scan.brand} wasn't ranked first — use these to identify concrete content/topic gaps, not just aggregate counts:\n${excerptLines}\n` : ''}
 Based on this, respond with ONLY a JSON object (no markdown fences, no commentary before or after) with this shape:
 {
   "steps": [
     { "title": "short actionable step", "reasoning": "1-2 sentences on why this helps AI search visibility specifically", "difficulty": "Easy" | "Medium" | "Hard" }
   ]
 }
-Provide up to 5 steps, ordered by highest-leverage first. Ground each step in the actual data above — reference specific competitors, the citation rate, and which query type(s) from the breakdown the brand is weak in — rather than generic SEO advice.`;
+Provide up to 5 steps, ordered by highest-leverage first. Ground each step in the actual data above — reference specific competitors, the citation rate, which query type(s) from the breakdown the brand is weak in, and any concrete topics/attributes from the excerpts above that the brand doesn't own — rather than generic SEO advice.`;
 }
 
 // Same lenient-extraction, always-safe-shape pattern as

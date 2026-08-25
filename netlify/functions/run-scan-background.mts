@@ -46,7 +46,7 @@
 // tab) and keeps using the full PROMPT_TEMPLATES set.
 import type { Config } from '@netlify/functions';
 import {
-  PROMPT_TEMPLATES,
+  promptTemplatesForLanguage,
   MODELS,
   callModel,
   callModelWithRetry,
@@ -58,6 +58,7 @@ import {
   parseSentimentJudgeResponse,
 } from '../../shared/aivis-core.mjs';
 import { analyzeHarmonia } from '../../shared/harmonia.mjs';
+import { analyzeEntityPresence } from '../../shared/entityPresence.mjs';
 import { sql } from './_shared/db.mts';
 import { sendScanCompleteEmail } from './_shared/email.mts';
 
@@ -156,6 +157,11 @@ export default async (req: Request) => {
   // loop's typical 5-8 minute runtime, so it adds no measurable wall-clock
   // time to the scan. Never throws — see harmonia.mjs's module comment.
   const harmoniaPromise = analyzeHarmonia(prospect, psiApiKey);
+  // Same reasoning as harmoniaPromise above — a plain HTTP fetch chain
+  // (Wikipedia's public API, no key needed) with no Perplexity-rate-limit
+  // interaction, safe to run concurrently. Never throws — see
+  // entityPresence.mjs's module comment.
+  const entityPresencePromise = analyzeEntityPresence(prospect.brand, prospect.website);
 
   // Was PROMPT_TEMPLATES.slice(0, 3), then the full 10-prompt set once
   // Milestone 0's synchronous-timeout constraint was gone (see
@@ -164,7 +170,11 @@ export default async (req: Request) => {
   // wall-clock time is call-count-bound with no parallelism to absorb it,
   // so this keeps total calls at 20 (same as before the model expansion)
   // instead of letting the full 10-prompt set push a scan to 40 calls.
-  const scanPrompts = PROMPT_TEMPLATES.slice(0, 5);
+  // Language-aware since Milestone C3 (English + Dutch) — company.language
+  // is nullable (older/unset companies), treated as English. Same 5-of-10
+  // slice regardless of language: this is a call-budget constraint, not a
+  // language-specific one.
+  const scanPrompts = promptTemplatesForLanguage(company.language ?? 'en').slice(0, 5);
   const CALL_TIMEOUT_MS = 60000;
   // xai/grok-4.6 gets its own longer per-call timeout — root-caused
   // 2026-08-17 (docs/grok-timeout-investigation.md) from a production
@@ -409,6 +419,12 @@ export default async (req: Request) => {
       console.error(`run-scan-background: Harmonia analysis failed for scan ${scanId}:`, err);
       return null;
     });
+    // entityPresencePromise never throws (see entityPresence.mjs's module
+    // comment), same defensive .catch() as harmoniaPromise above anyway.
+    const entityPresence = await entityPresencePromise.catch((err) => {
+      console.error(`run-scan-background: entity presence check failed for scan ${scanId}:`, err);
+      return null;
+    });
 
     // Auto-judge sentiment for every mention (Milestone F, extended
     // 2026-08-20 — was on-demand/manual-only, see aivis-core.mjs's comment
@@ -479,6 +495,7 @@ export default async (req: Request) => {
         score = ${score},
         advice = ${JSON.stringify(advice)},
         harmonia = ${harmonia ? JSON.stringify(harmonia) : null},
+        entity_presence = ${entityPresence ? JSON.stringify(entityPresence) : null},
         generated_at = now()
       WHERE id = ${scanId}
     `;
