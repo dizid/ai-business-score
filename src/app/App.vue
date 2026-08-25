@@ -30,6 +30,7 @@ async function handleSignOut() {
         <a href="/privacy">Privacy Policy</a>
         <a href="/terms">Terms of Service</a>
         <a href="/how-it-works">How this works</a>
+        <a href="/blog/">Blog</a>
         <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
       </nav>
       <p class="footer-support">

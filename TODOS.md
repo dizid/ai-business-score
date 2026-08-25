@@ -23,12 +23,17 @@ mechanism" section for the technical detail, including the "not served by
 
 **Not done:** the shared header/footer partial `index.html`/
 `how-it-works.html`/`privacy.html`/`terms.html` still duplicate (blog
-pages match that existing duplication rather than fixing it); a `/blog`
-nav link on those four pages. **Most importantly: the essay content
-itself is still Marc's original draft**, explicitly marked "needs Marc's
-read before posting" in the source frontmatter — the pipeline and format
-conversion are done, the actual read-through is not, regardless of
-whether this entry says "shipped."
+pages match that existing duplication rather than fixing it). **Most
+importantly: the essay content itself is still Marc's original draft**,
+explicitly marked "needs Marc's read before posting" in the source
+frontmatter — the pipeline and format conversion are done, the actual
+read-through is not, regardless of whether this entry says "shipped."
+
+**Update (later same day):** the `/blog` nav link was added to all four
+static pages' footers, `scripts/build-blog.mjs`'s own template, and
+`src/app/App.vue`'s authenticated-app footer — the "not done" nav-link gap
+above is closed. The duplicated-markup gap and the content-review gap are
+still open.
 
 ## STATUS 2026-08-24: Deep-advice gating + $19 single-scan SKU + real Pro pricing — SHIPPED and live
 

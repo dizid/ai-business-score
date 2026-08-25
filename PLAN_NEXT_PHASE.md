@@ -66,10 +66,13 @@ loops, not feature-count — see Milestones F and G below.
   not scraping. `enrich.mts` makes one `web_search`-grounded Perplexity call
   (`openai/gpt-5-mini`) asking the model to research the URL — no HTML
   fetch/parse of the site itself happens anywhere in the app today.
-- **Billing**: Stripe subscription is live — Free (1 company/3 scans) vs Pro
-  (unlimited, recurring monthly, price still unset in copy). Deep advice is
-  **not** plan-gated today despite the landing page already claiming it's a
-  Pro perk.
+- **Billing**: Stripe subscription is live — Free (1 company/3 scans total)
+  vs Pro (unlimited companies, 20 scans/calendar-month fair-use with
+  top-up packs available, **$199/month**, price set 2026-08-24 — see
+  `TODOS.md`'s 2026-08-24 entry). A $19 one-time single-scan SKU (no
+  account required) also shipped 2026-08-24. Deep advice **is now
+  plan-gated** (since 2026-08-24) — requires Pro or a matching single-scan
+  purchase, returning `402 {upgradeRequired: true}` otherwise.
 - **Recently shipped, now unwanted**: a public opt-in leaderboard
   (`companies.is_public`, commit `1b0c7a9`) and multi-URL-per-company
   tracking (`company_urls` table, commit `dd95291`). Both fully committed

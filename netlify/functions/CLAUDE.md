@@ -241,35 +241,37 @@ gap this update fixes rather than something built this session.
   frontend (`CompanyDetailView.vue`/`ScanDetail.vue`'s new
   `deepAdviceLocked` prop) shows an "Upgrade to Pro" CTA in place of the
   generate button for non-Pro users instead of hiding the section outright.
-  The Pro subscription price is now decided: **$199/month**, reflected in
-  `index.html`'s pricing card, FAQ, and JSON-LD `Offer`, and `llms.txt`.
-  **Not yet confirmed**: whether the live Stripe Price behind the existing
-  `STRIPE_PRICE_ID` actually charges $199 — Stripe Prices are immutable
-  once created, so if the original Price was provisioned at a different or
-  placeholder amount, a new Price + env var swap is needed to make the
-  real charge match this now-public number. Verify directly in the Stripe
-  dashboard before treating this as fully live.
+  The Pro subscription price is now decided and live: **$199/month**,
+  reflected in `index.html`'s pricing card, FAQ, and JSON-LD `Offer`, and
+  `llms.txt`. **Confirmed 2026-08-24**: a direct Stripe API check found the
+  original `STRIPE_PRICE_ID` actually charged $29/month, a stale
+  placeholder — a new Price (`price_1U7s8r8gBja0qkMxwx4bqoSD`) was created
+  at $199/month and the env var swapped (see root `CLAUDE.md`'s Deployment
+  section for the full correction). Note `STRIPE_SECRET_KEY` is still a
+  Stripe *test-mode* key, so "live" here means the pricing/config matches
+  reality, not that real payments are being accepted yet.
 - **Scan top-up packs** (added 2026-08-23) — Pro users who hit the
   monthly cap can buy a one-time $19/10-scan pack instead of waiting for
   the reset. See the `scan_credit_purchases` schema entry above for the
   accounting model (insert-only, rolling 2-month window, no decrementing
-  balance). **Not yet fully live**: `STRIPE_TOPUP_PRICE_ID` has not been
-  created in Stripe/set as an env var yet (see root `CLAUDE.md`'s
-  Deployment section) — until it is, `create-topup-checkout-session.mts`
-  500s. This is a distinct SKU from the still-unbuilt one-time report
-  purchase below — same architectural shape (separate one-time Stripe
-  Price + additive purchases table), different product.
+  balance). **Live as of 2026-08-24**: `STRIPE_TOPUP_PRICE_ID` was created
+  and set (`price_1U7s9K8gBja0qkMx9TV9czH4`, $19/10 scans) —
+  `create-topup-checkout-session.mts` no longer 500s. This is a distinct
+  SKU from the still-unbuilt one-time report purchase below — same
+  architectural shape (separate one-time Stripe Price + additive purchases
+  table), different product.
 - **Single-scan purchase — shipped 2026-08-24** (Milestone 2 of
   `~/.claude/plans/we-need-alot-of-transient-floyd.md`): a $19 one-time
   scan, serving both an anonymous lead-gen entry point and a logged-in
   free-tier fallback for a user out of scans who doesn't want to
-  subscribe, bundling deep advice for that one scan. **Not yet fully
-  live**: `STRIPE_SINGLE_SCAN_PRICE_ID` has not been created in Stripe/set
-  as an env var yet — until it is,
-  `create-single-scan-checkout-session.mts` 500s, same pattern as the
-  top-up pack above. The E0 manual-sales-validation gate from
-  `PLAN_NEXT_PHASE.md` was explicitly waived by Marc for this round;
-  pricing was decided directly instead ($199/mo Pro, $19 one-time).
+  subscribe, bundling deep advice for that one scan. **Live as of
+  2026-08-24**: `STRIPE_SINGLE_SCAN_PRICE_ID` was created and set
+  (`price_1U7s9C8gBja0qkMxi4bLhk3X`, $19 one-time) and live-verified with a
+  full anonymous Checkout session (`amount_total: 1900`) —
+  `create-single-scan-checkout-session.mts` no longer 500s. The E0
+  manual-sales-validation gate from `PLAN_NEXT_PHASE.md` was explicitly
+  waived by Marc for this round; pricing was decided directly instead
+  ($199/mo Pro, $19 one-time).
 
 ### `netlify/functions/` — one function per file, all auth-scoped except `enrich`
 
