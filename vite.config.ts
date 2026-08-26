@@ -2,6 +2,35 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import netlifyPlugin from '@netlify/vite-plugin';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { resolveIncludes } from './scripts/html-includes.mjs';
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const partialsDir = path.join(rootDir, 'partials');
+
+// Expands <!--#include:name--> markers (reading partials/name.html) into
+// each Vite HTML entry, at build time — see partials/ for what's shared
+// across index.html/how-it-works.html/privacy.html/terms.html/app.html and
+// scripts/build-blog.mjs (the last one reads the same partials directly,
+// since it runs as plain Node after this build, not through Vite).
+// `order: 'pre'` is required, not cosmetic: Vite's built-in htmlEnvHook
+// (the %VITE_...% replacer) is appended to the *end* of Vite's internal
+// preHooks array, so a plugin hook registered with order:'pre' runs before
+// it — needed so partials/ga4.html's own %VITE_GA4_MEASUREMENT_ID% token
+// is already inlined into the page by the time htmlEnvHook substitutes it.
+// A 'normal' or 'post' order hook runs too late (Rollup's generateBundle
+// phase, after htmlEnvHook already ran), leaving the literal token in
+// dist/ unresolved.
+function htmlIncludesPlugin() {
+  return {
+    name: 'html-includes',
+    transformIndexHtml: {
+      order: 'pre' as const,
+      handler: (html: string) => resolveIncludes(html, partialsDir),
+    },
+  };
+}
 
 // Three entry points. `result.html` is the pre-SaaS-pivot shareable result
 // page — kept alive indefinitely (CEO decision, Milestone 5) so links
@@ -31,7 +60,7 @@ import netlifyPlugin from '@netlify/vite-plugin';
 // genuinely indexable. index.html plus these three are the only pages
 // meant to be indexed; app.html/result.html both keep noindex.
 export default defineConfig({
-  plugins: [vue(), tailwindcss(), netlifyPlugin()],
+  plugins: [htmlIncludesPlugin(), vue(), tailwindcss(), netlifyPlugin()],
   build: {
     rollupOptions: {
       input: {

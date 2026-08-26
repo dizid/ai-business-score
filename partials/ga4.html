@@ -1,0 +1,14 @@
+<script>
+(function () {
+  var GA_ID = '%VITE_GA4_MEASUREMENT_ID%';
+  if (!GA_ID || GA_ID.charAt(0) === '%' || GA_ID.indexOf('G-') !== 0) return;
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { dataLayer.push(arguments); };
+  gtag('js', new Date());
+  gtag('config', GA_ID);
+})();
+</script>

@@ -100,6 +100,39 @@ export function deriveBeatenCount(payload: ValidatedPayload) {
   return payload.perPromptRank.filter((r) => ['ranked-2', 'ranked-3', 'mentioned', 'beaten'].includes(r.rank)).length;
 }
 
+// Qualitative read on completedCalls, next to the score card's existing raw
+// "X / Y successful checks" count. Thresholds are against the hosted site's
+// fixed 20-call scan size (5 prompt templates x 4 models — see
+// aivis-core.mjs's MODELS/PROMPT_TEMPLATES.slice(0,5)), not a percentage: a
+// handful of extra failed calls out of 20 matters more than the same
+// handful would out of a much larger set.
+export type ConfidenceLevel = 'High' | 'Medium' | 'Low';
+export function confidenceLabel(completedCalls: number): ConfidenceLevel {
+  if (completedCalls >= 16) return 'High';
+  if (completedCalls >= 10) return 'Medium';
+  return 'Low';
+}
+
+// Three headline stats relabeling numbers already computed elsewhere
+// (citedCount, deriveRank1Count, competitorTallies' beatBrandCount) — pure
+// re-derivation, no new data collection.
+export interface KeyMetrics {
+  recommendationRatePct: number;
+  firstChoiceRatePct: number;
+  topCompetitorTakeoverRatePct: number;
+  topCompetitorName: string | null;
+}
+export function deriveKeyMetrics(payload: ValidatedPayload): KeyMetrics | null {
+  if (payload.completedCalls === 0) return null;
+  const topCompetitor = [...payload.competitorTallies].sort((a, b) => b.beatBrandCount - a.beatBrandCount)[0];
+  return {
+    recommendationRatePct: Math.round((payload.citedCount / payload.completedCalls) * 100),
+    firstChoiceRatePct: Math.round((deriveRank1Count(payload) / payload.completedCalls) * 100),
+    topCompetitorTakeoverRatePct: topCompetitor ? Math.round((topCompetitor.beatBrandCount / payload.completedCalls) * 100) : 0,
+    topCompetitorName: topCompetitor && topCompetitor.beatBrandCount > 0 ? topCompetitor.name : null,
+  };
+}
+
 export type HeadlineKind = 'none' | 'zero' | 'beaten' | 'good';
 export function deriveHeadlineKind(payload: ValidatedPayload): HeadlineKind {
   if (payload.completedCalls === 0) return 'none';

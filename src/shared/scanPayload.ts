@@ -160,6 +160,21 @@ export function asShortString(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 && v.length <= MAX_NAME_LEN ? v : null;
 }
 
+// Real competitor-quote excerpt attached to an advice card's params
+// (selectAdvice, aivis-core.mjs) — same shape used for deep advice's LLM
+// prompt, structured instead of pre-formatted for rendering here. `params`
+// itself isn't per-field validated (see the `advice` loop below), so this
+// reads it defensively the same way asShortString/asNonNegativeInt do.
+export interface AdviceExcerpt { promptLabel: string; snippet: string; }
+export function asAdviceExcerpt(v: unknown): AdviceExcerpt | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const promptLabel = asShortString(o.promptLabel);
+  const snippet = typeof o.snippet === 'string' && o.snippet.length > 0 && o.snippet.length <= MAX_TEXT_LEN ? o.snippet : null;
+  if (!promptLabel || !snippet) return null;
+  return { promptLabel, snippet };
+}
+
 export function b64urlDecode(str: string): string {
   const padded = str.replace(/-/g, '+').replace(/_/g, '/');
   const withPad = padded + '='.repeat((4 - (padded.length % 4)) % 4);

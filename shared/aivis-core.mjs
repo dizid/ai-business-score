@@ -774,13 +774,18 @@ export function selectAdvice(agg) {
     cards.push({ id: 'zero-citations', tone: 'critical', params: { completedCalls: agg.completedCalls } });
   } else if (beaten > 0 && ranked1 === 0) {
     const topRival = [...agg.competitorTallies].sort((a, b) => b.beatBrandCount - a.beatBrandCount)[0];
+    const topCompetitorName = topRival && topRival.beatBrandCount > 0 ? topRival.name : null;
     cards.push({
       id: 'consistently-beaten',
       tone: 'warning',
       params: {
         beaten,
         completedCalls: agg.completedCalls,
-        topCompetitorName: topRival && topRival.beatBrandCount > 0 ? topRival.name : null,
+        topCompetitorName,
+        // Real quoted evidence, not just the tally — same underlying data
+        // findCompetitorExcerpts() feeds the paid deep-advice prompt, reused
+        // here for the free card. null when no matching excerpt is found.
+        excerpt: topCompetitorName ? findCompetitorExcerpt(agg, topCompetitorName) : null,
       },
     });
   } else if (ranked1 === agg.completedCalls) {
@@ -803,7 +808,12 @@ export function selectAdvice(agg) {
     cards.push({
       id: 'top-rival',
       tone: 'neutral',
-      params: { name: topRival.name, mentionCount: topRival.mentionCount, completedCalls: agg.completedCalls },
+      params: {
+        name: topRival.name,
+        mentionCount: topRival.mentionCount,
+        completedCalls: agg.completedCalls,
+        excerpt: findCompetitorExcerpt(agg, topRival.name),
+      },
     });
   }
 
@@ -950,6 +960,35 @@ const MAX_DEEP_ADVICE_EXCERPTS = 4;
 const MAX_EXCERPT_CHARS = 500;
 const TOP_COMPETITORS_FOR_EXCERPTS = 2;
 
+// Finds up to `maxCount` real excerpts where `competitorName` was cited and
+// the brand wasn't already ranked-1 for that check — factored out so both
+// selectDeepAdviceExcerpts below (paid, LLM-prompt-formatted) and
+// selectAdvice's free rule-based cards (UI-structured) pull from the exact
+// same underlying evidence instead of two independent implementations.
+function findCompetitorExcerpts(agg, competitorName, maxCount) {
+  const rankByCall = new Map((agg.perPromptRank || []).map((r, i) => [i, r.rank]));
+  const excerpts = [];
+  for (let i = 0; i < (agg.rawResponses || []).length; i++) {
+    if (excerpts.length >= maxCount) break;
+    const response = agg.rawResponses[i];
+    if (rankByCall.get(i) === 'ranked-1') continue; // brand already winning this check
+    const match = findMentions(response.text, competitorName);
+    if (!match.mentioned) continue;
+    const start = Math.max(0, match.firstIndex - 100);
+    const snippet = response.text.slice(start, start + MAX_EXCERPT_CHARS).trim();
+    const promptLabel = PROMPT_LABELS[response.promptIndex] || `prompt ${response.promptIndex}`;
+    excerpts.push({ promptLabel, snippet });
+  }
+  return excerpts;
+}
+
+// Convenience wrapper for callers that just want one excerpt for one
+// competitor (selectAdvice's free rule-based cards) — returns null rather
+// than an empty array so callers can drop it straight into a params object.
+export function findCompetitorExcerpt(agg, competitorName) {
+  return findCompetitorExcerpts(agg, competitorName, 1)[0] || null;
+}
+
 function selectDeepAdviceExcerpts(scan) {
   const topCompetitors = [...(scan.competitorTallies || [])]
     .filter((c) => !c.ambiguous)
@@ -957,25 +996,15 @@ function selectDeepAdviceExcerpts(scan) {
     .slice(0, TOP_COMPETITORS_FOR_EXCERPTS);
   if (topCompetitors.length === 0) return [];
 
-  const rankByCall = new Map(
-    (scan.perPromptRank || []).map((r, i) => [i, r.rank])
-  );
-  const excerpts = [];
-
-  outer: for (const competitor of topCompetitors) {
-    for (let i = 0; i < (scan.rawResponses || []).length; i++) {
-      if (excerpts.length >= MAX_DEEP_ADVICE_EXCERPTS) break outer;
-      const response = scan.rawResponses[i];
-      if (rankByCall.get(i) === 'ranked-1') continue; // brand already winning this check
-      const match = findMentions(response.text, competitor.name);
-      if (!match.mentioned) continue;
-      const start = Math.max(0, match.firstIndex - 100);
-      const snippet = response.text.slice(start, start + MAX_EXCERPT_CHARS).trim();
-      const label = PROMPT_LABELS[response.promptIndex] || `prompt ${response.promptIndex}`;
-      excerpts.push(`- [${competitor.name}, ${label}]: "...${snippet}..."`);
+  const lines = [];
+  for (const competitor of topCompetitors) {
+    if (lines.length >= MAX_DEEP_ADVICE_EXCERPTS) break;
+    const remaining = MAX_DEEP_ADVICE_EXCERPTS - lines.length;
+    for (const { promptLabel, snippet } of findCompetitorExcerpts(scan, competitor.name, remaining)) {
+      lines.push(`- [${competitor.name}, ${promptLabel}]: "...${snippet}..."`);
     }
   }
-  return excerpts;
+  return lines;
 }
 
 // ---------- Deep advice (on-demand, live LLM call) ----------

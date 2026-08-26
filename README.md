@@ -181,7 +181,9 @@ append a row to `tracking.csv` (both gitignored — run output, not source).
   and why.
 - **`DASHBOARD.md`** — plain-English explanation of the score formula and
   what the scoreboard/advice cards mean.
-- **`TODOS.md`** — project history and current status.
-- **`WISH_LIST.md`** — deferred ideas not yet promoted to `TODOS.md`.
+- **`TODO.md`** — actionable checklist plus (merged 2026-08-26) the full
+  project history/status log that used to be `TODOS.md`, which is now just
+  a pointer to this file.
+- **`WISH_LIST.md`** — deferred ideas not yet promoted to `TODO.md`.
 - **`proof-script/OUTREACH.md`** — the cold-outreach playbook for using
   `proof-script` against a real prospect list.

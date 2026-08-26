@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { scoreBand, PROMPT_LABELS } from '../../shared/aivis-core.mjs';
-import { asNonNegativeInt, asShortString, type ValidatedPayload, type Rank } from './scanPayload';
+import { asNonNegativeInt, asShortString, asAdviceExcerpt, type ValidatedPayload, type Rank } from './scanPayload';
 import CollapsibleSection from './CollapsibleSection.vue';
 import {
   SENTIMENT_LABEL, BAND_LABEL, BAND_EXPLAIN, ADVICE_HEADING, CHECK_BADGE_LABEL, CATEGORY_EXPLAIN, CITATION_TIER_LABEL,
@@ -13,6 +13,7 @@ import {
   deriveCompetitorAppearances, deriveExecutiveSummary,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveVisibleAdvice,
   deriveHarmoniaPillars, deriveHarmoniaBand, cwvRating, formatSeconds, deriveScanDurationLabel,
+  confidenceLabel, deriveKeyMetrics,
   type ScoreboardRow,
 } from './scanDerived';
 import { buildScanReportMarkdown, downloadMarkdown } from './scanReport';
@@ -144,6 +145,8 @@ const rank1Count = computed(() => deriveRank1Count(props.payload));
 const beatenCount = computed(() => deriveBeatenCount(props.payload));
 const headlineKind = computed(() => deriveHeadlineKind(props.payload));
 const executiveSummary = computed(() => deriveExecutiveSummary(props.payload));
+const confidence = computed(() => confidenceLabel(props.payload.completedCalls));
+const keyMetrics = computed(() => deriveKeyMetrics(props.payload));
 
 const scoreboardRows = computed(() => deriveScoreboardRows(props.payload));
 function rowPct(row: ScoreboardRow) {
@@ -211,6 +214,19 @@ const scanDurationLabel = computed(() => deriveScanDurationLabel(props.payload))
 function downloadReport() {
   downloadMarkdown(buildScanReportMarkdown(props.payload), props.payload);
 }
+
+// "Copy schema" button on Site Health's schema opportunities: index-keyed
+// (not boolean) since a user could plausibly want to copy more than one
+// snippet, and a single flag would spuriously mark every button "Copied" at
+// once. Resets after 2s.
+const copiedSchemaIndex = ref<number | null>(null);
+function copySchema(example: string, index: number) {
+  navigator.clipboard.writeText(example);
+  copiedSchemaIndex.value = index;
+  setTimeout(() => {
+    if (copiedSchemaIndex.value === index) copiedSchemaIndex.value = null;
+  }, 2000);
+}
 </script>
 
 <template>
@@ -254,7 +270,7 @@ function downloadReport() {
         <div class="score-side">
           <div class="score-band-label">{{ BAND_LABEL[band] }}</div>
           <div class="score-explain">{{ BAND_EXPLAIN[band] }} AI Visibility Score — weighted for being mentioned first, not just mentioned.</div>
-          <div class="confidence-note">Based on {{ payload.completedCalls }} / {{ payload.completedCalls + payload.failedCalls }} successful checks.</div>
+          <div class="confidence-note">Confidence: {{ confidence }} — based on {{ payload.completedCalls }} / {{ payload.completedCalls + payload.failedCalls }} successful checks.</div>
           <a class="methodology-link" href="/how-it-works#methodology" target="_blank" rel="noopener">How this is measured &rarr;</a>
         </div>
       </div>
@@ -283,6 +299,26 @@ function downloadReport() {
           <li v-if="executiveSummary.vulnerability"><strong>Biggest vulnerability:</strong> {{ executiveSummary.vulnerability }}</li>
           <li v-if="executiveSummary.quickWin"><strong>Quick win:</strong> {{ executiveSummary.quickWin }}</li>
         </ul>
+      </div>
+
+      <!-- key metrics: three headline stats relabeling numbers already
+           computed elsewhere (citedCount, rank-1 count, top competitor's
+           beatBrandCount) as the more visceral "recommendation rate /
+           first-choice rate / competitor takeover rate" framing — no new
+           data, pure re-derivation. -->
+      <div class="key-metrics-row" v-if="keyMetrics">
+        <div class="key-metric-tile">
+          <div class="key-metric-value">{{ keyMetrics.recommendationRatePct }}%</div>
+          <div class="key-metric-label">AI recommendation rate</div>
+        </div>
+        <div class="key-metric-tile">
+          <div class="key-metric-value">{{ keyMetrics.firstChoiceRatePct }}%</div>
+          <div class="key-metric-label">AI first-choice rate</div>
+        </div>
+        <div class="key-metric-tile" v-if="keyMetrics.topCompetitorName">
+          <div class="key-metric-value">{{ keyMetrics.topCompetitorTakeoverRatePct }}%</div>
+          <div class="key-metric-label">Taken by {{ keyMetrics.topCompetitorName }}</div>
+        </div>
       </div>
 
       <!-- sentiment summary: at-a-glance rollup of the per-check sentiment
@@ -324,32 +360,10 @@ function downloadReport() {
         </div>
       </template>
 
-      <!-- performance by query type: the score model already weights each
-           check by category (high-intent/comparison/informational) — this
-           surfaces that breakdown plus each category's sentiment mix,
-           instead of leaving the pattern buried in the Details tab. -->
-      <template v-if="categoryBreakdown.length">
-        <h2>Performance by query type</h2>
-        <div class="card">
-          <div class="category-row" v-for="row in categoryBreakdown" :key="row.category">
-            <div class="board-label">
-              <span class="board-name">{{ row.label }}</span>
-              <span class="board-count">{{ row.ranked1 + row.beaten }}/{{ row.total }} mentioned</span>
-            </div>
-            <div class="board-track"><div class="board-fill you" :style="{ width: row.presencePct + '%' }"></div></div>
-            <div class="category-detail">{{ row.ranked1 }} first, {{ row.beaten }} beaten to it, {{ row.notMentioned }} not mentioned</div>
-            <p class="category-detail" v-if="CATEGORY_EXPLAIN[row.category]">{{ CATEGORY_EXPLAIN[row.category] }}</p>
-            <div class="sentiment-summary-row" v-if="row.sentimentCounts.length">
-              <span
-                v-for="s in row.sentimentCounts" :key="s.classification"
-                class="sentiment-badge" :class="`sentiment-${s.classification}`"
-              >{{ s.count }} {{ s.label }}</span>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- advice cards -->
+      <!-- advice cards: moved directly after the Scoreboard (was after
+           "Performance by query type") so the reader reaches "what do I do"
+           before the more granular category table — 2026-08-26 report
+           reorder. -->
       <template v-if="visibleAdvice.length || sentimentAdvice">
         <h2>What to do next</h2>
         <div class="advice-card" :class="`tone-${card.tone}`" v-for="card in visibleAdvice" :key="card.id">
@@ -365,6 +379,15 @@ function downloadReport() {
             <template v-else-if="card.id === 'mixed'">Mixed results across {{ asNonNegativeInt(card.params.completedCalls) ?? '?' }} checks: ranked first in {{ asNonNegativeInt(card.params.ranked1) ?? 0 }}, beaten by a competitor in {{ asNonNegativeInt(card.params.beaten) ?? 0 }}, not mentioned at all in {{ asNonNegativeInt(card.params.notMentioned) ?? 0 }}. The not-mentioned checks are the biggest opportunity — competitors aren't necessarily winning those either, nobody is.</template>
             <template v-else-if="card.id === 'top-rival'"><strong>{{ asShortString(card.params.name) }}</strong> is the competitor showing up most — mentioned in {{ asNonNegativeInt(card.params.mentionCount) ?? 0 }} of {{ asNonNegativeInt(card.params.completedCalls) ?? '?' }} checks. Worth understanding what makes them citable (content structure, third-party coverage, reviews).</template>
           </div>
+          <!-- excerpt: a real quoted sentence citing the competitor, when
+               one was found (consistently-beaten/top-rival only) — answers
+               "why aren't you being recommended" with actual evidence
+               instead of just a tally. Absent on scans from before this
+               shipped (advice is frozen at scan time), so guard on presence. -->
+          <blockquote class="advice-excerpt" v-if="asAdviceExcerpt(card.params.excerpt)">
+            &ldquo;&hellip;{{ asAdviceExcerpt(card.params.excerpt)!.snippet }}&hellip;&rdquo;
+            <cite>{{ asAdviceExcerpt(card.params.excerpt)!.promptLabel }}</cite>
+          </blockquote>
         </div>
         <div class="advice-card tone-warning" v-if="sentimentAdvice">
           <div class="advice-tag">Sentiment</div>
@@ -410,6 +433,31 @@ function downloadReport() {
           <button type="button" class="deep-advice-button" @click="$emit('upgrade')">
             Upgrade to Pro
           </button>
+        </div>
+      </template>
+
+      <!-- performance by query type: the score model already weights each
+           check by category (high-intent/comparison/informational) — this
+           surfaces that breakdown plus each category's sentiment mix,
+           instead of leaving the pattern buried in the Details tab. -->
+      <template v-if="categoryBreakdown.length">
+        <h2>Performance by query type</h2>
+        <div class="card">
+          <div class="category-row" v-for="row in categoryBreakdown" :key="row.category">
+            <div class="board-label">
+              <span class="board-name">{{ row.label }}</span>
+              <span class="board-count">{{ row.ranked1 + row.beaten }}/{{ row.total }} mentioned</span>
+            </div>
+            <div class="board-track"><div class="board-fill you" :style="{ width: row.presencePct + '%' }"></div></div>
+            <div class="category-detail">{{ row.ranked1 }} first, {{ row.beaten }} beaten to it, {{ row.notMentioned }} not mentioned</div>
+            <p class="category-detail" v-if="CATEGORY_EXPLAIN[row.category]">{{ CATEGORY_EXPLAIN[row.category] }}</p>
+            <div class="sentiment-summary-row" v-if="row.sentimentCounts.length">
+              <span
+                v-for="s in row.sentimentCounts" :key="s.classification"
+                class="sentiment-badge" :class="`sentiment-${s.classification}`"
+              >{{ s.count }} {{ s.label }}</span>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -525,7 +573,12 @@ function downloadReport() {
         <div class="harmonia-schema" v-if="payload.harmonia.schema.opportunities.length">
           <h3>Schema opportunities</h3>
           <div class="schema-opportunity" v-for="(o, i) in payload.harmonia.schema.opportunities" :key="i">
-            <div class="schema-opportunity-head">{{ o.type }}</div>
+            <div class="schema-opportunity-head-row">
+              <div class="schema-opportunity-head">{{ o.type }}</div>
+              <button type="button" class="copy-schema-button" @click="copySchema(o.example, i)">
+                {{ copiedSchemaIndex === i ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
             <p class="schema-opportunity-reason">{{ o.reason }}</p>
             <pre class="schema-opportunity-example"><code>{{ o.example }}</code></pre>
           </div>
@@ -710,6 +763,17 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 .exec-summary-list li { font-size: 0.9rem; color: var(--text); }
 .exec-summary-list strong { color: var(--fg); }
 
+.key-metrics-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
+.key-metric-tile {
+  flex: 1 1 140px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.key-metric-value { font-size: 1.4rem; font-weight: 700; font-variant-numeric: proportional-nums; }
+.key-metric-label { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
 .warn {
   background: color-mix(in srgb, var(--warning) 16%, var(--card));
   border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
@@ -781,6 +845,14 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 .advice-card.tone-neutral { border-left-color: var(--faint); }
 .advice-card.tone-neutral .advice-tag { color: var(--muted); }
 .advice-body { font-size: 0.92rem; }
+.advice-excerpt {
+  margin: 10px 0 0; padding: 8px 12px;
+  border-left: 2px solid var(--border);
+  font-size: 0.85rem; font-style: italic; color: var(--muted);
+}
+.advice-excerpt cite {
+  display: block; margin-top: 4px; font-size: 0.76rem; font-style: normal; color: var(--faint);
+}
 
 /* ---- deep advice ---- */
 .deep-advice-steps { margin: 0; padding: 0; list-style: none; counter-reset: step-counter; }
@@ -1007,7 +1079,14 @@ h2:first-of-type { margin-top: 0; }
 
 .schema-opportunity { margin-bottom: 16px; }
 .schema-opportunity:last-child { margin-bottom: 0; }
+.schema-opportunity-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .schema-opportunity-head { font-weight: 600; font-size: 0.88rem; margin-bottom: 2px; }
+.copy-schema-button {
+  font-size: 0.76rem; padding: 3px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--card); color: var(--muted);
+  cursor: pointer; flex: none;
+}
+.copy-schema-button:hover { color: var(--fg); border-color: var(--accent); }
 .schema-opportunity-reason { font-size: 0.82rem; color: var(--muted); margin: 0 0 8px; }
 .schema-opportunity-example {
   font-size: 0.78rem; font-family: ui-monospace, monospace; color: var(--muted);

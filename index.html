@@ -18,11 +18,7 @@
      icon; the PNG sizes and apple-touch-icon below are rasterized
      fallbacks generated via the `browse` skill (headless-browser
      screenshot of the SVG at each target pixel size). -->
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-<link rel="manifest" href="/site.webmanifest" />
+<!--#include:favicon-->
 
 <!-- Matches --stage-black in public/marketing-theme.css (the Spotlight
      identity's base background), so the browser chrome (mobile address
@@ -148,43 +144,22 @@
 <!-- Display font (Space Grotesk) — see public/marketing-theme.css for why
      it's loaded here rather than @import'd from the stylesheet, and
      brand/BRAND.md for the full Spotlight typography rationale. -->
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<!--#include:fonts-->
 
 <!-- Shared Spotlight theme — tokens and base styles for all four static
      marketing pages, consolidated 2026-08-17 so palette updates can't
      drift out of sync across pages again. See brand/BRAND.md. -->
-<link rel="stylesheet" href="/marketing-theme.css" />
+<!--#include:marketing-theme-link-->
 
 <!-- Google Analytics (GA4) — no-ops until VITE_GA4_MEASUREMENT_ID is set as
      a Netlify env var (needs a GA4 property created first — see CLAUDE.md's
      Deployment section). See privacy.html's Cookies section for the
      user-facing disclosure. -->
-<script>
-(function () {
-  var GA_ID = '%VITE_GA4_MEASUREMENT_ID%';
-  if (!GA_ID || GA_ID.charAt(0) === '%' || GA_ID.indexOf('G-') !== 0) return;
-  var s = document.createElement('script');
-  s.async = true;
-  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
-  document.head.appendChild(s);
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function () { dataLayer.push(arguments); };
-  gtag('js', new Date());
-  gtag('config', GA_ID);
-})();
-</script>
+<!--#include:ga4-->
 </head>
 <body>
 
-<nav class="top">
-  <a class="logo" href="/">Foreground</a>
-  <div class="links">
-    <a href="/app/login">Log in</a>
-    <a class="cta" href="/app/signup">Get in the foreground</a>
-  </div>
-</nav>
+<!--#include:nav-->
 
 <div class="wrap">
 
@@ -389,12 +364,7 @@
 </div>
 
 <div class="wrap">
-  <footer>
-    &copy; 2026 Foreground. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
-    · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
-    · <a href="/how-it-works">How this works</a> · <a href="/blog/">Blog</a>
-    · <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
-  </footer>
+  <!--#include:footer-->
 </div>
 
 </body>

@@ -21,10 +21,12 @@ import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { marked } from 'marked';
+import { resolveIncludes } from './html-includes.mjs';
 
 const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const contentDir = path.join(rootDir, 'content', 'blog');
 const distDir = path.join(rootDir, 'dist');
+const partialsDir = path.join(rootDir, 'partials');
 const siteUrl = 'https://aivis-scan.netlify.app';
 
 // --- frontmatter: plain `key: value` lines between `---` fences. Simple on
@@ -55,16 +57,18 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Shared nav/footer markup — copied from index.html's current markup
-// rather than imported from it, since index.html has unrelated concurrent
-// edits in flight as of this writing. Extracting a real shared partial
-// (index.html/how-it-works.html/privacy.html/terms.html all still
-// duplicate this markup independently) is tracked as a follow-up once
-// those files are stable; this template deliberately matches today's
-// existing duplication pattern rather than being a new one-off.
+// Shared nav/footer/head-boilerplate markup now lives in partials/ (see
+// scripts/html-includes.mjs) — the same source index.html/how-it-works.html/
+// privacy.html/terms.html/app.html pull from via a Vite plugin. This script
+// isn't Vite-processed (it runs as plain Node after `vite build`), so it
+// calls resolveIncludes() directly and does its own %VITE_GA4_MEASUREMENT_ID%
+// substitution afterward via process.env, same as it always has.
+// __EXTRA_HEAD__/__BODY_HTML__ are plain string placeholders, not passed
+// through resolveIncludes() — caller-supplied blog-post content should
+// never be scanned for include markers.
 function pageShell({ title, description, canonicalPath, ogImagePath = '/og-image.png', ogType = 'website', bodyHtml, extraHead = '' }) {
   const canonicalUrl = `${siteUrl}${canonicalPath}`;
-  return `<!doctype html>
+  const shell = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -73,11 +77,7 @@ function pageShell({ title, description, canonicalPath, ogImagePath = '/og-image
 <meta name="description" content="${escapeHtml(description)}" />
 <link rel="canonical" href="${canonicalUrl}" />
 
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-<link rel="manifest" href="/site.webmanifest" />
+<!--#include:favicon-->
 <meta name="theme-color" content="#0a0a0d" />
 
 <meta property="og:type" content="${ogType}" />
@@ -90,58 +90,36 @@ function pageShell({ title, description, canonicalPath, ogImagePath = '/og-image
 <meta name="twitter:description" content="${escapeHtml(description)}" />
 <meta property="twitter:image" content="${siteUrl}${ogImagePath}" />
 
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/marketing-theme.css" />
+<!--#include:fonts-->
+<!--#include:marketing-theme-link-->
 <link rel="stylesheet" href="/blog-theme.css" />
-${extraHead}
+__EXTRA_HEAD__
 
-<!-- Google Analytics (GA4) — mirrors the same no-op-until-configured guard
-     as index.html/how-it-works.html/privacy.html/terms.html/app.html, but
-     reads process.env directly since this script runs as plain Node after
-     vite build, not through Vite's %VITE_...% HTML replacement. -->
-<script>
-(function () {
-  var GA_ID = ${JSON.stringify(process.env.VITE_GA4_MEASUREMENT_ID || '')};
-  if (!GA_ID || GA_ID.indexOf('G-') !== 0) return;
-  var s = document.createElement('script');
-  s.async = true;
-  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
-  document.head.appendChild(s);
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function () { dataLayer.push(arguments); };
-  gtag('js', new Date());
-  gtag('config', GA_ID);
-})();
-</script>
+<!-- Google Analytics (GA4) — see partials/ga4.html. Its measurement-ID
+     token is substituted directly below via process.env, since this script
+     runs as plain Node after vite build, not through Vite's htmlEnvHook. -->
+<!--#include:ga4-->
 </head>
 <body>
 
-<nav class="top">
-  <a class="logo" href="/">Foreground</a>
-  <div class="links">
-    <a href="/app/login">Log in</a>
-    <a class="cta" href="/app/signup">Get in the foreground</a>
-  </div>
-</nav>
+<!--#include:nav-->
 
 <div class="wrap blog-wrap">
-${bodyHtml}
+__BODY_HTML__
 </div>
 
 <div class="wrap">
-  <footer>
-    &copy; 2026 Foreground. <a href="/app/login">Log in</a> · <a href="/app/signup">Sign up</a>
-    · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
-    · <a href="/how-it-works">How this works</a> · <a href="/blog/">Blog</a>
-    · <a href="https://dizid.com" target="_blank" rel="noopener noreferrer">Made by Dizid</a>
-  </footer>
+  <!--#include:footer-->
 </div>
 
 </body>
 </html>
 `;
+  const gaId = process.env.VITE_GA4_MEASUREMENT_ID || '';
+  return resolveIncludes(shell, partialsDir)
+    .replaceAll('%VITE_GA4_MEASUREMENT_ID%', gaId)
+    .replace('__EXTRA_HEAD__', () => extraHead)
+    .replace('__BODY_HTML__', () => bodyHtml);
 }
 
 function formatDate(isoDate) {
