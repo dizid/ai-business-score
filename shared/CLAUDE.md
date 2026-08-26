@@ -132,18 +132,21 @@ The single source of truth, imported by every consumer:
     generic one — same "skip and count separately" failure shape every
     other call failure already used, so a single missing key degrades that
     one provider's calls to failures instead of failing the whole scan.
-  - **Deliberately NOT changed by this migration**: `CONCURRENCY_LIMIT`
-    (still 1) and `SCAN_DEADLINE_MS` (still 600000) in
-    `run-scan-background.mts` — those were tuned specifically against
-    Perplexity's own real per-key rate limit (~1 concurrent), which no
-    longer gates 3 of the 4 models now that they call separate independent
-    services. Revisiting concurrency now that most calls don't share one
-    rate limit is a real, plausible follow-up, but retuning it blind in the
-    same change as the provider migration would make it impossible to tell
-    which change caused which effect if something broke — this file's own
-    history (three separate concurrency-tuning incidents: 2026-08-09's
-    10→4 revert, 2026-08-13's 4→1 finding, 2026-08-14's cascading-timeout
-    gap) is the reason for that caution, not theoretical.
+  - **Deliberately NOT changed by this (2026-08-15) migration**:
+    `CONCURRENCY_LIMIT` and `SCAN_DEADLINE_MS` in `run-scan-background.mts`
+    — those were tuned specifically against Perplexity's own real per-key
+    rate limit (~1 concurrent), which no longer gates 3 of the 4 models now
+    that they call separate independent services. **This was revisited
+    later**: `CONCURRENCY_LIMIT` went from one flat value to a
+    per-provider `CONCURRENCY_LIMIT_BY_PROVIDER` map on 2026-08-23
+    (anthropic/google/xai raised, live-verified against a real scan), and
+    `openai` itself was raised on 2026-08-26 once it stopped sharing
+    Perplexity's key too — see `netlify/functions/CLAUDE.md`'s
+    `run-scan-background.mts` entry for the full current values and both
+    changes' verification detail, not duplicated here. The caution
+    described below (three prior concurrency-tuning incidents) is exactly
+    why both later changes were tested live before shipping rather than
+    retuned blind.
   - **Not yet live-verified**: an actual full 20-call scan through
     `run-scan-background.mts` with real production traffic — the
     per-provider smoke tests above each confirmed one call succeeds with

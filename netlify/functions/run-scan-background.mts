@@ -246,9 +246,30 @@ export default async (req: Request) => {
   // discipline; do one live-triggered scan (not proof-script) and check
   // scans.failures for a 429 spike before treating this as validated, and
   // roll a provider back toward 1 immediately if one appears.
+  // 2026-08-26: `openai` raised 1 -> 3. It was left at 1 during the
+  // 2026-08-23 change above because at the time it was still the Perplexity
+  // gateway lane. Since 2026-08-25 (OPENAI_API_KEY live, see callModel's
+  // 'openai' case in aivis-core.mjs), gpt-5-mini calls OpenAI's own API
+  // directly and no longer shares Perplexity's fragile ~1-concurrent limit —
+  // the 2026-08-23 note above even flagged this lane as "still the
+  // wall-clock bottleneck" for getting scans under 2 minutes, but nobody had
+  // re-tested the cap against the new direct-API routing until now.
+  // **Live-verified same day**: a throwaway script (`callModel` directly,
+  // real `OPENAI_API_KEY`, not committed) ran burst sizes 1/2/3 against
+  // `openai/gpt-5-mini`, 3 rounds each at sizes 2 and 3 — 16/16 calls
+  // succeeded (100%), including 9/9 at burst size 3, with no latency
+  // degradation (each call still ~25-40s, consistent with gpt-5-mini's known
+  // per-call range). Raised to 3, matching anthropic/google — a scan only
+  // ever makes 5 openai calls (5-prompt slice x 1 model), so this collapses
+  // that lane from 5 sequential calls to roughly 2 concurrent batches.
+  // Not yet confirmed against a full production 20-call scan's real
+  // `scans.failures` — do that once before treating this as fully settled,
+  // same "verify live before trusting" discipline as every provider/
+  // concurrency change in this file's history; roll back to 1 immediately
+  // if a 429 (or any new failure pattern) appears on the openai lane.
   const DEFAULT_PROVIDER_CONCURRENCY = 1;
   const CONCURRENCY_LIMIT_BY_PROVIDER: Record<string, number> = {
-    openai: 1,
+    openai: 3,
     anthropic: 3,
     google: 3,
     xai: 2,

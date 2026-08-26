@@ -1,5 +1,38 @@
 # TODOs
 
+## STATUS 2026-08-26: openai-lane concurrency raised 1 → 3 — SHIPPED, live-verified against the direct API, not yet against a full production scan
+
+**Trigger:** Marc asked for a competitive-analysis deep-research pass (started
+from a ChatGPT conversation reviewing Foreground vs. Brand Armor), then asked
+to turn its "concurrency re-test" idea into an actual implementation plan. See
+`docs/improvement-roadmap.md`'s "Concurrency re-test" section for the full
+history this continues — that section's original ask (re-test anthropic/
+google/xai now that they call direct APIs) turned out to already be shipped
+and live-verified 2026-08-23 (`CONCURRENCY_LIMIT_BY_PROVIDER = {openai: 1,
+anthropic: 3, google: 3, xai: 2}`, real scan completed in 233.5s, down from
+5-8 min). What was actually still open: the `openai` lane was left at 1
+because it used to share Perplexity's fragile shared-gateway key — but since
+2026-08-25, `OPENAI_API_KEY` is live and `gpt-5-mini` calls OpenAI's own API
+directly (see `shared/CLAUDE.md`'s multi-provider client entry), so that
+lane's `1` cap was never re-examined against the new routing.
+
+**What shipped:** A throwaway script (`callModel` direct, real
+`OPENAI_API_KEY` sourced from `DEV.md`, deleted after use, not committed)
+tested burst sizes 1/2/3 against the live OpenAI API — 16/16 calls succeeded
+(100%), including 9/9 at burst size 3, with no latency degradation (each call
+still ~25-40s). `CONCURRENCY_LIMIT_BY_PROVIDER.openai` raised from 1 to 3 in
+`netlify/functions/run-scan-background.mts` (matching anthropic/google),
+comment block extended in place with the test result and rollback condition.
+
+**Verified:** `npm run build` clean before and after the change.
+**Not yet verified:** a full 20-call production scan's `scans.failures` —
+the burst test hit the raw OpenAI endpoint directly, not the whole scan
+pipeline (DB writes, Harmonia, sentiment judge, the other 3 provider lanes
+running concurrently alongside it). Trigger one real scan post-deploy and
+check `scans.failures` for a 429 (or any new failure) before treating this as
+fully settled — roll back to `openai: 1` immediately if one appears, same
+discipline as every prior concurrency change in this file's history.
+
 ## STATUS 2026-08-24: On-site `/blog` pipeline — SHIPPED, content not yet reviewed
 
 **Trigger:** Marc asked for a plan to make the app "best of breed" (easier

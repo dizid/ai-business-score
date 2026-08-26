@@ -5,7 +5,30 @@ That doc covers the `xai/grok-4.6` timeout root cause specifically; this one
 covers the concurrency re-test raised as the top follow-up, plus a broader
 set of improvement candidates discussed the same day.
 
-## Concurrency re-test — highest priority, not yet run
+## Concurrency re-test — DONE (2026-08-23 for anthropic/google/xai, 2026-08-26 for openai)
+
+**Update 2026-08-23**: this section's original ask — re-test whether
+anthropic/google/xai can run concurrently now that they call direct
+provider APIs — is shipped and live-verified. `CONCURRENCY_LIMIT` (flat, 1)
+became `CONCURRENCY_LIMIT_BY_PROVIDER` (`{openai: 1, anthropic: 3, google: 3,
+xai: 2}`) in `run-scan-background.mts`; a real production scan completed in
+233.5s (down from the 5-8 min baseline), 20/20 calls succeeded, zero 429s.
+`openai` was deliberately left at 1 in that change — at the time it was still
+routing through Perplexity's shared gateway.
+
+**Update 2026-08-26**: `openai` raised 1 → 3. Since 2026-08-25,
+`OPENAI_API_KEY` is live and `gpt-5-mini` calls OpenAI's own API directly
+(no longer sharing Perplexity's key), so the 1-cap was stale. A throwaway
+script (same shape as the one originally proposed below, narrowed to one
+model) tested burst sizes 1/2/3 against the real OpenAI API: 16/16 calls
+succeeded, including 9/9 at burst size 3, no latency degradation. See
+`TODOS.md`'s 2026-08-26 entry for the full writeup. **Still open**: a full
+20-call production scan hasn't been run against this specific change yet —
+do that and check `scans.failures` before fully trusting it.
+
+The original proposal (kept below for the record/methodology, since the
+2026-08-26 openai test reused its shape) — not a live "not yet run" item
+anymore:
 
 **Why this matters**: `CONCURRENCY_LIMIT = 1` (`run-scan-background.mts`)
 forces every one of a scan's 20 calls fully sequential, which is the main
@@ -109,11 +132,14 @@ result there the same way.
 Grouped by what they'd actually move.
 
 ### Speed / UX
-- **Stream scan progress instead of poll-and-wait.** The UI currently shows
-  nothing until the whole scan finishes. Since calls run model-major, the
-  backend already knows which model is "done/running/queued" at any point —
-  surfacing that live would make a 5-10 minute wait feel very different
-  even before the concurrency fix above lands.
+- ~~**Stream scan progress instead of poll-and-wait.**~~ **Shipped the same
+  day this doc was written (2026-08-17)** — `scans.progress jsonb`
+  (`{completed, total, currentModels}`), written incrementally by
+  `run-scan-background.mts` and polled live via `scan-status.mts` into
+  `CompanyDetailView.vue`'s progress UI. See
+  `netlify/functions/CLAUDE.md`'s `progress` column entry. This doc's own
+  "Suggested priority order" below wasn't updated to reflect that until
+  2026-08-26 — found stale while researching an unrelated question.
 
 ### Product value
 - **Scheduled/recurring scans.** Everything today is manual (`CompanyDetailView.vue`'s
@@ -154,11 +180,12 @@ Grouped by what they'd actually move.
 
 ## Suggested priority order
 
-1. Concurrency re-test (above) — cheap, reversible, directly fixes the
-   latency pain that prompted this doc.
-2. Streaming scan progress — cheap UX win, independent of #1.
+1. ~~Concurrency re-test~~ — shipped 2026-08-23 (anthropic/google/xai) and
+   2026-08-26 (openai), see above.
+2. ~~Streaming scan progress~~ — shipped 2026-08-17, see above.
 3. Scheduled scans + regression alerts — biggest product-value lever for
-   retention/subscription justification.
+   retention/subscription justification. **The top open item on this whole
+   list as of 2026-08-26.**
 4. Competitor-benchmarking view — biggest lever for new-customer conviction.
 5. ~~Gate deep advice~~ — shipped 2026-08-24.
 6. Team/agency access — opens a new buyer segment, bigger lift (invite

@@ -353,6 +353,21 @@ gap this update fixes rather than something built this session.
   confirms the `openai`/Perplexity lane (still capped at 1, untouched by
   this change) remains the wall-clock bottleneck — 233.5s is real
   improvement but still over the 2-minute goal, exactly as expected.
+  **`openai` raised 1 → 3 on 2026-08-26**: by this date `openai/gpt-5-mini`
+  no longer shares Perplexity's key at all — `OPENAI_API_KEY` went live
+  2026-08-25 and `apiKeys.openai` now routes that model to OpenAI's own API
+  directly (see `shared/CLAUDE.md`'s multi-provider client entry), so the
+  `openai: 1` cap above was inherited caution from a gateway this lane no
+  longer uses. A throwaway script hitting the real OpenAI API directly (not
+  through this file) confirmed burst sizes up to 3 succeed 100% (16/16
+  calls, 9/9 at size 3) with no latency regression; raised to 3 to match
+  anthropic/google. See `docs/improvement-roadmap.md`'s "Concurrency
+  re-test" section and `TODOS.md`'s 2026-08-26 entry for the full test
+  writeup. **Not yet confirmed against a full 20-call production scan** —
+  the burst test only exercised the raw API call, not this file's DB
+  writes/Harmonia/sentiment-judge/other-provider-lanes running alongside
+  it. Check `scans.failures` on the next real scan before trusting this the
+  way the 2026-08-23 change above was confirmed.
 - **`scan-status.mts`** — GET `/scans/:id`, auth + ownership-scoped (join
   through `companies`), polled by the frontend. Returns `progress` (the
   live `{completed, total, currentModel}` object, added 2026-08-17) and
