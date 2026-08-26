@@ -98,6 +98,14 @@ root `CLAUDE.md` for overall project context.
   a URL-chip selector, "+ Add URL") was **removed 2026-08-12** per
   Milestone B of `PLAN_NEXT_PHASE.md` — every company now has exactly one
   URL (`companies.website`), matching `scan.mts`'s current behavior.
+  **Added 2026-08-26**: an "Automatic weekly scans: Off/On" toggle next to
+  "Run new scan", backed by the new `PATCH /companies/:id`
+  (`scan_frequency`). Gated on `isProUser` (same `profile.value.plan_tier
+  === 'pro'` check as `allowDeepAdvice`) — clicking while not Pro calls the
+  existing `startCheckout()` instead of the PATCH, same upgrade-flow reuse
+  as everywhere else in this file. The actual weekly trigger is
+  `netlify/functions/scheduled-rescan.mts`, a new scheduled Netlify
+  Function this view has no direct dependency on beyond the toggle state.
 - **`views/CompanyProgressChart.vue`** — hand-rolled SVG line chart (no
   chart library, matching `ScanDetail.vue`'s score ring/scoreboard
   approach), single series so no legend needed per the `dataviz` skill's

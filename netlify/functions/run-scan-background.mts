@@ -60,7 +60,8 @@ import {
 import { analyzeHarmonia } from '../../shared/harmonia.mjs';
 import { analyzeEntityPresence } from '../../shared/entityPresence.mjs';
 import { sql } from './_shared/db.mts';
-import { sendScanCompleteEmail } from './_shared/email.mts';
+import { sendScanCompleteEmail, sendScoreRegressionEmail } from './_shared/email.mts';
+import { REGRESSION_ALERT_THRESHOLD } from './_shared/plan.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
@@ -566,16 +567,39 @@ export default async (req: Request) => {
       }
 
       const origin = new URL(req.url).origin;
+      const companyUrl = `${origin}/app/companies/${scanRow.company_id}`;
       const result = await sendScanCompleteEmail({
         to: owners[0].email,
         brand: company.brand,
-        companyUrl: `${origin}/app/companies/${scanRow.company_id}`,
+        companyUrl,
         status: finalStatus,
         score: finalScore,
         previousScore,
       });
       if (!result.ok) {
         console.error(`run-scan-background: scan-complete email failed for scan ${scanId}: ${result.error}`);
+      }
+
+      // Regression alert — additive to the routine email above, not a
+      // replacement (see sendScoreRegressionEmail's own comment). Applies
+      // regardless of trigger_source: a manual re-scan that regresses is
+      // just as worth flagging as a scheduled one.
+      if (
+        finalStatus === 'completed' &&
+        finalScore !== null &&
+        previousScore !== null &&
+        previousScore - finalScore >= REGRESSION_ALERT_THRESHOLD
+      ) {
+        const regressionResult = await sendScoreRegressionEmail({
+          to: owners[0].email,
+          brand: company.brand,
+          companyUrl,
+          score: finalScore,
+          previousScore,
+        });
+        if (!regressionResult.ok) {
+          console.error(`run-scan-background: regression alert email failed for scan ${scanId}: ${regressionResult.error}`);
+        }
       }
     }
   } catch (err) {

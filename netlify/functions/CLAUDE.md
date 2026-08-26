@@ -101,6 +101,13 @@ See the root `CLAUDE.md` for overall project context.
   a deliberate product decision (Marc confirmed AI visibility stays "the
   main thing") — never blended into it.** See `src/shared/CLAUDE.md` for
   the pillar breakdown and UI.
+  Added 2026-08-26 (scheduled weekly re-scans): **`companies.scan_frequency
+  text default 'off'`** (`'off'` | `'weekly'`) — a Pro-only opt-in read by
+  the new `scheduled-rescan.mts`, set via `PATCH /companies/:id`. And
+  **`scans.trigger_source text default 'manual'`** (`'manual'` |
+  `'scheduled'`), letting the scan-history list (and Marc's own querying)
+  distinguish auto-triggered scans from ones a user clicked "Run new scan"
+  for. Both additive, existing rows default correctly.
 - **`company_urls`** — an **unused, present-but-dead table**. It backed
   multi-URL-per-company tracking (shipped, then deleted per Milestone B of
   `PLAN_NEXT_PHASE.md`): every company got a primary row equal to its
@@ -322,7 +329,14 @@ gap this update fixes rather than something built this session.
   `sendScanCompleteEmail` (`_shared/email.mts`, added 2026-08-13) after
   every scan finalizes, success or failure, via Resend's plain HTTP API —
   best-effort, a failed send is logged but never changes the scan's own
-  already-persisted status. Sends from `scans@notifications.dizid.com`,
+  already-persisted status. **Added 2026-08-26**: also calls
+  `sendScoreRegressionEmail` (`_shared/email.mts`) — a distinct, additional
+  alert (not a replacement for the routine email above) whenever this
+  scan's score drops by `REGRESSION_ALERT_THRESHOLD` (15, `_shared/plan.mts`)
+  or more from the prior completed scan, regardless of whether the scan was
+  manual or triggered by `scheduled-rescan.mts` — a real regression is
+  worth flagging either way. Same best-effort, never-throws contract.
+  Sends from `scans@notifications.dizid.com`,
   DNS-verified with Resend (`region: eu-west-1`; DKIM/MX/SPF records live
   on `dizid.com`'s Netlify-managed DNS zone) — confirmed working
   end-to-end with a real delivered test email to a non-owner address the
@@ -383,7 +397,35 @@ gap this update fixes rather than something built this session.
   `latest_score`) and POST (create) `/companies`, auth-scoped.
 - **`company.mts`** — GET `/companies/:id` (via Netlify's URLPattern path
   syntax, `context.params.id`), returns the company plus its full scan
-  history via `toScanPayload`.
+  history via `toScanPayload`. **Added 2026-08-26**: `PATCH /companies/:id`,
+  body `{scan_frequency: 'off'|'weekly'}` — toggles the new weekly-auto-scan
+  opt-in read by `scheduled-rescan.mts`. Setting `'weekly'` requires
+  `isPro(planTier)`, returning the standard `402 {error, upgradeRequired}`
+  otherwise; setting `'off'` never needs a plan check, so a downgraded user
+  can always turn it back off.
+- **`scheduled-rescan.mts`** — added 2026-08-26, this repo's first
+  scheduled/cron Netlify Function (`config.schedule = '0 6 * * *'`, no
+  `path` — never reachable via HTTP, only Netlify's own scheduler or a
+  manual `netlify functions:invoke`). Runs daily, not weekly: checks each
+  Pro company's own last-scan date rather than firing everyone on one
+  shared weekly tick, since companies opt in on different days. Due =
+  `scan_frequency='weekly'`, owner currently Pro (a downgraded owner's
+  companies just stop matching — no separate reset needed), no scan
+  currently `pending`/`running`, and no *completed* scan in the last 7 days
+  (`generated_at` is only ever set on completion, never on failure, so a
+  company with only failed scans is retried daily until one succeeds).
+  Reuses `scan.mts`'s own insert-pending-row-then-fetch-`/run-scan-background`
+  trigger pattern — that function has no auth gate and does its own atomic
+  claim, so it's already safe to invoke from a non-request context.
+  Re-applies the exact same monthly fair-use check `scan.mts` runs for a
+  manual scan (`PRO_PLAN_MONTHLY_SCAN_LIMIT` + `scan_credit_purchases`
+  credits) before triggering each due company, silently skipping (no
+  email) any owner already at their cap — auto-scans deliberately don't
+  bypass the margin guardrail that cap exists for. Origin for the trigger
+  fetch comes from `Netlify.env.get('URL')` (no incoming `Request` to
+  derive one from the way `scan.mts` does) — **not yet live-verified
+  post-deploy** that this resolves correctly, per this file's own
+  "verify live before trusting" discipline.
 - **`enrich.mts`** — POST `/enrich`, auth-gated (not company-scoped — it's a
   stateless research helper with no DB/company concept). Always returns 200
   even on internal failure (`{ ok: false, error }`); nothing here is

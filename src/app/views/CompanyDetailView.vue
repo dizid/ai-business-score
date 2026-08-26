@@ -22,6 +22,7 @@ interface CompanyRow {
   customer_segment: string;
   competitors: string[];
   is_legacy_import: boolean;
+  scan_frequency: 'off' | 'weekly';
 }
 
 interface Profile {
@@ -46,6 +47,7 @@ const toppingUp = ref(false);
 const topupBanner = ref<'success' | 'cancelled' | ''>('');
 const startingSingleScan = ref(false);
 const singleScanBanner = ref<'success' | 'cancelled' | ''>('');
+const autoScanUpdating = ref(false);
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
 
 const deepAdviceLoading = ref(false);
@@ -253,6 +255,41 @@ async function startSingleScanCheckout() {
   }
 }
 
+// Weekly auto-scans (scheduled-rescan.mts) are Pro-only — reused for the
+// toggle below, same underlying check as allowDeepAdvice further down.
+const isProUser = computed(() => profile.value.plan_tier === 'pro');
+
+// Toggles companies.scan_frequency between 'off' and 'weekly'. A non-Pro
+// caller PATCHing 'weekly' gets a 402 upgradeRequired from company.mts —
+// route that into the same upgrade CTA the rest of this view already uses
+// rather than a bespoke error message.
+async function toggleAutoScan() {
+  if (!company.value || autoScanUpdating.value) return;
+  const nextFrequency = company.value.scan_frequency === 'weekly' ? 'off' : 'weekly';
+  if (nextFrequency === 'weekly' && !isProUser.value) {
+    startCheckout();
+    return;
+  }
+  autoScanUpdating.value = true;
+  try {
+    const res = await authFetch(`/companies/${company.value.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scan_frequency: nextFrequency }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      scanError.value = data.error || 'Failed to update automatic scans.';
+      return;
+    }
+    company.value = data.company;
+  } catch (err) {
+    scanError.value = (err as Error).message;
+  } finally {
+    autoScanUpdating.value = false;
+  }
+}
+
 const scanTrend = computed(() =>
   scans.value.map((s, index) => ({
     id: keyOf(s, index),
@@ -435,6 +472,16 @@ watch(() => route.params.id, load);
           <button type="button" :disabled="scanning" @click="runNewScan">
             {{ scanning ? 'Scanning…' : 'Run new scan' }}
           </button>
+          <button
+            type="button"
+            class="auto-scan-toggle"
+            :class="{ active: company.scan_frequency === 'weekly' }"
+            :disabled="autoScanUpdating"
+            :title="isProUser ? '' : 'Automatic weekly scans are a Pro feature'"
+            @click="toggleAutoScan"
+          >
+            Automatic weekly scans: {{ company.scan_frequency === 'weekly' ? 'On' : 'Off' }}
+          </button>
           <div class="scan-status" v-if="scanStatus">{{ scanStatus }}</div>
           <div class="scan-status error" v-if="scanError">
             {{ scanError }}
@@ -528,6 +575,12 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 }
 .scan-trigger button:hover:not(:disabled) { transform: translateY(-1px); }
 .scan-trigger button:disabled { opacity: 0.6; cursor: wait; transform: none; }
+.auto-scan-toggle {
+  margin-top: 8px; margin-left: 0;
+  background: transparent !important; color: var(--muted) !important;
+  border: 1px solid var(--border) !important; box-shadow: none !important;
+}
+.auto-scan-toggle.active { border-color: var(--accent) !important; color: var(--fg) !important; }
 .scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 280px; }
 .scan-status.error { color: var(--critical); }
 .inline-upgrade {

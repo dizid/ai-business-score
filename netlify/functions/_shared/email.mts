@@ -87,6 +87,59 @@ export async function sendScanCompleteEmail(params: {
   }
 }
 
+// Score-regression alert — added 2026-08-26 alongside scheduled weekly
+// re-scans. Sent IN ADDITION to sendScanCompleteEmail above (not instead of
+// it) whenever a scan's score drops by REGRESSION_ALERT_THRESHOLD or more
+// from the prior completed scan, regardless of whether the scan that
+// triggered it was manual or scheduled — a real regression is worth
+// flagging either way. A distinct notification type rather than a third
+// status value on sendScanCompleteEmail, matching this file's existing
+// "completed"/"failed" shape. Same best-effort, never-throws contract.
+export async function sendScoreRegressionEmail(params: {
+  to: string;
+  brand: string;
+  companyUrl: string;
+  score: number;
+  previousScore: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = Netlify.env.get('RESEND_API_KEY');
+  const fromEmail = Netlify.env.get('RESEND_FROM_EMAIL');
+  if (!apiKey || !fromEmail) {
+    console.error('sendScoreRegressionEmail: RESEND_API_KEY or RESEND_FROM_EMAIL not set, skipping');
+    return { ok: false, error: 'Email not configured' };
+  }
+
+  const delta = params.previousScore - params.score;
+  const bodyText =
+    `Heads up — ${params.brand}'s AI visibility score dropped ${delta} points, ` +
+    `from ${params.previousScore} to ${params.score}/100.\n\n` +
+    `This is a bigger move than normal run-to-run variation, worth a look.\n\n` +
+    `View the full result: ${params.companyUrl}`;
+
+  try {
+    const res = await fetch(RESEND_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: params.to,
+        subject: `⚠️ ${params.brand}'s AI visibility score dropped ${delta} points`,
+        text: bodyText,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      return { ok: false, error: `HTTP ${res.status}: ${body.slice(0, 300)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 // Sent once, right after an anonymous $19 single-scan purchase's webhook
 // finishes creating the ownerless company + scan (Milestone 2 of the
 // 2026-08-24 monetization plan) — the buyer has no account yet, so this

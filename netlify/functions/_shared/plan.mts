@@ -39,6 +39,14 @@ export const MAX_CREDIT_PACKS_PER_MONTH = 3;
 // to subscribe.
 export const SINGLE_SCAN_PRICE_USD = 19;
 
+// Score-regression alert threshold, added 2026-08-26 alongside scheduled
+// weekly re-scans (scheduled-rescan.mts). A drop of this many points or
+// more from a company's prior completed scan fires a distinct alert email
+// (sendScoreRegressionEmail) in addition to the routine scan-complete one —
+// big enough to reflect a real regression (roughly a score-band jump), not
+// just normal run-to-run noise in AI answers.
+export const REGRESSION_ALERT_THRESHOLD = 15;
+
 export function isPro(planTier: string | null | undefined): boolean {
   return planTier === 'pro';
 }
