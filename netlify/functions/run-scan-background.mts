@@ -62,6 +62,7 @@ import { analyzeEntityPresence } from '../../shared/entityPresence.mjs';
 import { sql } from './_shared/db.mts';
 import { sendScanCompleteEmail, sendScoreRegressionEmail } from './_shared/email.mts';
 import { REGRESSION_ALERT_THRESHOLD } from './_shared/plan.mts';
+import { getPreviousCompletedScore } from './_shared/scoreHistory.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
@@ -557,13 +558,7 @@ export default async (req: Request) => {
       // company's very first scan correctly has nothing to compare against.
       let previousScore: number | null = null;
       if (finalStatus === 'completed') {
-        const prevRows = await db`
-          SELECT score FROM public.scans
-          WHERE company_id = ${scanRow.company_id} AND id != ${scanId} AND status = 'completed'
-          ORDER BY generated_at DESC
-          LIMIT 1
-        `;
-        if (prevRows.length > 0) previousScore = prevRows[0].score;
+        previousScore = await getPreviousCompletedScore(db, scanRow.company_id, scanId);
       }
 
       const origin = new URL(req.url).origin;
@@ -599,6 +594,19 @@ export default async (req: Request) => {
         });
         if (!regressionResult.ok) {
           console.error(`run-scan-background: regression alert email failed for scan ${scanId}: ${regressionResult.error}`);
+        }
+
+        // Persist the regression as a row too, not just an email — added
+        // for the portfolio dashboard's "Alerts" section
+        // (CompaniesListView.vue), since the email alone is invisible until
+        // someone opens their inbox.
+        try {
+          await db`
+            INSERT INTO public.score_alerts (company_id, scan_id, prior_score, new_score, delta)
+            VALUES (${scanRow.company_id}, ${scanId}, ${previousScore}, ${finalScore}, ${finalScore - previousScore})
+          `;
+        } catch (err) {
+          console.error(`run-scan-background: score_alerts insert failed for scan ${scanId}:`, err);
         }
       }
     }

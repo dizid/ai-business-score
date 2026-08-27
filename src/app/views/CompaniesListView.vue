@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { scoreBand } from '../../../shared/aivis-core.mjs';
 import { authFetch } from '../lib/auth';
 import Icon from '../../shared/Icon.vue';
+import ScanDetail from '../../shared/ScanDetail.vue';
+import { EXAMPLE_REPORT } from '../exampleReport';
 
 const router = useRouter();
 
@@ -15,26 +17,52 @@ interface CompanyRow {
   is_legacy_import: boolean;
   scan_count: number;
   latest_score: number | null;
+  prev_score: number | null;
+  delta: number | null;
+  latest_scan_status: 'pending' | 'running' | 'completed' | 'failed' | null;
+  last_scanned_at: string | null;
   created_at: string;
 }
+
+// Mirrors netlify/functions/_shared/plan.mts's REGRESSION_ALERT_THRESHOLD —
+// duplicated here rather than imported since frontend/functions code isn't
+// wired to share .mts constants across that build boundary. Keep in sync.
+const REGRESSION_ALERT_THRESHOLD = 15;
+const LONG_UNSCANNED_DAYS = 14;
+
+type SortMode = 'recent' | 'score' | 'regression';
+const sortMode = ref<SortMode>('recent');
 
 interface Profile {
   plan_tier: string;
   subscription_status: string | null;
 }
 
+interface AlertRow {
+  id: string;
+  company_id: string;
+  brand: string;
+  prior_score: number;
+  new_score: number;
+  delta: number;
+  created_at: string;
+}
+
 const companies = ref<CompanyRow[]>([]);
+const alerts = ref<AlertRow[]>([]);
 const profile = ref<Profile>({ plan_tier: 'free', subscription_status: null });
 const loading = ref(true);
 const loadError = ref('');
 const upgrading = ref(false);
 const upgradeError = ref('');
 
+const showExample = ref(false);
 const showCreate = ref(false);
 const creating = ref(false);
 const createError = ref('');
 const createUpgradeRequired = ref(false);
 const detailsRevealed = ref(false);
+const editingDetails = ref(false);
 const enriching = ref(false);
 const enrichError = ref('');
 const form = ref({
@@ -60,6 +88,66 @@ function scoreColor(score: number | null) {
   return typeof score === 'number' ? BAND_COLOR[scoreBand(score)] : 'var(--faint)';
 }
 
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  return (Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24);
+}
+
+// "Needs attention": a real regression, a failed scan, never scanned, or
+// scanned so long ago the data is stale — everything the header count and
+// the "needs attention" sort surface. Ignores companies currently
+// pending/running (nothing actionable until that scan resolves).
+function needsAttention(c: CompanyRow): boolean {
+  if (c.latest_scan_status === 'pending' || c.latest_scan_status === 'running') return false;
+  if (c.latest_scan_status === 'failed') return true;
+  if (c.scan_count === 0) return true;
+  if (c.delta !== null && c.delta <= -REGRESSION_ALERT_THRESHOLD) return true;
+  const age = daysSince(c.last_scanned_at);
+  if (age !== null && age > LONG_UNSCANNED_DAYS) return true;
+  return false;
+}
+
+const scoredCompanies = computed(() => companies.value.filter((c) => typeof c.latest_score === 'number'));
+
+const portfolioStats = computed(() => {
+  const scored = scoredCompanies.value;
+  if (scored.length === 0) return null;
+  const scores = scored.map((c) => c.latest_score as number);
+  const avg = Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length);
+  const best = scored.reduce((a, b) => ((b.latest_score as number) > (a.latest_score as number) ? b : a));
+  const worst = scored.reduce((a, b) => ((b.latest_score as number) < (a.latest_score as number) ? b : a));
+  const attentionCount = companies.value.filter(needsAttention).length;
+  return { avg, best, worst, attentionCount };
+});
+
+const sortedCompanies = computed(() => {
+  const rows = [...companies.value];
+  if (sortMode.value === 'score') {
+    return rows.sort((a, b) => (b.latest_score ?? -1) - (a.latest_score ?? -1));
+  }
+  if (sortMode.value === 'regression') {
+    return rows.sort((a, b) => (a.delta ?? 0) - (b.delta ?? 0));
+  }
+  return rows.sort((a, b) => new Date(b.last_scanned_at ?? b.created_at).getTime() - new Date(a.last_scanned_at ?? a.created_at).getTime());
+});
+
+function formatAlertAge(iso: string): string {
+  const age = daysSince(iso);
+  if (age === null) return '';
+  if (age < 1) return 'today';
+  if (age < 2) return 'yesterday';
+  return `${Math.floor(age)}d ago`;
+}
+
+function formatLastScanned(c: CompanyRow): string {
+  if (!c.last_scanned_at) return 'Never scanned';
+  const age = daysSince(c.last_scanned_at);
+  if (age === null) return 'Never scanned';
+  if (age < 1) return 'Scanned today';
+  if (age < 2) return 'Scanned yesterday';
+  return `Scanned ${Math.floor(age)}d ago`;
+}
+
 async function loadCompanies() {
   loading.value = true;
   loadError.value = '';
@@ -72,6 +160,7 @@ async function loadCompanies() {
     }
     companies.value = data.companies;
     if (data.profile) profile.value = data.profile;
+    alerts.value = data.alerts || [];
   } catch (err) {
     loadError.value = (err as Error).message;
   } finally {
@@ -100,9 +189,20 @@ async function startCheckout() {
 function resetForm() {
   form.value = { brand: '', website: '', category: '', use_case: '', region: '', customer_segment: '', competitors: '', language: 'en' };
   detailsRevealed.value = false;
+  editingDetails.value = false;
   enrichError.value = '';
   createError.value = '';
   createUpgradeRequired.value = false;
+}
+
+// Enrichment succeeded and the user hasn't asked to edit: show a compact
+// confirm card instead of forcing a click through all 7 fields. Falls back
+// to the full editable form on enrich failure, since those fields are
+// blank and need real input.
+const showSummary = computed(() => detailsRevealed.value && !editingDetails.value && !enrichError.value);
+
+function editDetails() {
+  editingDetails.value = true;
 }
 
 function toggleCreate() {
@@ -152,6 +252,7 @@ async function onEnrich() {
 
 function backToUrl() {
   detailsRevealed.value = false;
+  editingDetails.value = false;
   enrichError.value = '';
 }
 
@@ -215,6 +316,38 @@ onMounted(loadCompanies);
     </div>
     <p class="status error" v-if="upgradeError">{{ upgradeError }}</p>
 
+    <div class="portfolio-strip" v-if="portfolioStats && !showCreate && !showExample">
+      <div class="portfolio-stat">
+        <span class="portfolio-value">{{ portfolioStats.avg }}</span>
+        <span class="portfolio-label">Portfolio average</span>
+      </div>
+      <div class="portfolio-stat">
+        <span class="portfolio-value" :style="{ color: scoreColor(portfolioStats.best.latest_score) }">{{ portfolioStats.best.latest_score }}</span>
+        <span class="portfolio-label">Best — {{ portfolioStats.best.brand }}</span>
+      </div>
+      <div class="portfolio-stat">
+        <span class="portfolio-value" :style="{ color: scoreColor(portfolioStats.worst.latest_score) }">{{ portfolioStats.worst.latest_score }}</span>
+        <span class="portfolio-label">Worst — {{ portfolioStats.worst.brand }}</span>
+      </div>
+      <div class="portfolio-stat" :class="{ warn: portfolioStats.attentionCount > 0 }">
+        <span class="portfolio-value">{{ portfolioStats.attentionCount }}</span>
+        <span class="portfolio-label">Needing attention</span>
+      </div>
+    </div>
+
+    <div class="alerts-section" v-if="alerts.length > 0 && !showCreate && !showExample">
+      <h2 class="alerts-heading">Alerts</h2>
+      <router-link
+        v-for="alert in alerts"
+        :key="alert.id"
+        class="alert-row"
+        :to="`/app/companies/${alert.company_id}`"
+      >
+        <strong>{{ alert.brand }}</strong> dropped {{ Math.abs(alert.delta) }} points
+        ({{ alert.prior_score }} → {{ alert.new_score }}) · {{ formatAlertAge(alert.created_at) }}
+      </router-link>
+    </div>
+
     <form class="card create-card" v-if="showCreate" @submit.prevent="onSubmit">
       <div class="step-indicator" aria-hidden="true">
         <span class="step-dot" :class="{ active: !detailsRevealed, done: detailsRevealed }">1</span>
@@ -231,6 +364,21 @@ onMounted(loadCompanies);
         <p class="hint-text">We'll look up the site and pre-fill the rest — you can edit anything before creating.</p>
 
         <button type="submit" :disabled="enriching || !form.website.trim()">{{ enriching ? 'Looking it up…' : 'Continue' }}</button>
+      </template>
+
+      <template v-else-if="showSummary">
+        <button type="button" class="back-link" @click="backToUrl">&larr; Change URL</button>
+        <div class="summary-card">
+          <div class="summary-row"><span class="summary-label">Brand</span><span>{{ form.brand }}</span></div>
+          <div class="summary-row"><span class="summary-label">Website</span><span>{{ form.website }}</span></div>
+          <div class="summary-row"><span class="summary-label">Category</span><span>{{ form.category }}</span></div>
+          <div class="summary-row"><span class="summary-label">Use case</span><span>{{ form.use_case }}</span></div>
+          <div class="summary-row"><span class="summary-label">Region</span><span>{{ form.region }}</span></div>
+          <div class="summary-row"><span class="summary-label">Segment</span><span>{{ form.customer_segment }}</span></div>
+          <div class="summary-row"><span class="summary-label">Competitors</span><span>{{ form.competitors }}</span></div>
+        </div>
+        <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'Create company' }}</button>
+        <button type="button" class="edit-details-link" @click="editDetails">Edit details first</button>
       </template>
 
       <template v-else>
@@ -280,7 +428,7 @@ onMounted(loadCompanies);
       <div class="skeleton-card" v-for="n in 3" :key="n"></div>
     </div>
 
-    <div class="empty-state" v-else-if="companies.length === 0 && !showCreate">
+    <div class="empty-state" v-else-if="companies.length === 0 && !showCreate && !showExample">
       <div class="empty-icon" aria-hidden="true">
         <svg width="28" height="28" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.6"></circle>
@@ -290,32 +438,59 @@ onMounted(loadCompanies);
       <h2>No companies yet</h2>
       <p>Add a business to see whether it shows up when AI search engines are asked about its category.</p>
       <button type="button" class="empty-cta" @click="toggleCreate">+ Add your first company</button>
+      <button type="button" class="example-link" @click="showExample = true">See what a report looks like →</button>
     </div>
 
-    <div class="list" v-else-if="companies.length > 0">
-      <router-link
-        v-for="company in companies"
-        :key="company.id"
-        class="company-card"
-        :to="`/app/companies/${company.id}`"
-      >
-        <div>
-          <div class="brand">
-            {{ company.brand }}
-            <span class="legacy-tag" v-if="company.is_legacy_import">legacy import</span>
-          </div>
-          <div class="meta">{{ company.category }} · {{ company.website }} · {{ company.scan_count }} scan(s)</div>
-        </div>
-        <div class="score-wrap">
-          <span v-if="typeof company.latest_score !== 'number'" class="score na">no data</span>
-          <template v-else>
-            <span class="score-dot" :style="{ background: scoreColor(company.latest_score) }"></span>
-            <span class="score" :style="{ color: scoreColor(company.latest_score) }">{{ company.latest_score }}</span>
-          </template>
-          <Icon name="chevron" class="chevron" />
-        </div>
-      </router-link>
+    <div class="example-wrap" v-else-if="showExample">
+      <button type="button" class="back-link example-back" @click="showExample = false">&larr; Back</button>
+      <div class="example-banner">Example report — illustrative data, not a real scan.</div>
+      <ScanDetail :payload="EXAMPLE_REPORT" theme="dashboard" />
     </div>
+
+    <template v-else-if="companies.length > 0">
+      <div class="list-controls">
+        <label for="sort-select">Sort by</label>
+        <select id="sort-select" v-model="sortMode">
+          <option value="recent">Last scanned</option>
+          <option value="score">Score</option>
+          <option value="regression">Biggest drop first</option>
+        </select>
+      </div>
+      <div class="list">
+        <router-link
+          v-for="company in sortedCompanies"
+          :key="company.id"
+          class="company-card"
+          :class="{ attention: needsAttention(company) }"
+          :to="`/app/companies/${company.id}`"
+        >
+          <div>
+            <div class="brand">
+              {{ company.brand }}
+              <span class="legacy-tag" v-if="company.is_legacy_import">legacy import</span>
+              <span class="attention-tag" v-if="needsAttention(company)">needs attention</span>
+            </div>
+            <div class="meta">{{ company.category }} · {{ company.website }} · {{ company.scan_count }} scan(s)</div>
+            <div class="meta scan-meta">
+              {{ formatLastScanned(company) }}
+              <template v-if="company.latest_scan_status === 'running' || company.latest_scan_status === 'pending'"> · scan in progress</template>
+              <template v-else-if="company.latest_scan_status === 'failed'"> · last scan failed</template>
+            </div>
+          </div>
+          <div class="score-wrap">
+            <span v-if="company.delta !== null" class="delta-badge" :class="company.delta > 0 ? 'up' : company.delta < 0 ? 'down' : 'flat'">
+              {{ company.delta > 0 ? '↑' : company.delta < 0 ? '↓' : '·' }}{{ company.delta !== 0 ? Math.abs(company.delta) : '' }}
+            </span>
+            <span v-if="typeof company.latest_score !== 'number'" class="score na">no data</span>
+            <template v-else>
+              <span class="score-dot" :style="{ background: scoreColor(company.latest_score) }"></span>
+              <span class="score" :style="{ color: scoreColor(company.latest_score) }">{{ company.latest_score }}</span>
+            </template>
+            <Icon name="chevron" class="chevron" />
+          </div>
+        </router-link>
+      </div>
+    </template>
   </main>
 </template>
 
@@ -344,6 +519,57 @@ p.sub { color: var(--muted); margin: 0; }
   border: 1px solid var(--critical); border-radius: 999px; background: transparent; color: var(--critical); cursor: pointer;
 }
 .inline-upgrade:disabled { opacity: 0.6; cursor: wait; }
+
+.portfolio-strip {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;
+  margin-bottom: 24px;
+}
+.portfolio-stat {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.portfolio-stat.warn { border-color: color-mix(in srgb, var(--critical) 40%, var(--border)); }
+.portfolio-value { display: block; font-size: 1.5rem; font-weight: 700; font-variant-numeric: proportional-nums; }
+.portfolio-stat.warn .portfolio-value { color: var(--critical); }
+.portfolio-label { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+.alerts-section {
+  background: color-mix(in srgb, var(--critical) 6%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--critical) 30%, var(--border));
+  border-radius: 12px; padding: 16px 18px; margin-bottom: 24px;
+}
+.alerts-heading { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--critical); margin: 0 0 10px; }
+.alert-row {
+  display: block; padding: 7px 0; font-size: 0.88rem; color: var(--fg);
+  text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--critical) 12%, transparent);
+}
+.alert-row:last-child { border-bottom: none; }
+.alert-row:hover { color: var(--critical); }
+
+.list-controls {
+  display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+  margin-bottom: 10px; font-size: 0.85rem; color: var(--muted);
+}
+.list-controls select {
+  padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--card); color: var(--fg); font-size: 0.85rem;
+}
+
+.attention-tag {
+  font-size: 0.7rem; font-weight: 600; color: var(--critical);
+  border: 1px solid color-mix(in srgb, var(--critical) 45%, transparent);
+  background: color-mix(in srgb, var(--critical) 10%, transparent);
+  border-radius: 999px; padding: 2px 8px; margin-left: 8px;
+}
+.company-card.attention { border-color: color-mix(in srgb, var(--critical) 30%, var(--border)); }
+.scan-meta { margin-top: 1px; }
+.delta-badge {
+  font-size: 0.78rem; font-weight: 700; font-variant-numeric: proportional-nums;
+  border-radius: 999px; padding: 2px 8px;
+}
+.delta-badge.up { color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.delta-badge.down { color: var(--critical); background: color-mix(in srgb, var(--critical) 12%, transparent); }
+.delta-badge.flat { color: var(--muted); background: color-mix(in srgb, var(--muted) 10%, transparent); }
 
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px 24px 26px; margin-bottom: 28px; box-shadow: var(--shadow); }
 .card label { display: block; font-size: 0.83rem; font-weight: 600; color: var(--muted); margin-top: 18px; margin-bottom: 6px; }
@@ -386,6 +612,22 @@ p.sub { color: var(--muted); margin: 0; }
 }
 .step-labels span.active { color: var(--accent); }
 
+.summary-card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 4px 16px; margin-top: 4px;
+}
+.summary-row {
+  display: flex; justify-content: space-between; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--border); font-size: 0.9rem;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-label { flex: none; color: var(--muted); font-weight: 600; }
+.summary-row span:last-child { text-align: right; overflow-wrap: anywhere; }
+.edit-details-link {
+  display: block; margin: 10px auto 0; padding: 0; border: none; background: none;
+  color: var(--muted); font-size: 0.85rem; text-decoration: underline; cursor: pointer;
+}
+
 .status.error { margin-top: 12px; font-size: 0.9rem; color: var(--critical); }
 
 .skeleton { padding-top: 4px; }
@@ -420,6 +662,19 @@ p.sub { color: var(--muted); margin: 0; }
   transition: transform 0.15s ease;
 }
 .empty-cta:hover { transform: translateY(-1px); }
+.example-link {
+  display: block; margin: 14px auto 0; padding: 0; border: none; background: none;
+  color: var(--muted); font-size: 0.85rem; text-decoration: underline; cursor: pointer;
+}
+
+.example-wrap { position: relative; }
+.example-back { margin-bottom: 12px; }
+.example-banner {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent); font-size: 0.85rem; font-weight: 600;
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 18px;
+}
 
 .list { display: flex; flex-direction: column; gap: 10px; }
 .company-card {

@@ -1,6 +1,6 @@
 // Scheduled weekly re-scans — added 2026-08-26, the top open item from
 // docs/improvement-roadmap.md's priority list and the strategic-pathways
-// review that picked it: without this, nothing about the $199/mo Pro tier
+// review that picked it: without this, nothing about the Pro tier
 // produces value between manual clicks, so a rational buyer could just
 // purchase one-off scans instead of subscribing. The first scheduled/cron
 // Netlify Function in this repo — every other background job so far is

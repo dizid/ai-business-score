@@ -42,10 +42,12 @@ const scanStatus = ref('');
 const scanError = ref('');
 const scanUpgradeRequired = ref(false);
 const upgrading = ref(false);
-const scanTopupAvailable = ref(false);
-const toppingUp = ref(false);
+// topupBanner/singleScanBanner: read-only redirect-completion state (see
+// onMounted's ?topup=/?singlescan= handling below) — kept even though the
+// in-app CTAs that used to *initiate* these purchases were removed
+// (S3 pricing simplification), so anyone who already had a Checkout tab
+// open still gets a graceful confirmation banner on return.
 const topupBanner = ref<'success' | 'cancelled' | ''>('');
-const startingSingleScan = ref(false);
 const singleScanBanner = ref<'success' | 'cancelled' | ''>('');
 const autoScanUpdating = ref(false);
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
@@ -161,7 +163,6 @@ async function runNewScan() {
   scanning.value = true;
   scanError.value = '';
   scanUpgradeRequired.value = false;
-  scanTopupAvailable.value = false;
   scanStatus.value = 'Starting scan…';
   try {
     const res = await authFetch('/scan', {
@@ -173,7 +174,6 @@ async function runNewScan() {
     if (!data.ok) {
       scanError.value = data.error || 'Failed to start scan.';
       scanUpgradeRequired.value = !!data.upgradeRequired;
-      scanTopupAvailable.value = !!data.topupAvailable;
       scanning.value = false;
       return;
     }
@@ -201,57 +201,6 @@ async function startCheckout() {
   } catch (err) {
     scanError.value = (err as Error).message;
     upgrading.value = false;
-  }
-}
-
-// Same shape as startCheckout above — kept duplicated rather than shared,
-// matching this codebase's convention of copy-pasted per-file auth/billing
-// calls over a shared abstraction.
-async function startTopupCheckout() {
-  if (!company.value) return;
-  toppingUp.value = true;
-  try {
-    const res = await authFetch('/create-topup-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company_id: company.value.id }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      scanError.value = data.error || 'Failed to start checkout.';
-      toppingUp.value = false;
-      return;
-    }
-    window.location.href = data.url;
-  } catch (err) {
-    scanError.value = (err as Error).message;
-    toppingUp.value = false;
-  }
-}
-
-// A $19 one-time scan for a free-tier user out of scans who doesn't want to
-// subscribe (Milestone 2 of the 2026-08-24 monetization plan) — same shape
-// as startCheckout/startTopupCheckout above, kept duplicated for the same
-// reason.
-async function startSingleScanCheckout() {
-  if (!company.value) return;
-  startingSingleScan.value = true;
-  try {
-    const res = await authFetch('/create-single-scan-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company_id: company.value.id }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      scanError.value = data.error || 'Failed to start checkout.';
-      startingSingleScan.value = false;
-      return;
-    }
-    window.location.href = data.url;
-  } catch (err) {
-    scanError.value = (err as Error).message;
-    startingSingleScan.value = false;
   }
 }
 
@@ -487,12 +436,6 @@ watch(() => route.params.id, load);
             {{ scanError }}
             <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="upgrading" @click="startCheckout">
               Upgrade to Pro
-            </button>
-            <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="startingSingleScan" @click="startSingleScanCheckout">
-              Buy one scan — $19
-            </button>
-            <button type="button" class="inline-upgrade" v-if="scanTopupAvailable" :disabled="toppingUp" @click="startTopupCheckout">
-              Buy more scans
             </button>
           </div>
         </div>

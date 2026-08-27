@@ -23,17 +23,47 @@ export default async (req: Request) => {
   const db = sql();
 
   if (req.method === 'GET') {
+    // Portfolio-dashboard fields (prev_score/delta/latest_scan_status/
+    // last_scanned_at), added for CompaniesListView.vue's cockpit rework.
+    // `latest`/`prev` use the same "most recently completed scan" ordering
+    // the original latest_score subquery already relied on (generated_at is
+    // only ever set on completion, never on failure — so filtering
+    // status='completed' here is equivalent to the old NULLS LAST ordering,
+    // just explicit) — same underlying definition of "previous score" as
+    // getPreviousCompletedScore() in _shared/scoreHistory.mts, expressed as
+    // an OFFSET 1 set query here since this is a bulk list, not a lookup for
+    // one specific scan.
     const companies = await db`
       SELECT
         c.*,
-        (SELECT count(*)::int FROM public.scans s WHERE s.company_id = c.id) AS scan_count,
-        (
-          SELECT s.score FROM public.scans s
-          WHERE s.company_id = c.id
-          ORDER BY s.generated_at DESC NULLS LAST
-          LIMIT 1
-        ) AS latest_score
+        COALESCE(cnt.scan_count, 0) AS scan_count,
+        latest.score AS latest_score,
+        prev.score AS prev_score,
+        CASE WHEN latest.score IS NOT NULL AND prev.score IS NOT NULL THEN latest.score - prev.score ELSE NULL END AS delta,
+        recent.status AS latest_scan_status,
+        recent.created_at AS last_scanned_at
       FROM public.companies c
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int AS scan_count FROM public.scans s WHERE s.company_id = c.id
+      ) cnt ON true
+      LEFT JOIN LATERAL (
+        SELECT s.score FROM public.scans s
+        WHERE s.company_id = c.id AND s.status = 'completed'
+        ORDER BY s.generated_at DESC
+        LIMIT 1
+      ) latest ON true
+      LEFT JOIN LATERAL (
+        SELECT s.score FROM public.scans s
+        WHERE s.company_id = c.id AND s.status = 'completed'
+        ORDER BY s.generated_at DESC
+        OFFSET 1 LIMIT 1
+      ) prev ON true
+      LEFT JOIN LATERAL (
+        SELECT s.status, s.created_at FROM public.scans s
+        WHERE s.company_id = c.id
+        ORDER BY s.created_at DESC
+        LIMIT 1
+      ) recent ON true
       WHERE c.owner_user_id = ${userId}
       ORDER BY c.created_at DESC
     `;
@@ -43,7 +73,22 @@ export default async (req: Request) => {
       SELECT plan_tier, subscription_status FROM public.user_profiles WHERE user_id = ${userId}
     `;
     const profile = profiles[0] || { plan_tier: 'free', subscription_status: null };
-    return new Response(JSON.stringify({ ok: true, companies, profile }), {
+
+    // Recent regression events across the whole portfolio, for the
+    // dashboard's "Alerts" section — surfaces what sendScoreRegressionEmail
+    // already computes, since the email alone is invisible until someone
+    // checks their inbox. Last 30 days, most recent first, capped at 10 —
+    // no read/dismissed state (out of scope for this pass).
+    const alerts = await db`
+      SELECT a.id, a.company_id, c.brand, a.prior_score, a.new_score, a.delta, a.created_at
+      FROM public.score_alerts a
+      JOIN public.companies c ON c.id = a.company_id
+      WHERE c.owner_user_id = ${userId} AND a.created_at >= now() - interval '30 days'
+      ORDER BY a.created_at DESC
+      LIMIT 10
+    `;
+
+    return new Response(JSON.stringify({ ok: true, companies, profile, alerts }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
