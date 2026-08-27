@@ -51,6 +51,10 @@ const topupBanner = ref<'success' | 'cancelled' | ''>('');
 const singleScanBanner = ref<'success' | 'cancelled' | ''>('');
 const autoScanUpdating = ref(false);
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
+// Tracked outside pollScan's own recursive param so the terminal-error
+// "Check again" button (added for QA-FIXES-PLAN.md #3a) can still know
+// which scan to re-check after polling has already given up.
+const pendingScanId = ref<string | null>(null);
 
 const deepAdviceLoading = ref(false);
 const sentimentJudgeLoadingKey = ref<string | null>(null);
@@ -125,6 +129,7 @@ function formatRunningStatus(progress: { completed: number; total: number; curre
 }
 
 async function pollScan(scanId: string, retriesLeft = POLL_RETRY_BACKOFFS_MS.length) {
+  pendingScanId.value = scanId;
   try {
     const res = await authFetch(`/scans/${scanId}`);
     const data = await res.json();
@@ -136,11 +141,13 @@ async function pollScan(scanId: string, retriesLeft = POLL_RETRY_BACKOFFS_MS.len
     if (data.status === 'completed') {
       scanning.value = false;
       scanStatus.value = '';
+      pendingScanId.value = null;
       await load();
       return;
     }
     if (data.status === 'failed') {
       scanning.value = false;
+      pendingScanId.value = null;
       scanError.value = data.errorMessage || 'Scan failed.';
       return;
     }
@@ -153,8 +160,30 @@ async function pollScan(scanId: string, retriesLeft = POLL_RETRY_BACKOFFS_MS.len
       pollHandle = setTimeout(() => pollScan(scanId, retriesLeft - 1), backoffMs);
       return;
     }
-    scanError.value = (err as Error).message;
+    // Retries exhausted — the scan may well have completed or failed
+    // server-side despite our connection trouble, so re-sync before giving
+    // up. A scan that already resolved (now present in scans.value after
+    // reload) just shows normally instead of dead-ending on an error the
+    // user can't act on (QA-FIXES-PLAN.md #3a).
     scanning.value = false;
+    await load();
+    if (scans.value.some((s) => (s as { id?: string }).id === scanId)) {
+      pendingScanId.value = null;
+    } else {
+      scanError.value = (err as Error).message;
+    }
+  }
+}
+
+// "Check again" button for the terminal connection-error state — retries
+// load() (not a full page reload) rather than leaving the user stuck once
+// polling has given up.
+async function recheckPendingScan() {
+  await load();
+  if (!pendingScanId.value) return;
+  if (scans.value.some((s) => (s as { id?: string }).id === pendingScanId.value)) {
+    pendingScanId.value = null;
+    scanError.value = '';
   }
 }
 
@@ -436,6 +465,9 @@ watch(() => route.params.id, load);
             {{ scanError }}
             <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="upgrading" @click="startCheckout">
               Upgrade to Pro
+            </button>
+            <button type="button" class="inline-upgrade" v-else-if="pendingScanId" @click="recheckPendingScan">
+              Check again
             </button>
           </div>
         </div>

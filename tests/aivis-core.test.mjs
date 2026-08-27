@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   aggregateProspect,
   buildSentimentJudgePrompt,
+  callModelWithRetry,
   computeScore,
   extractCitations,
   findBrandMention,
@@ -10,6 +11,7 @@ import {
   parseAnthropicResponse,
   parseGoogleResponse,
   parseSentimentJudgeResponse,
+  runWithConcurrency,
   scoreBand,
   selectAdvice,
 } from '../shared/aivis-core.mjs';
@@ -459,5 +461,134 @@ describe('parseSentimentJudgeResponse', () => {
     const longReasoning = 'x'.repeat(500);
     const text = JSON.stringify({ classification: 'neutral', reasoning: longReasoning });
     expect(parseSentimentJudgeResponse(text).reasoning.length).toBe(300);
+  });
+});
+
+// Coverage added for the surface this repo's own incident history keeps
+// pointing at (429s, cascading timeouts) but that had zero test coverage:
+// callModelWithRetry's 429-only backoff/retry logic and runWithConcurrency's
+// worker-pool limiter. Network is mocked at the global fetch boundary
+// (rather than mocking callModel itself) so the real retry/backoff/status
+// logic in aivis-core.mjs actually runs, not a stand-in for it.
+function mockFetchResponse({ ok, status = 200, jsonBody = {}, textBody = '' }) {
+  return { ok, status, json: async () => jsonBody, text: async () => textBody };
+}
+
+describe('callModelWithRetry', () => {
+  const apiKeys = { xai: 'test-xai-key' };
+  const model = 'xai/grok-4.6';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('succeeds on the first attempt without retrying', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockFetchResponse({ ok: true, jsonBody: { output_text: 'hello' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await callModelWithRetry(apiKeys, model, 'prompt', 1000);
+    expect(result.text).toBe('hello');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // The 2026-08-13 incident this backoff exists for: a burst of concurrent
+  // calls hit Perplexity's rate limit, and a too-short backoff retried
+  // straight back into the same limit. Confirms a 429 gets the escalating
+  // backoff (RATE_LIMIT_BACKOFF_MS = 5000ms * attempt) and a real retry.
+  it('retries once on a 429 and succeeds on the second attempt', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockFetchResponse({ ok: false, status: 429, textBody: 'rate limited' }))
+      .mockResolvedValueOnce(mockFetchResponse({ ok: true, jsonBody: { output_text: 'recovered' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const promise = callModelWithRetry(apiKeys, model, 'prompt', 1000, 2);
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await promise;
+    expect(result.text).toBe('recovered');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  // 2026-08-17 fix: a plain timeout/500 used to get the same up-to-3x retry
+  // as a 429, burning shared scan-deadline budget on failures unlikely to
+  // succeed on immediate retry. Retries are now scoped to 429 only.
+  it('does not retry a non-429 failure', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockFetchResponse({ ok: false, status: 500, textBody: 'server error' }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(callModelWithRetry(apiKeys, model, 'prompt', 1000, 2)).rejects.toThrow(/HTTP 500/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up after maxAttempts on repeated 429s', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockFetchResponse({ ok: false, status: 429, textBody: 'still limited' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const promise = callModelWithRetry(apiKeys, model, 'prompt', 1000, 2);
+    const assertion = expect(promise).rejects.toThrow(/HTTP 429/);
+    await vi.advanceTimersByTimeAsync(5000);
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  // "No point waiting to retry into a deadline that's already passed" — a
+  // 429 that arrives after the scan-wide deadline already fired should not
+  // also pay the backoff, even though it would otherwise qualify for retry.
+  it('does not sleep/retry once the external signal is already aborted', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockFetchResponse({ ok: false, status: 429, textBody: 'rate limited' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(callModelWithRetry(apiKeys, model, 'prompt', 1000, 3, controller.signal)).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('runWithConcurrency', () => {
+  it('preserves result order matching input order regardless of completion order', async () => {
+    const tasks = [30, 10, 20]; // simulated per-task delay in ms
+    const results = await runWithConcurrency(
+      tasks,
+      3,
+      (delayMs) => new Promise((resolve) => setTimeout(() => resolve(delayMs), delayMs))
+    );
+    expect(results).toEqual([30, 10, 20]);
+  });
+
+  // The exact property CONCURRENCY_LIMIT_BY_PROVIDER depends on — added
+  // 2026-08-09 specifically because firing every call in a scan at once was
+  // untested against provider rate limits.
+  it('never runs more than `limit` tasks concurrently', async () => {
+    const tasks = [1, 2, 3, 4, 5, 6];
+    let active = 0;
+    let maxActive = 0;
+    const results = await runWithConcurrency(tasks, 2, async (task) => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      active--;
+      return task * 2;
+    });
+    expect(maxActive).toBeLessThanOrEqual(2);
+    expect(results).toEqual([2, 4, 6, 8, 10, 12]);
+  });
+
+  // limit=1 is the openai/Perplexity-gateway lane's historical value (three
+  // documented incidents) — confirms it's genuinely sequential, not just
+  // bounded.
+  it('runs strictly one at a time when limit is 1', async () => {
+    const tasks = ['a', 'b', 'c'];
+    const order = [];
+    await runWithConcurrency(tasks, 1, async (task) => {
+      order.push(`start:${task}`);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      order.push(`end:${task}`);
+    });
+    expect(order).toEqual(['start:a', 'end:a', 'start:b', 'end:b', 'start:c', 'end:c']);
+  });
+
+  it('returns an empty array for an empty task list without hanging', async () => {
+    const results = await runWithConcurrency([], 3, async () => 'never called');
+    expect(results).toEqual([]);
   });
 });

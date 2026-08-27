@@ -140,6 +140,66 @@ export async function sendScoreRegressionEmail(params: {
   }
 }
 
+// Ops failure-rate alert — added for docs/improvement-roadmap.md's
+// long-open "no aggregate view of scans.failures across users/time" gap
+// (priority #7, reliability). Sent by the new ops-failure-digest.mts
+// scheduled function ONLY when the last 24h's failure rate crosses a real
+// threshold — not a routine daily "all good" email, since this repo's own
+// commit history (429s, cascading timeouts) is what this is meant to catch
+// faster than a support ping, not something to add inbox noise for.
+export async function sendOpsFailureDigestEmail(params: {
+  to: string;
+  windowHours: number;
+  totalScans: number;
+  failedScans: number;
+  totalCalls: number;
+  totalCallFailures: number;
+  failuresByProvider: { provider: string; count: number }[];
+}): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = Netlify.env.get('RESEND_API_KEY');
+  const fromEmail = Netlify.env.get('RESEND_FROM_EMAIL');
+  if (!apiKey || !fromEmail) {
+    console.error('sendOpsFailureDigestEmail: RESEND_API_KEY or RESEND_FROM_EMAIL not set, skipping');
+    return { ok: false, error: 'Email not configured' };
+  }
+
+  const callFailureRate = params.totalCalls > 0 ? Math.round((params.totalCallFailures / params.totalCalls) * 100) : 0;
+  const providerLines = params.failuresByProvider
+    .sort((a, b) => b.count - a.count)
+    .map((p) => `  - ${p.provider}: ${p.count} failed call(s)`)
+    .join('\n');
+
+  const bodyText =
+    `Scan reliability check — last ${params.windowHours}h:\n\n` +
+    `${params.totalScans} scan(s), ${params.failedScans} failed entirely.\n` +
+    `${params.totalCalls} model call(s), ${params.totalCallFailures} failed (${callFailureRate}%).\n\n` +
+    (providerLines ? `By provider:\n${providerLines}\n\n` : '') +
+    `This crossed the alert threshold — check Netlify function logs (run-scan-background) for the underlying cause.`;
+
+  try {
+    const res = await fetch(RESEND_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: params.to,
+        subject: `⚠️ Scan failure rate at ${callFailureRate}% over the last ${params.windowHours}h`,
+        text: bodyText,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      return { ok: false, error: `HTTP ${res.status}: ${body.slice(0, 300)}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 // Sent once, right after an anonymous $19 single-scan purchase's webhook
 // finishes creating the ownerless company + scan (Milestone 2 of the
 // 2026-08-24 monetization plan) — the buyer has no account yet, so this
