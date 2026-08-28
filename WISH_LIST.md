@@ -1,9 +1,9 @@
 # Wish list
 
 Running log of ideas raised in conversation but deliberately not built yet —
-distinct from `TODOS.md` (which tracks shipped-milestone history and
+distinct from `TODO.md` (which tracks shipped-milestone history and
 concrete open follow-ups). Add to this file instead of losing a good idea
-in chat scrollback; move an item to `TODOS.md` (or just build it) once it's
+in chat scrollback; move an item to `TODO.md` (or just build it) once it's
 actually being picked up.
 
 ## From the 2026-08-09 "check-by-check breakdown / prompt & model expansion" conversation

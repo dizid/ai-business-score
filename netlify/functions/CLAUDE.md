@@ -376,7 +376,7 @@ gap this update fixes rather than something built this session.
   through this file) confirmed burst sizes up to 3 succeed 100% (16/16
   calls, 9/9 at size 3) with no latency regression; raised to 3 to match
   anthropic/google. See `docs/improvement-roadmap.md`'s "Concurrency
-  re-test" section and `TODOS.md`'s 2026-08-26 entry for the full test
+  re-test" section and `TODO.md`'s 2026-08-26 entry for the full test
   writeup. **Not yet confirmed against a full 20-call production scan** —
   the burst test only exercised the raw API call, not this file's DB
   writes/Harmonia/sentiment-judge/other-provider-lanes running alongside

@@ -17,7 +17,7 @@ against the 60s ceiling, so a meaningful fraction of calls tip over it. In
 the screenshot, all 5 of that scan's xai calls did.
 
 This is not a new bug — it's the second half of an already-diagnosed
-problem tracked in `TODOS.md`:
+problem tracked in `TODO.md`:
 
 - **2026-08-14**: a live scan lost 15/20 calls because one slow call could
   retry 3x at 60s each (~182s worst case), fully serialized under
@@ -40,7 +40,7 @@ That fix worked — it stopped xai from taking down other providers' checks.
 screenshot that triggered this investigation is exactly that remaining gap:
 containment succeeded (only xai failed), but xai itself still fails
 consistently because a flat 60s cutoff is too short for a model whose own
-documented normal-case latency brushes or exceeds it. `TODOS.md`'s
+documented normal-case latency brushes or exceeds it. `TODO.md`'s
 2026-08-17 entry itself notes the live re-verification scan to confirm this
 was never run — this screenshot is that missing data point.
 
@@ -62,7 +62,7 @@ needs a live timed scan, not an assumption. `SCAN_DEADLINE_MS` may need a
 modest bump too (Background Functions allow up to 900000ms) if the first
 change alone isn't enough — but that's a second knob, matching this
 codebase's own "one knob at a time, verify live before trusting"
-discipline (see the 2026-08-15 and 2026-08-17 entries in `TODOS.md`), so
+discipline (see the 2026-08-15 and 2026-08-17 entries in `TODO.md`), so
 only pull it if live data shows it's needed.
 
 **Deliberately not doing, at least not first**: re-touching
@@ -113,7 +113,7 @@ specific named competitor (none were named). Likely mechanisms:
    request time.
 2. **Real parallelism** — this app is forced to `CONCURRENCY_LIMIT=1`
    because of one low-tier Perplexity key's ~1 concurrent-call limit
-   (confirmed via live burst-testing, see `TODOS.md`'s 2026-08-13 entry). A
+   (confirmed via live burst-testing, see `TODO.md`'s 2026-08-13 entry). A
    higher-tier key or provider-native keys with real rate limits allow
    parallel dispatch, so wall time is the slowest single call, not the sum
    of 20 sequential ones.
@@ -184,6 +184,6 @@ for (const model of candidates) {
      candidate) in `MODELS` (`shared/aivis-core.mjs`), adjusting
      `CALL_TIMEOUT_MS` if the replacement's real latency differs from the
      default.
-3. Log whichever path is taken in `TODOS.md`, matching the dated
+3. Log whichever path is taken in `TODO.md`, matching the dated
    `STATUS`-entry pattern already used for every prior tuning change in
    this file.

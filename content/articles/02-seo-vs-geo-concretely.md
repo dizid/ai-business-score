@@ -3,7 +3,7 @@ title: SEO and AI visibility are not the same job
 author: Marc de Ruijter
 platforms: [LinkedIn, Substack, Facebook]
 word_count: ~800
-status: draft — needs Marc's read before posting
+status: draft — needs Marc's read before posting (the web-article conversion of this piece already shipped 2026-08-24 at content/blog/seo-vs-geo-concretely.md — this long-form/X-thread version is a separate, still-unreviewed artifact)
 ---
 
 Every week or so someone asks me some version of "so this is just SEO for

@@ -10,7 +10,7 @@ angle the marketing plan wanted, but unbuilt.
 
 **What shipped:** the 4 drafts are now web articles at `content/blog/*.md`,
 rendered by a new build pipeline (`scripts/build-blog.mjs`) into a real
-`/blog` on the site, indexed in `sitemap.xml`. See `TODOS.md`'s 2026-08-24
+`/blog` on the site, indexed in `sitemap.xml`. See `TODO.md`'s 2026-08-24
 "On-site `/blog` pipeline" entry and `CLAUDE.md`'s "`/blog`" architecture
 section for the technical detail. The original `content/articles/*.md`
 files (LinkedIn/Substack + X-thread format) are untouched — still usable
@@ -35,7 +35,7 @@ points per the existing competitor research — no longer "cheapest in
 category," a real repositioning), one-time single scan **$19**. Synced
 across `index.html` (pricing cards, JSON-LD, FAQ), `llms.txt`,
 `README.md`, `terms.html`, and the app itself (deep advice now actually
-Pro-gated — see `TODOS.md`'s 2026-08-24 entry for the engineering side).
+Pro-gated — see `TODO.md`'s 2026-08-24 entry for the engineering side).
 The Stripe Price behind the old subscription was found to actually charge
 $29/mo (a stale placeholder) — corrected the same day.
 
@@ -47,8 +47,10 @@ site — recommended Netlify Analytics or Plausible, not yet added), a PR
 angle (a `proof-script`-generated "state of AI visibility" stat, pitched to
 GEO-beat trade press; the honesty page as its own contrarian hook), and
 repointing `proof-script/OUTREACH.md`'s cold-outreach sequence at
-Foreground itself instead of Site Improver (see `NEXT-STEPS.md`'s
-2026-08-24 update). **None of that Part-B work is built yet** — this
+Foreground itself instead of Site Improver (see `TODO.md`'s 2026-08-09
+"NEXT-STEPS.md GTM resume-point" history entry for the 2026-08-24 update
+this refers to — `NEXT-STEPS.md` itself was retired into that entry
+2026-08-27). **None of that Part-B work is built yet** — this
 status entry is pricing/copy only.
 
 **Also found, unrelated to this plan**: a 4-part content article series
@@ -98,10 +100,9 @@ same browse-skill screenshot method.
 real migration cost): `shared/aivis-core.mjs` and its ~10 importers,
 `package.json`'s `"name": "aivis-web"`, the Netlify site name/ID
 (`aivis-scan`), the Neon project name (`aivis`), the Netlify Blobs store
-(`aivis-scans`), the GitHub repo. Dated/historical docs (`TODOS.md`,
-`PLAN_NEXT_PHASE.md`, `DASHBOARD.md`, `NEXT-STEPS.md`, `WISH_LIST.md`,
-`MIGRATION.md`, `REPORTPLAN.md`, `V2_SCORING_MODEL.md`, `docs/*`, the
-nested `CLAUDE.md` files, `content/growth-ideas.md`) still say "AIVis"
+(`aivis-scans`), the GitHub repo. Dated/historical docs (`TODO.md`,
+`PLAN_NEXT_PHASE.md`, `DASHBOARD.md`, `WISH_LIST.md`,
+`REPORTPLAN.md`, `docs/*`, the nested `CLAUDE.md` files) still say "AIVis"
 where that was the real name on that date — intentional, not missed.
 
 **A domain has NOT been registered yet.** Every canonical/OG/JSON-LD/

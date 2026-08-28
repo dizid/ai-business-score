@@ -3,7 +3,7 @@ title: What to actually do this week if AI doesn't know you exist
 author: Marc de Ruijter
 platforms: [LinkedIn, Substack, Facebook]
 word_count: ~730
-status: draft — needs Marc's read before posting
+status: draft — needs Marc's read before posting (the web-article conversion of this piece already shipped 2026-08-24 at content/blog/ai-visibility-checklist.md — this long-form/X-thread version is a separate, still-unreviewed artifact)
 ---
 
 Somewhere in the last year, "check how your business shows up on Google"

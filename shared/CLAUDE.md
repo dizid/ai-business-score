@@ -36,7 +36,7 @@ entry, not duplicated here.
 The single source of truth, imported by every consumer:
 
 - **Prompt templates** (10, generic brand/competitor substitution only —
-  vertical-specific templating still deferred, see `TODOS.md`) x **4
+  vertical-specific templating still deferred, see `TODO.md`) x **4
   models** (`openai/gpt-5-mini`, `google/gemini-3-flash-preview`,
   `anthropic/claude-haiku-4-5`, `xai/grok-4.6`, the latter two added
   2026-08-13). Prompt count grew from 8 to 10 on 2026-08-09, and the hosted

@@ -4,12 +4,12 @@
 
 | Milestone | Status |
 |---|---|
-| A — Correctness & trust | **Shipped**, pushed to `master` (`8af2803`). Live scan not yet re-verified due to a sandbox network limitation during testing — see `TODOS.md`'s 2026-08-12 entry. |
+| A — Correctness & trust | **Shipped**, pushed to `master` (`8af2803`). Live scan not yet re-verified due to a sandbox network limitation during testing — see `TODO.md`'s 2026-08-12 entry. |
 | B — Remove leaderboard + multi-URL | **Shipped**, pushed to `master`. |
-| C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13**, confirmed live in production 2026-08-14 via a real end-to-end scan — but that same live scan found a new cascading-timeout reliability gap (15/20 calls lost on one scan), not yet fixed. See `TODOS.md`'s 2026-08-14 entry and Milestone C below. C3 (locale-aware prompts) not started. |
+| C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13**, confirmed live in production 2026-08-14 via a real end-to-end scan — but that same live scan found a new cascading-timeout reliability gap (15/20 calls lost on one scan), not yet fixed. See `TODO.md`'s 2026-08-14 entry and Milestone C below. C3 (locale-aware prompts) not started. |
 | D — Product depth & trust surfaces | **D3 (footer/legal) and D4 (technical SEO) shipped.** D1 (raw data — likely already satisfied by A3, needs Marc's confirmation) and D2 (competitor click-through) not started. |
 | F — Differentiation | **Both picks shipped** (row updated 2026-08-20). Citation-URL attribution shipped 2026-08-15 (Milestone F1). Sentiment-aware judge shipped 2026-08-15 as on-demand-only, then extended 2026-08-20 to auto-run on every scan — see `shared/CLAUDE.md`'s "Sentiment judge" entry for the full history. |
-| E — Monetization | **Superseded 2026-08-24** by `~/.claude/plans/we-need-alot-of-transient-floyd.md` — Marc explicitly waived E0 (the manual sales test below never ran) and decided pricing directly ($199/mo Pro, $19 one-time scan) instead. Deep-advice gating (E2/E3 below) and a one-time purchase SKU (E1, though shaped as a $19 single-scan product, not the €499 report this section originally proposed) both shipped 2026-08-24 — see `TODOS.md`'s entry that date. E4 ("book a call" CTA) not built. |
+| E — Monetization | **Superseded 2026-08-24** by `~/.claude/plans/we-need-alot-of-transient-floyd.md` — Marc explicitly waived E0 (the manual sales test below never ran) and decided pricing directly ($199/mo Pro, $19 one-time scan) instead. Deep-advice gating (E2/E3 below) and a one-time purchase SKU (E1, though shaped as a $19 single-scan product, not the €499 report this section originally proposed) both shipped 2026-08-24 — see `TODO.md`'s entry that date. E4 ("book a call" CTA) not built. |
 | G — Growth loop | Not started. No longer strictly gated on E0 (waived), but still sensibly gated on a first *real* payment — and `STRIPE_SECRET_KEY` is a test-mode key as of 2026-08-24 (see root `CLAUDE.md`), so no real payment can land yet regardless. |
 
 ## Context
@@ -69,7 +69,7 @@ loops, not feature-count — see Milestones F and G below.
 - **Billing**: Stripe subscription is live — Free (1 company/3 scans total)
   vs Pro (unlimited companies, 20 scans/calendar-month fair-use with
   top-up packs available, **$199/month**, price set 2026-08-24 — see
-  `TODOS.md`'s 2026-08-24 entry). A $19 one-time single-scan SKU (no
+  `TODO.md`'s 2026-08-24 entry). A $19 one-time single-scan SKU (no
   account required) also shipped 2026-08-24. Deep advice **is now
   plan-gated** (since 2026-08-24) — requires Pro or a matching single-scan
   purchase, returning `402 {upgradeRequired: true}` otherwise.
@@ -241,7 +241,7 @@ behind them. Two other same-day scans (NRC, De Nara Hotel) lost only 3-4/20
 each, so this is a worse-than-typical outlier, not the norm — but it's a
 real, reproducible failure mode inherent to fully-sequential execution
 with per-call retries this expensive. Full root-cause writeup and fix
-candidates: `TODOS.md`'s 2026-08-14 entry. Deliberately not fixed yet —
+candidates: `TODO.md`'s 2026-08-14 entry. Deliberately not fixed yet —
 Marc's call, logged for later prioritization rather than fixed inline.
 
 1. **✅ Shipped.** Grew `MODELS` from 2 to 4, one candidate at a time, each
@@ -380,7 +380,7 @@ one-time SKU shipped as a $19 **single scan** (bundling deep advice for
 that scan), not a separate "Full AI Visibility Report" product layered on
 top of an already-completed scan; and E4 ("book a call" CTA) was not
 built. E2 (gate deep advice) and E3 (frontend gating) shipped as described
-below, mechanically accurate to what was built. See `TODOS.md`'s
+below, mechanically accurate to what was built. See `TODO.md`'s
 2026-08-24 entry for the full shipping log.
 
 **Guardrail — Pro fair-use cap. ✅ SHIPPED 2026-08-13, alongside Milestone
@@ -456,7 +456,7 @@ regardless of the outcome.
    no price yet either) — copy change gated on Marc picking numbers, not a
    blocking engineering task.
 6. Clean up now-stale doc comments: `aivis-core.mjs`'s note that
-   "pricing/plan limits... aren't decided yet" and `TODOS.md`'s "pricing/
+   "pricing/plan limits... aren't decided yet" and `TODO.md`'s "pricing/
    plan-tier gating for deep advice is unresolved" — both resolved by this
    milestone.
 

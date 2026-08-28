@@ -18,11 +18,10 @@ rename — the Netlify site `aivis-scan`, the Neon project `aivis`,
 `package.json`'s `"name": "aivis-web"` — are deliberately left as-is
 (renaming them touches every import/deploy path for zero user-visible
 benefit) and are not evidence of an incomplete rename. Historical/dated
-entries throughout this repo's journal-style docs (`TODOS.md`,
-`PLAN_NEXT_PHASE.md`, `DASHBOARD.md`, `NEXT-STEPS.md`, `WISH_LIST.md`,
-`MIGRATION.md`, `REPORTPLAN.md`, `V2_SCORING_MODEL.md`, `docs/*`, the
-nested `netlify/functions/CLAUDE.md`/`shared/CLAUDE.md`/
-`proof-script/CLAUDE.md`) still say "AIVis" where that was the product's
+entries throughout this repo's journal-style docs (`TODO.md`,
+`PLAN_NEXT_PHASE.md`, `DASHBOARD.md`, `WISH_LIST.md`,
+`REPORTPLAN.md`, `docs/*`, the nested `netlify/functions/CLAUDE.md`/
+`shared/CLAUDE.md`/`proof-script/CLAUDE.md`) still say "AIVis" where that was the product's
 actual name on that date — intentional, not an oversight; only
 current-state prose was updated. The site still lives at
 `aivis-scan.netlify.app`; a real domain hasn't been registered yet, so
@@ -37,7 +36,7 @@ implementations share one core:
 
 - **`proof-script/`** (Approach A) — a local CLI, run manually by one person
   against a hand-curated prospect list. No server, no DB, no accounts. Still
-  the tool for hand-curated outbound (see `TODOS.md`'s GTM notes) — untouched
+  the tool for hand-curated outbound (see `TODO.md`'s GTM notes) — untouched
   by the SaaS pivot below.
 - **The repo root** (Approach B) — a hosted, self-serve, multi-tenant SaaS
   deployed to Netlify as site `aivis-scan`: users sign up, add companies they
@@ -68,7 +67,7 @@ and its eng-review addendum — still useful history, but read it knowing the
 "no database, no accounts" scoping it documents was reversed on 2026-08-03,
 not just the earlier "add a Blobs store" reversal it already describes.
 Vertical prompt templating is still deliberately deferred per that doc's
-original reasoning (see `TODOS.md`).
+original reasoning (see `TODO.md`).
 
 **Scan pipeline mechanics** — prompt/model counts, per-call timeouts, the
 concurrency-limit incident history, retry/backoff behavior, DB schema, and

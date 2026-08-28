@@ -3,7 +3,7 @@ title: Google isn't the front page anymore
 author: Marc de Ruijter
 platforms: [LinkedIn, Substack, Facebook]
 word_count: ~780
-status: draft — needs Marc's read before posting
+status: draft — needs Marc's read before posting (the web-article conversion of this piece already shipped 2026-08-24 at content/blog/ai-is-the-new-front-page.md — this long-form/X-thread version is a separate, still-unreviewed artifact)
 ---
 
 A few weeks ago I typed "best plumber in my area" into ChatGPT, mostly to

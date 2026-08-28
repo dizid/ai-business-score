@@ -22,7 +22,7 @@ routing through Perplexity's shared gateway.
 script (same shape as the one originally proposed below, narrowed to one
 model) tested burst sizes 1/2/3 against the real OpenAI API: 16/16 calls
 succeeded, including 9/9 at burst size 3, no latency degradation. See
-`TODOS.md`'s 2026-08-26 entry for the full writeup. **Still open**: a full
+`TODO.md`'s 2026-08-26 entry for the full writeup. **Still open**: a full
 20-call production scan hasn't been run against this specific change yet —
 do that and check `scans.failures` before fully trusting it.
 
@@ -124,7 +124,7 @@ targeting different providers, since `openai/gpt-5-mini` still shares
 Perplexity's own ~1-concurrent limit and would need to stay serialized
 relative to itself. Whoever runs this should repeat the burst 3-5x (not
 just once) before trusting it, matching the repeated-burst methodology the
-2026-08-13 incident write-up in `TODOS.md` already used, then log the
+2026-08-13 incident write-up in `TODO.md` already used, then log the
 result there the same way.
 
 ## Other major improvement candidates
@@ -160,7 +160,7 @@ Grouped by what they'd actually move.
 
 ### Revenue
 - ~~**Gate deep advice.**~~ **Shipped 2026-08-24** — `generate-deep-advice.mts`
-  now requires Pro or a $19 single-scan purchase; see `TODOS.md`'s
+  now requires Pro or a $19 single-scan purchase; see `TODO.md`'s
   2026-08-24 entry.
 
 ### Reliability

@@ -1,7 +1,7 @@
 # Report clarity + agency portfolio view — implementation plan
 
 Written 2026-08-18. **Change 1 (report clarity) shipped 2026-08-19** — see
-`TODOS.md`'s 2026-08-19 entry — implemented as an Overview/Details tab
+`TODO.md`'s 2026-08-19 entry — implemented as an Overview/Details tab
 split same as specified here, but with the Details tab further broken into
 collapsible accordion sections (a "harmonica bars" request from the same
 day, layered on top of this plan rather than replacing it) and extended
@@ -15,7 +15,7 @@ Marc asked to push the app further and make it more useful for both
 small businesses and agencies, and specifically to make scan reports
 clearer — a simple overview vs. all the dirty details. Before proposing
 anything, every `.md` file in the repo was read (`CLAUDE.md` + its 5
-nested per-directory files, `TODOS.md`, `PLAN_NEXT_PHASE.md`,
+nested per-directory files, `TODO.md`, `PLAN_NEXT_PHASE.md`,
 `WISH_LIST.md`, `DEEPSEEK.md`, `docs/improvement-roadmap.md`,
 `docs/grok-timeout-investigation.md`, `README.md`, `DASHBOARD.md`,
 `V2_SCORING_MODEL.md`, `CLAUDE_HANDOFF.md`, `NEXT-STEPS.md`,

@@ -1,20 +1,18 @@
 # TODO
 
 Quick checklist, split by who it's for. Full context/history for most of
-these already lives in `QA-FIXES-PLAN.md`, `TODO-MARKETING.md`,
-`REPORTPLAN.md`, and `PLAN_NEXT_PHASE.md` — this file is just the
-scannable action list, not a replacement for those.
+these already lives in `TODO-MARKETING.md`, `REPORTPLAN.md`, and
+`PLAN_NEXT_PHASE.md` — this file is just the scannable action list, not a
+replacement for those.
 
 **Merged with `TODOS.md` on 2026-08-26** (at the CEO's request) — that file's
 full chronological shipped-work/status log now lives below as this file's
 "History / status log" section, unchanged, so nothing in either file's
-content was lost. `TODOS.md` itself is now a one-line pointer here rather
-than deleted outright, since it's referenced by name from several other
-docs (`CLAUDE.md`, `README.md`, `shared/CLAUDE.md`,
-`netlify/functions/CLAUDE.md`, and others) — those references were left
-as-is rather than chased down as a separate cleanup, same precedent this
-repo already follows for other historical/dated doc references (see root
-`CLAUDE.md`'s AIVis→Foreground rename note).
+content was lost. `TODOS.md` was initially kept as a one-line pointer here
+rather than deleted outright, since it was referenced by name from several
+other docs — but during the broader 2026-08-27 markdown consolidation pass
+those ~13 references were repointed at this file directly, so `TODOS.md`
+was then deleted outright too.
 
 **Before picking anything up: run `git status` and `ListAgents` first.**
 This repo regularly has multiple concurrent sessions editing it. The
@@ -29,12 +27,25 @@ assuming nothing else is in flight.
       treating them as final — the source drafts were explicitly marked
       "needs Marc's read before posting," and only the format was
       converted, not the substance.
-- [ ] **Decide on Stripe live mode.** `STRIPE_SECRET_KEY` is still a
-      test-mode key — every checkout to date, including "live" Pro
-      signups, has been fake money. Real payments need live mode
-      activated on the Stripe account (business details, banking) plus
-      live-mode Prices swapped in for all SKUs (soon to be four — see the
-      Starter pack item below).
+- [x] ~~Decide on Stripe live mode~~ **Done 2026-08-28** — went live on
+      Dizid's existing multi-app Stripe account (KYC already done from
+      other Dizid projects, no fresh activation flow needed). Same day,
+      Marc also decided to simplify pricing to **just Free + Pro** — cut
+      the top-up-pack SKU and the never-built $39 Starter pack idea below
+      entirely, keeping only the $19 no-account single scan alongside Pro.
+      Live-mode Products/Prices created for Pro ($99/mo) and single scan
+      ($19 one-time); `STRIPE_SECRET_KEY` is now a **restricted** key
+      (scoped to Checkout Sessions: Write only — confirmed by reading the
+      code that no other Stripe resource is ever called), not a full
+      account key, since this account also holds other Dizid apps' real
+      revenue. `STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_ID`/
+      `STRIPE_SINGLE_SCAN_PRICE_ID` set to their live values on Netlify.
+      **Not done on purpose:** no live Price was created for top-ups —
+      `STRIPE_TOPUP_PRICE_ID` was deliberately left pointing at its old
+      test-mode value so that checkout path fails closed. See the Claude
+      item below for the actual code cleanup this still needs, and a flag
+      about a second concurrent session that set a live top-up Price
+      anyway before this decision was final.
 - [x] ~~Create the GA4 property~~ **Done 2026-08-25** — Marc created it,
       provided `G-HZKLBPKH81`, set live on Netlify, confirmed baked into
       the deployed pages. Still open: no cookie-consent mechanism exists on
@@ -52,20 +63,29 @@ assuming nothing else is in flight.
 
 ## Claude
 
-- [ ] **Build the $39 Starter pack (10 scans, one-time)** — Phase 3 of
-      `i-looked-at-the-frolicking-lake.md`, the pricing-tier restructure
-      the strategic review flagged (the $19→$199 jump was too steep).
-      Marc decided: one new middle tier only (not two, to avoid
-      cannibalizing the $199/mo Pro subscription), priced at $39 for 10
-      scans, matching the strategic doc's number. **Requires a free
-      account** (unlike the accountless $19 single-scan SKU) — it reuses
-      the already-shipped Pro top-up mechanism
-      (`scan_credit_purchases` table + `stripe-webhook.mts`'s
-      `scan_credit_pack` branch, both usable **unchanged**) rather than
-      building a new anonymous multi-scan credit wallet, which would have
-      been a much bigger lift. Full implementation plan, in 3 reviewable
-      batches (backend/billing, frontend CTA, marketing copy + docs), at
-      `~/.claude/plans/read-relevant-md-files-linked-wind.md`. Not started.
+- [x] ~~Build the $39 Starter pack (10 scans, one-time)~~ **Cancelled
+      2026-08-28** — superseded by the same day's Free/Pro-only
+      simplification (see Marc's "Decide on Stripe live mode" entry
+      above). Never started, so nothing to unwind in code. The plan this
+      pointed at (`~/.claude/plans/read-relevant-md-files-linked-wind.md`)
+      is now stale — don't resume it without checking with Marc first.
+- [ ] **Remove the top-up-pack purchase path** now that it's cut from the
+      pricing (see above): the "buy 10 more scans" CTA in the app, the
+      `create-topup-checkout-session.mts` function, `stripe-webhook.mts`'s
+      `scan_credit_pack` branch, and the top-up mentions in `index.html`'s
+      pricing/FAQ copy and `llms.txt`. Not urgent — with no live
+      `STRIPE_TOPUP_PRICE_ID` wired in for most contexts the checkout call
+      just fails closed — but it's a dead, half-visible feature until
+      this lands. **Also needs reconciling first:** a second, concurrent
+      Claude Code session set `STRIPE_TOPUP_PRICE_ID`'s *production*
+      value on Netlify to a real live Price (`price_1U9NJJ8gBja0qkMxEmZoQWNJ`)
+      at 11:53 on 2026-08-28, ~13 minutes before this decision to cut
+      top-ups was finalized — so as of this entry, production is
+      inconsistent with every other deploy context (dev/branch-deploy/
+      deploy-preview/dev-server still point at the old test-mode Price).
+      Check with Marc before touching it: either revert production to
+      match (safer, matches the cut decision) or leave it if he's changed
+      his mind back.
 - [ ] **Fix the `stripe-webhook.mts` token-in-URL issue** — the
       scan-receipt email links to `/app/scan?token=...`, which can leak
       via referrer/access logs. Flagged by an automated security review
@@ -105,9 +125,9 @@ assuming nothing else is in flight.
       before/after diff; only the blog's GA4 line changed (quote style +
       an inert guard clause, now matching the other 5 pages exactly).
 - [ ] **Reconcile docs once the in-progress scan-clarity work (see repo
-      status note above) lands** — `PLAN_NEXT_PHASE.md` and
-      `QA-FIXES-PLAN.md` will both need a status update once that commits,
-      same pattern as the blog reconciliation on 2026-08-24.
+      status note above) lands** — `PLAN_NEXT_PHASE.md` will need a status
+      update once that commits, same pattern as the blog reconciliation on
+      2026-08-24.
 
 ---
 
@@ -811,6 +831,28 @@ was never confirmed broken — only the preview URL was tested.
 here since it's the dedicated place for this, per the user's request this
 session to stop losing ideas to chat scrollback.
 
+### STATUS 2026-08-09: `NEXT-STEPS.md` GTM resume-point — folded in here 2026-08-27, mostly superseded
+
+**Retired as a standalone file during the 2026-08-27 markdown consolidation
+pass** — every point it made was already marked superseded in-line by later
+dates, pointing back at this file and `PLAN_NEXT_PHASE.md`. Kept here only
+for the two facts that are still true and not written down elsewhere:
+
+- **Cold outreach never actually ran.** `proof-script/prospects.json` was
+  never created (only `prospects.example.json` exists) — zero real
+  prospects qualified, zero emails sent, as of 2026-08-09. Unknown whether
+  this has changed since; check `proof-script/tracking.csv` before assuming
+  either way.
+- **Open risk, never explicitly marked resolved:** the CEO said on
+  2026-08-09 he was "not happy at all" with Site Improver's delivered
+  results ("mediocre at best"). This mattered because the outreach sequence
+  in `proof-script/OUTREACH.md` was written to close on Site Improver. That
+  close target has since moved — `TODO-MARKETING.md`'s 2026-08-24 entry
+  says outreach is now planned to close on Foreground itself (Pro/$19
+  scan) instead, partly *because* of this unresolved quality concern — but
+  `OUTREACH.md` itself hasn't been rewritten yet, and the underlying Site
+  Improver quality question was never revisited or closed out.
+
 ### STATUS 2026-08-03: SaaS pivot (auth, Neon Postgres, async scans, deep advice, progress chart) — SHIPPED, verified in production
 
 The CEO reviewed an external draft plan proposing user accounts, a real
@@ -939,7 +981,7 @@ Vite multi-page entry (not a Vue-Router SPA — preserves the native
 placeholder window: all three pages have full parity with the pre-migration
 vanilla-JS versions.
 
-Key decisions (see `MIGRATION.md` for full reasoning): `web/shared/
+Key decisions (see `git log` around this date for the deleted `MIGRATION.md`'s full reasoning): `web/shared/
 aivis-core.mjs` stays untouched/unmoved/untyped (proof-script's plain
 `node index.mjs` has no way to load a `.ts` file); `@netlify/blobs` kept at
 `^8.2.0` (not downgraded); Tailwind v4 CSS-first (`@theme`-style palette in

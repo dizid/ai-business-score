@@ -74,3 +74,22 @@ E-E-A-T/entity-salience scoring and per-element Core Web Vitals diagnosis
 were deliberately deferred (cost/latency per scan, and a real
 headless-Chrome dependency Netlify Functions can't run as-is) — logged as a
 follow-up phase in `~/.claude/plans/ping-spicy-oasis.md`, not built.
+
+### `scanDerived.ts` / `scanLabels.ts` / `scanReport.ts` / `Icon.vue`
+
+`scanDerived.ts` and `scanLabels.ts` were pulled out of `ScanDetail.vue`'s
+`<script setup>` block (aggregation-computeds and label maps
+respectively) because a `<script setup>` component's internals aren't
+importable by another module. `scanReport.ts` is the reason they were
+extracted: `buildScanReportMarkdown()` builds a single self-contained
+Markdown report — AI Visibility score, Site Health/Harmonia audit, full
+check-by-check breakdown — for pasting into an external AI assistant to
+get improvement recommendations, and `downloadMarkdown()` saves it
+client-side. Both `ScanDetail.vue`'s on-screen rendering and the
+downloadable report now call the exact same `scanDerived`/`scanLabels`
+functions, so the report can't independently drift from what's on screen.
+Pure client-side — no new endpoint, no server call.
+
+`Icon.vue` is a small shared SVG icon component (`chevron`, `caret-down`,
+`logo`, `check`, `x`) used across `App.vue`, the auth views, and several
+`src/app/components/`.

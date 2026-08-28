@@ -108,27 +108,15 @@ forward unchanged from every prior version of this document — only the
 
 ## Voice
 
-Direct, causal, grounded — unchanged in substance from every prior version
-of this document, only the flavor vocabulary changes (no more "climb,"
-"canopy," "underbrush," "top banana"; no more "spotlight," "offstage," "in
-the light"; now "foreground," "background," "cited"):
-
-- Lead with the outcome (sales), not the mechanism (AI visibility). "More
-  sales" beats "better visibility" in every headline-level sentence.
-- Short sentences. No "leverage," "unlock," "empower," or other SaaS filler.
-- It's fine to name the threat plainly: *a competitor is the one getting
-  mentioned instead of you.* Loss-framing is on-brand here, not
-  fear-mongering — it's the literal mechanism (`competitorTallies` in the
-  scoring engine).
-- Every claim stays grounded in what the product actually does: four AI
-  models (OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude
-  Haiku 4.5, xAI's Grok 4.6), five prompts per scan, twenty checks total, a
-  0-100 score tracked over time. Don't inflate beyond that.
-- Foreground/background vocabulary ("in the foreground," "cited," "the
-  background") is available for headline-level copy, but it's flavor on
-  top of the same grounded claims above, not a license to invent
-  capabilities. "In the foreground" still means "your 0-100 AI Score is
-  high," nothing more mystical.
+Direct, causal, grounded — see `brand/voice.md` for the full rules,
+tagline-variant table, and optional microcopy suggestions; this section
+just summarizes so BRAND.md's visual system and voice.md's copy rules
+don't drift into two competing statements of the same thing. In short:
+lead with the outcome (sales) over the mechanism (AI visibility), keep
+sentences short with zero SaaS filler, let loss-framing name the
+competitor plainly (it's the literal `competitorTallies` mechanism, not
+fear-mongering), and stay literal about what the product does — four AI
+models, five prompts per scan, twenty checks, a 0-100 score over time.
 
 ## Color palette
 

@@ -3,7 +3,7 @@ title: What happens between "best dentist near me" and the answer you get
 author: Marc de Ruijter
 platforms: [LinkedIn, Substack, Facebook]
 word_count: ~760
-status: draft — needs Marc's read before posting
+status: draft — needs Marc's read before posting (the web-article conversion of this piece already shipped 2026-08-24 at content/blog/anatomy-of-an-ai-answer.md — this long-form/X-thread version is a separate, still-unreviewed artifact)
 ---
 
 People tend to picture this as a lookup. You ask an AI a question, it

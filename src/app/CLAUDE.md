@@ -8,10 +8,14 @@ root `CLAUDE.md` for overall project context.
 ### `src/app/` — the authenticated app shell
 
 - **`router.ts`** — routes: `/app` (companies list), `/app/login`,
-  `/app/signup`, `/app/companies/:id`, `/app/billing/success`, plus three
-  no-auth-required content routes added 2026-08-12:  `/app/privacy`,
-  `/app/terms`, `/app/how-it-works` (see `App.vue`'s footer below). A
-  global `beforeEach` guard calls `restoreSession()` once, then redirects
+  `/app/signup`, `/app/companies/:id`, `/app/billing/success`
+  (`BillingSuccessView.vue`, the post-Stripe-Checkout landing page),
+  `/app/scan` (`PublicScanView.vue`, `meta: {requiresAuth: false}` — see
+  its own entry below). The three no-auth content routes added 2026-08-12
+  (`/app/privacy`, `/app/terms`, `/app/how-it-works`) were themselves
+  **removed 2026-08-14** once their views were deleted and converted to
+  static HTML — see those views' entries below; `router.ts` no longer has
+  them. A global `beforeEach` guard calls `restoreSession()` once, then redirects
   unauthenticated visitors to `/app/login?redirect=<intended path>` (and
   authenticated visitors away from `/app/login`/`/app/signup`) — verified
   end-to-end including the redirect-preservation round trip. The
@@ -114,3 +118,11 @@ root `CLAUDE.md` for overall project context.
   start/end instead of center so they don't clip past the SVG viewport (a
   real bug caught by screenshotting the rendered chart, not just reading
   the code — the skill's own "render it and look at it" step).
+- **`views/CompetitorTrendChart.vue`** — same hand-rolled-SVG approach as
+  `CompanyProgressChart.vue` above, but plots mention-count-over-time for
+  the brand plus its top named competitors (capped at 5), so unlike that
+  single-series component it does render a legend, per the `dataviz`
+  skill's "a legend is always present for 2+ series" rule.
+- **`views/BillingSuccessView.vue`** — route `/app/billing/success`, the
+  page Stripe Checkout redirects back to after a successful Pro
+  subscription or credit-pack purchase.
