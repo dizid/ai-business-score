@@ -101,6 +101,25 @@ See the root `CLAUDE.md` for overall project context.
   a deliberate product decision (Marc confirmed AI visibility stays "the
   main thing") — never blended into it.** See `src/shared/CLAUDE.md` for
   the pillar breakdown and UI.
+  **Extended 2026-08-31** (no migration — same jsonb column, more fields
+  inside it): `coreWebVitals` now also carries `seoScore`/
+  `accessibilityScore`/`bestPracticesScore` (PSI's other Lighthouse
+  categories, pulled via the same call already made for
+  `performanceScore` — zero extra cost/latency, live-verified against a
+  real site first) and `additionalAudits` (5 genuinely-new PSI Lighthouse
+  audits — hreflang, crawlable-anchors, is-crawlable, color-contrast,
+  link-text — deliberately excluding any audit that duplicates a check
+  `harmonia.mjs` already does its own way, e.g. meta-description/canonical/
+  robots-txt/image-alt/structured-data). A new top-level `additionalSeoSignals`
+  field carries HTML/sitemap signals that needed no new fetch (favicon/
+  manifest presence, hreflang `<link>` tags, `<html lang>`, Twitter Card
+  tags, sitemap URL/sitemap-index count). All of this is **visible-but-
+  unscored** — none of it is folded into `harmoniaScore`'s weighted pillars,
+  same treatment `coreWebVitals`' own LCP/CLS/INP already got — and none of
+  it is surfaced in `ScanDetail.vue` yet (deliberate, kept out of this
+  batch to stay small; a UI pass is a natural follow-up once the shape has
+  settled). Pure parsing logic (`parseHtml`, `parseSitemapXml`,
+  `extractPsiSignals`) is unit-tested in `tests/harmonia.test.mjs`.
   Added 2026-08-26 (scheduled weekly re-scans): **`companies.scan_frequency
   text default 'off'`** (`'off'` | `'weekly'`) — a Pro-only opt-in read by
   the new `scheduled-rescan.mts`, set via `PATCH /companies/:id`. And

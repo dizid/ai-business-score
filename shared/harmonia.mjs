@@ -130,7 +130,7 @@ function extractTags(html, tagName) {
   return html.match(re) || [];
 }
 
-function parseHtml(html, origin) {
+export function parseHtml(html, origin) {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? titleMatch[1].trim() : null;
 
@@ -140,9 +140,18 @@ function parseHtml(html, origin) {
   const ogTags = metaTags
     .filter((t) => (getAttr(t, 'property') || '').toLowerCase().startsWith('og:'))
     .map((t) => ({ property: getAttr(t, 'property'), content: getAttr(t, 'content') || '' }));
+  const twitterTags = metaTags
+    .filter((t) => (getAttr(t, 'name') || '').toLowerCase().startsWith('twitter:'))
+    .map((t) => ({ name: getAttr(t, 'name'), content: getAttr(t, 'content') || '' }));
 
   const linkTags = extractTags(html, 'link');
   const canonicalTag = linkTags.find((t) => (getAttr(t, 'rel') || '').toLowerCase() === 'canonical');
+  const faviconTag = linkTags.find((t) => /icon/i.test(getAttr(t, 'rel') || ''));
+  const manifestTag = linkTags.find((t) => (getAttr(t, 'rel') || '').toLowerCase() === 'manifest');
+  const hreflangTags = linkTags
+    .filter((t) => (getAttr(t, 'rel') || '').toLowerCase() === 'alternate' && getAttr(t, 'hreflang'))
+    .map((t) => ({ hreflang: getAttr(t, 'hreflang'), href: getAttr(t, 'href') }));
+  const htmlLangMatch = html.match(/<html\b[^>]*\blang\s*=\s*(["'])(.*?)\1/i);
 
   const jsonLdRaw = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
     .map((m) => m[1]);
@@ -184,7 +193,12 @@ function parseHtml(html, origin) {
     metaDescription: descriptionTag ? (getAttr(descriptionTag, 'content') || '') : null,
     viewportPresent: Boolean(viewportTag),
     ogTags,
+    twitterTags,
     canonicalUrl: canonicalTag ? getAttr(canonicalTag, 'href') : null,
+    faviconHref: faviconTag ? getAttr(faviconTag, 'href') : null,
+    manifestHref: manifestTag ? getAttr(manifestTag, 'href') : null,
+    hreflangTags,
+    htmlLang: htmlLangMatch ? htmlLangMatch[2] : null,
     jsonLdRaw,
     h1Count,
     h2Count,
@@ -373,13 +387,27 @@ async function fetchRobotsTxt(origin) {
   }
 }
 
+// A sitemap index's <sitemap> children point at other sitemap files (not
+// fetched here — that would be a second hop per file, out of scope for
+// this check); a plain sitemap's <url> entries are counted directly.
+export function parseSitemapXml(text) {
+  const isSitemapIndex = /<sitemapindex[\s>]/i.test(text);
+  const urlCount = isSitemapIndex
+    ? (text.match(/<sitemap[\s>]/gi) || []).length
+    : (text.match(/<url[\s>]/gi) || []).length;
+  return { isSitemapIndex, urlCount };
+}
+
 async function fetchSitemapXml(origin) {
   const { signal, clear } = withTimeout(SITEMAP_TIMEOUT_MS);
   try {
     const res = await safeFetch(`${origin}/sitemap.xml`, { signal });
-    return { reachable: res.ok, error: null };
+    if (!res.ok) return { reachable: false, urlCount: null, isSitemapIndex: false, error: null };
+    const text = await res.text();
+    const { isSitemapIndex, urlCount } = parseSitemapXml(text);
+    return { reachable: true, urlCount, isSitemapIndex, error: null };
   } catch (err) {
-    return { reachable: false, error: `sitemap.xml check failed: ${err.message}` };
+    return { reachable: false, urlCount: null, isSitemapIndex: false, error: `sitemap.xml check failed: ${err.message}` };
   } finally {
     clear();
   }
@@ -401,24 +429,62 @@ function checkSecurityHeaders(headers) {
 // lower-traffic sites — most businesses this tool scans — so it's null
 // far more often than LCP/CLS. That's a real data-availability gap, not a
 // bug, and is surfaced as-is rather than faked.
+//
+// Requesting seo/accessibility/best-practices alongside performance is the
+// same PSI call, same latency/cost budget — Lighthouse computes all
+// requested categories in one run. Live-verified against a real site
+// (2026-08-31, same stripe.com precedent the original PSI integration
+// used) before wiring in: category scores are 0-1 fractions like
+// performance's; audit ids below were confirmed present with a real
+// score (0/1) in that live response, not guessed from Lighthouse docs.
+// Deliberately NOT pulling audits that duplicate a check `parseHtml`/
+// `checkSecurityHeaders` already does independently (meta-description,
+// document-title, canonical, robots-txt, image-alt, structured-data) —
+// two sources of truth for the same fact risks them disagreeing; only
+// genuinely new signal is added here.
+const PSI_AUDIT_IDS = [
+  { id: 'hreflang', label: 'hreflang tags are valid (if present)' },
+  { id: 'crawlable-anchors', label: 'Links are crawlable' },
+  { id: 'is-crawlable', label: "Page isn't blocked from indexing" },
+  { id: 'color-contrast', label: 'Text has sufficient color contrast' },
+  { id: 'link-text', label: 'Links have descriptive text' },
+];
+
+// Pure extraction from a already-parsed PSI JSON body — split out from
+// fetchCoreWebVitals so it's testable against a fixture without a network
+// call or an API key.
+export function extractPsiSignals(json) {
+  const lighthouse = json.lighthouseResult;
+  const categoryScores = lighthouse?.categories || {};
+  const toScore = (score) => (typeof score === 'number' ? Math.round(score * 100) : null);
+  const audits = lighthouse?.audits || {};
+  const additionalAudits = PSI_AUDIT_IDS.map(({ id, label }) => {
+    const score = audits[id]?.score;
+    return { id, label, passed: typeof score === 'number' ? score >= 1 : null };
+  });
+  return {
+    strategy: 'mobile',
+    performanceScore: toScore(categoryScores.performance?.score),
+    seoScore: toScore(categoryScores.seo?.score),
+    accessibilityScore: toScore(categoryScores.accessibility?.score),
+    bestPracticesScore: toScore(categoryScores['best-practices']?.score),
+    lcpMs: audits['largest-contentful-paint']?.numericValue ?? null,
+    clsScore: audits['cumulative-layout-shift']?.numericValue ?? null,
+    inpMs: json.loadingExperience?.metrics?.INTERACTION_TO_NEXT_PAINT?.percentile ?? null,
+    additionalAudits,
+  };
+}
+
 async function fetchCoreWebVitals(origin, apiKey) {
   if (!apiKey) return null;
   const { signal, clear } = withTimeout(PSI_TIMEOUT_MS);
   try {
-    const url = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(origin)}&strategy=mobile&category=performance&key=${apiKey}`;
+    const categories = 'category=performance&category=seo&category=accessibility&category=best-practices';
+    const url = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(origin)}&strategy=mobile&${categories}&key=${apiKey}`;
     const res = await fetch(url, { signal });
     if (!res.ok) return null;
     const json = await res.json();
-    const lighthouse = json.lighthouseResult;
-    const perf = lighthouse?.categories?.performance?.score;
-    const audits = lighthouse?.audits || {};
-    return {
-      strategy: 'mobile',
-      performanceScore: typeof perf === 'number' ? Math.round(perf * 100) : null,
-      lcpMs: audits['largest-contentful-paint']?.numericValue ?? null,
-      clsScore: audits['cumulative-layout-shift']?.numericValue ?? null,
-      inpMs: json.loadingExperience?.metrics?.INTERACTION_TO_NEXT_PAINT?.percentile ?? null,
-    };
+    return extractPsiSignals(json);
   } catch {
     return null;
   } finally {
@@ -472,6 +538,7 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
       coreWebVitals: null,
       securityHeaders: [],
       aiCrawlerAccess: { bots: [], blockedCount: 0, checkedCount: 0 },
+      additionalSeoSignals: null,
       errors: ['Invalid website URL — could not analyze'],
     };
   }
@@ -535,6 +602,21 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
     uxSignals: { score: coreWebVitals?.performanceScore ?? null, checks: uxChecks },
   };
 
+  // Visible-but-unscored data, same treatment coreWebVitals itself already
+  // gives LCP/CLS/INP — not folded into any pillar's weighted score in this
+  // pass (see this function's own PILLAR_WEIGHTS-based scoring above, left
+  // untouched). A future pass can decide which of these, if any, should
+  // become real scored checks once their shape has settled.
+  const additionalSeoSignals = {
+    htmlLang: page?.htmlLang ?? null,
+    faviconPresent: Boolean(page?.faviconHref),
+    manifestPresent: Boolean(page?.manifestHref),
+    hreflangTags: page?.hreflangTags ?? [],
+    twitterCard: page?.twitterTags ?? [],
+    sitemapUrlCount: sitemap.urlCount ?? null,
+    sitemapIsIndex: sitemap.isSitemapIndex ?? false,
+  };
+
   return {
     fetchedUrl: origin,
     statusCode: homepage.statusCode,
@@ -549,6 +631,7 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
       blockedCount: robots.aiCrawlers.filter((b) => b.blocked).length,
       checkedCount: robots.aiCrawlers.length,
     },
+    additionalSeoSignals,
     errors,
   };
 }

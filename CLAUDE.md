@@ -227,18 +227,21 @@ publish `dist`. `netlify.toml` sets `command = "npm run build"`,
 `node_bundler = "esbuild"`, plus a `[[redirects]]` rule rewriting `/app/*` to
 `/app.html` for the SPA (see below).
 
-No lint config, no test framework anywhere in this repo — `proof-script/`
-stays zero-dep, plain `node index.mjs`, no build step. The hosted site's
-Netlify Functions are bundled independently by Netlify's own esbuild
-function bundler at deploy time — they import `../../shared/aivis-core.mjs`
-directly and are unaffected by the frontend's Vite build (both are now
-type-checked by the same `npm run type-check`, though — `tsconfig.json`'s
-`include` covers `netlify/functions/**/*.mts` since Milestone 0 of the
-pivot, fixing a real gap where those files were never type-checked before).
-Formal automated tests were explicitly deferred in favor of `--dry-run` as
-the pre-flight check for `proof-script/` and `vue-tsc`/manual browser
-verification for the hosted site — this constraint predates the pivot and
-wasn't revisited by it.
+No lint config anywhere in this repo — `proof-script/` stays zero-dep,
+plain `node index.mjs`, no build step. The hosted site's Netlify Functions
+are bundled independently by Netlify's own esbuild function bundler at
+deploy time — they import `../../shared/aivis-core.mjs` directly and are
+unaffected by the frontend's Vite build (both are now type-checked by the
+same `npm run type-check`, though — `tsconfig.json`'s `include` covers
+`netlify/functions/**/*.mts` since Milestone 0 of the pivot, fixing a real
+gap where those files were never type-checked before).
+**Correction 2026-08-31**: a real test framework (`vitest`, `npm run
+test`/`npm run test:run`) was added 2026-08-27 (commit `bc7e2e0`,
+`tests/aivis-core.test.mjs` — retry/backoff/concurrency coverage) — this
+section previously said "no test framework anywhere in this repo," which
+predated that commit and was never updated. `vue-tsc`/manual browser
+verification is still the primary check for the hosted site's UI; vitest
+covers pure-function logic in `shared/`, not component/UI behavior.
 
 ## Architecture
 

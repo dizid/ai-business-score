@@ -23,6 +23,14 @@ assuming nothing else is in flight.
 
 ## Marc
 
+- [ ] **Supply a real prospect list (10-15 local businesses)** to unblock
+      cold outreach — plumbers/dentists/contractors/HVAC/local law-
+      accounting type "who does X near me" categories, per
+      `proof-script/OUTREACH.md`'s targeting section: brand, website,
+      category, region, 2-3 competitors each. This is the channel Marc
+      picked (2026-08-28) as the first push for paying users, now that
+      Stripe is live — important, but **explicitly deferred for now**,
+      not to be picked up proactively until Marc raises it again.
 - [ ] **Read the 4 blog posts** at `/blog` (`content/blog/*.md`) before
       treating them as final — the source drafts were explicitly marked
       "needs Marc's read before posting," and only the format was
@@ -86,19 +94,34 @@ assuming nothing else is in flight.
       Check with Marc before touching it: either revert production to
       match (safer, matches the cut decision) or leave it if he's changed
       his mind back.
-- [ ] **Fix the `stripe-webhook.mts` token-in-URL issue** — the
-      scan-receipt email links to `/app/scan?token=...`, which can leak
-      via referrer/access logs. Flagged by an automated security review
-      2026-08-24, still unfixed. Swap for a one-time-redemption flow
-      (`/app/scan/claim?token=...` → sets an httpOnly cookie → redirects
-      to a clean URL).
-- [ ] **Fix the real `pollScan()` gap** in `CompanyDetailView.vue`
-      (~line 152) — when retries exhaust, it sets `scanError` directly
-      without calling `load()` first, so a scan that actually completed
-      server-side can still dead-end the UI with a raw error. (The
-      *visible* double-messaging symptom was already fixed in `e2bde88`;
-      this is the deeper gap QA-FIXES-PLAN #3a originally asked for,
-      still open.)
+- [x] ~~Fix the `stripe-webhook.mts` token-in-URL issue~~ **Partially
+      fixed 2026-08-31, rest deliberately accepted as residual risk** — the
+      scan-receipt email links to `/app/scan?token=...`, flagged by an
+      automated security review 2026-08-24 as a referrer/access-log leak.
+      The referrer half is closed: `app.html` now sets
+      `<meta name="referrer" content="no-referrer">`, so the page never
+      leaks its own URL (token included) to GA4 or anything else it loads.
+      The originally-proposed fix for the other half — a one-time-
+      redemption redirect that rotates/invalidates the token on first
+      click — was designed, then rejected before shipping: corporate email
+      gateways (Microsoft Safe Links, Proofpoint, etc.) commonly pre-fetch
+      every link in an email to scan it, which would silently consume a
+      strict single-use token before the actual customer ever clicks it —
+      locking a paying customer out of their own $19 receipt, a worse
+      failure than the leak it fixes. No cookie/session mechanism exists
+      anywhere else in this app either (auth is bearer-JWT only), so that
+      part of the original proposal would've also been new infrastructure
+      for one edge case. Left as a known, accepted residual risk rather
+      than shipping something fragile and unverified against real email
+      providers.
+- [x] ~~Fix the real `pollScan()` gap~~ **Done 2026-08-27** (commit
+      `bc7e2e0`) — `CompanyDetailView.vue`'s `pollScan()` now calls
+      `load()` before setting a terminal `scanError` when retries exhaust,
+      so a scan that actually completed server-side shows up instead of
+      dead-ending the UI (QA-FIXES-PLAN #3a). Also added a "Check again"
+      action and real test coverage (`tests/aivis-core.test.mjs`) for the
+      retry/concurrency logic behind it. This item was left open here by
+      mistake — verified directly against the current code.
 - [x] ~~`gpt-5-mini` direct API migration~~ **Done, live-verified, and
       deliberately scoped down 2026-08-25** (QA-FIXES-PLAN #5). Key was in
       `DEV.md` (gitignored scratch notes, missed by the `.env`-only

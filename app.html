@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
+    <!-- Defense in depth for the $19 single-scan flow (/app/scan?token=...):
+         without this, the browser's default referrer policy still strips
+         the query string cross-origin, but this makes it explicit and
+         covers same-origin navigations too. No page in this app has a
+         legitimate reason to leak its own URL to anything it links to. -->
+    <meta name="referrer" content="no-referrer" />
     <title>Foreground — Dashboard</title>
     <!--#include:favicon-->
     <!-- Display font (Space Grotesk), dashboard-only (2026-08-23 redesign) —

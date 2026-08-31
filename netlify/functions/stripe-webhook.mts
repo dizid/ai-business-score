@@ -221,6 +221,18 @@ export default async (req: Request) => {
           ON CONFLICT (stripe_checkout_session_id) DO NOTHING
         `;
 
+        // The token in this URL was flagged by an automated security review
+        // (2026-08-24) as a referrer/access-log leak risk. Referrer leakage
+        // is now closed via app.html's `no-referrer` meta tag. A one-time-
+        // redemption redirect (rotate the token on first click, invalidate
+        // the emailed value) was considered and deliberately rejected: many
+        // corporate email gateways (Microsoft Safe Links, Proofpoint, etc.)
+        // pre-fetch every link in an email to scan it, which would silently
+        // burn a strict single-use token before the actual customer ever
+        // clicks it — locking a paying customer out of their own $19
+        // receipt, a worse failure than the leak it would fix. Accepted as
+        // a known residual risk rather than shipping an unverified fragile
+        // fix; see TODO.md for the same reasoning.
         await sendSingleScanReceiptEmail({
           to: email,
           brand,
