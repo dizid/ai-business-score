@@ -36,6 +36,26 @@ function checklistLine(passed: boolean, label: string): string {
   return `- [${passed ? 'x' : ' '}] ${label}`;
 }
 
+// xAI/Grok's citation annotations reuse their own footnote-index ("2", "5")
+// as the title field instead of a resolvable page title — falls back to a
+// readable hostname/path derived from the real URL rather than showing the
+// raw index number with no label. (Same fix as deriveOwnSiteCitationRows'
+// own resolveCitationTitle in scanDerived.ts, duplicated here since this
+// function reads c.citations directly rather than going through that
+// helper — the "Your site, cited" section below already gets this via
+// deriveOwnSiteCitationRows.)
+const BARE_NUMBER_TITLE = /^\d+$/;
+function resolveCitationTitle(title: string, url: string): string {
+  if (title && !BARE_NUMBER_TITLE.test(title.trim())) return title;
+  try {
+    const u = new URL(url);
+    const path = u.pathname.replace(/\/+$/, '');
+    return path ? `${u.hostname}${path}` : u.hostname;
+  } catch {
+    return url || title;
+  }
+}
+
 // Mirrors the six `v-else-if` cases in ScanDetail.vue's advice-card
 // template (Markdown bold instead of <strong>) — kept deliberately
 // duplicated rather than shared, matching this codebase's own convention
@@ -324,7 +344,7 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
         push(blockquote(c.text));
         push();
         if (c.citations.length) {
-          push('Sources: ' + c.citations.map((cit) => `[${mdEscapeCell(cit.title || cit.url)}](${cit.url})`).join(', '));
+          push('Sources: ' + c.citations.map((cit) => `[${mdEscapeCell(resolveCitationTitle(cit.title, cit.url))}](${cit.url})`).join(', '));
           push();
         }
         if (judgment) {

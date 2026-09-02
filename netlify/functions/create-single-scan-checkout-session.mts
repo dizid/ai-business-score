@@ -22,6 +22,26 @@ declare const Netlify: { env: { get(key: string): string | undefined } };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Rejects input that can't possibly be a real business website, after
+// normalizeUrl() has had a chance to add the https:// prefix — e.g. a typo
+// like "reuters com" (space instead of dot) would otherwise sail straight
+// through into Stripe metadata and later a companies row, same bug already
+// fixed at the main add-company entry points (companies.mts/enrich.mts).
+// Duplicated here rather than imported from shared/aivis-core.mjs because
+// that fix lives on a separate not-yet-merged branch; safe to replace with
+// a shared import once that branch merges.
+function isValidWebsiteUrl(input: string): boolean {
+  if (!input.trim()) return false;
+  let url: URL;
+  try {
+    url = new URL(normalizeUrl(input));
+  } catch {
+    return false;
+  }
+  if (!/^https?:$/i.test(url.protocol)) return false;
+  return url.hostname.includes('.');
+}
+
 export default async (req: Request) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
@@ -85,6 +105,12 @@ export default async (req: Request) => {
     const website = (body.website || '').trim();
     if (!EMAIL_RE.test(email) || !website) {
       return new Response(JSON.stringify({ error: 'A valid email and website are required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
+      });
+    }
+    if (!isValidWebsiteUrl(website)) {
+      return new Response(JSON.stringify({ error: 'Please enter a valid website URL (e.g. acmeplumbing.com)' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
       });
