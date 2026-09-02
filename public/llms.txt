@@ -13,11 +13,10 @@ plumbing in Rotterdam") — phrased the way a real customer would ask,
 covering direct recommendations, competitor comparisons, and "who are the
 leaders in X" questions — to 4 AI models: OpenAI's GPT-5 mini, Google's
 Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6. That's
-20 checks per scan. GPT-5 mini is queried through Perplexity's grounded
-search API; Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 are queried
-directly against each provider's own API, each using that provider's own
-web-search grounding tool — so answers reflect live web results rather
-than each model's static training data.
+20 checks per scan. Each model is queried directly against its own
+provider's API, using that provider's own web-search grounding tool — so
+answers reflect live web results rather than each model's static training
+data.
 
 For each completed check, Foreground records whether the business is
 mentioned, whether it's the first business mentioned, and how it ranks

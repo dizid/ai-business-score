@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Privacy Policy — Foreground</title>
-<meta name="description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Resend, Neon, Netlify) involved." />
+<meta name="description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (OpenAI, Anthropic, Google, xAI, Perplexity, Stripe, Resend, Neon, Netlify) involved." />
 <link rel="canonical" href="https://foreground.info/privacy" />
 <!--#include:llms-link-->
 <!--#include:favicon-->
@@ -12,12 +12,12 @@
 <meta name="theme-color" content="#0a0a0d" />
 <meta property="og:type" content="article" />
 <meta property="og:title" content="Privacy Policy — Foreground" />
-<meta property="og:description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Resend, Neon, Netlify) involved." />
+<meta property="og:description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (OpenAI, Anthropic, Google, xAI, Perplexity, Stripe, Resend, Neon, Netlify) involved." />
 <meta property="og:url" content="https://foreground.info/privacy" />
 <meta property="og:image" content="https://foreground.info/og-image.png" />
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="Privacy Policy — Foreground" />
-<meta name="twitter:description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Resend, Neon, Netlify) involved." />
+<meta name="twitter:description" content="What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (OpenAI, Anthropic, Google, xAI, Perplexity, Stripe, Resend, Neon, Netlify) involved." />
 <meta property="twitter:image" content="https://foreground.info/og-image.png" />
 <!-- Self-contained @graph: this page is a separate HTTP document from
      index.html, so the WebPage node's isPartOf/publisher @id references
@@ -47,7 +47,7 @@
       "@id": "https://foreground.info/privacy#webpage",
       "url": "https://foreground.info/privacy",
       "name": "Privacy Policy — Foreground",
-      "description": "What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (Perplexity, Anthropic, Google, xAI, Stripe, Resend, Neon, Netlify) involved.",
+      "description": "What Foreground collects, why, and how it's handled — account data, company data, scan results, and the third-party providers (OpenAI, Anthropic, Google, xAI, Perplexity, Stripe, Resend, Neon, Netlify) involved.",
       "isPartOf": { "@id": "https://foreground.info/#website" },
       "publisher": { "@id": "https://foreground.info/#organization" }
     }
@@ -120,10 +120,9 @@
       <h2>How we use it</h2>
       <ul>
         <li>Running the AI-visibility scans you request, which involves sending
-          your company/category/competitor data to AI models to generate
-          grounded, web-search-backed answers — one model (GPT-5 mini) via
-          Perplexity's grounded search API, and three (Gemini, Claude, Grok)
-          sent directly to their own providers' APIs.</li>
+          your company/category/competitor data directly to four AI
+          providers — OpenAI, Google, Anthropic, and xAI — to generate
+          grounded, web-search-backed answers.</li>
         <li>Computing and displaying your visibility score and scan history.</li>
         <li>Billing and subscription management, handled through Stripe.</li>
         <li>Operating, maintaining, and improving the product — for example,
@@ -139,14 +138,16 @@
       <h2>Who we share it with</h2>
       <p>These service providers process data on our behalf, only as needed to run Foreground:</p>
       <ul>
-        <li><strong>Perplexity AI</strong> — receives the prompts built from your company data to run
-          a grounded search against GPT-5 mini. This is one of the four AI
-          checks that make up a scan.</li>
-        <li><strong>Anthropic, Google, and xAI</strong> — each receives the prompts built from your
-          company data directly (not through Perplexity) to run a grounded
-          search against their own model — Claude Haiku 4.5, Gemini 3 Flash,
-          and Grok 4.6 respectively. Together with Perplexity above, these are
-          the four AI checks that make up a scan.</li>
+        <li><strong>OpenAI, Anthropic, Google, and xAI</strong> — each receives the prompts built
+          from your company data directly to run a grounded search against
+          their own model — GPT-5 mini, Claude Haiku 4.5, Gemini 3 Flash, and
+          Grok 4.6 respectively. These are the four AI checks that make up a
+          scan.</li>
+        <li><strong>Perplexity AI</strong> — receives data for a few narrower features, not the
+          core scan itself: looking up your business details from a URL when
+          you add a company, classifying the tone of a scan's mentions
+          ("sentiment judging"), and generating AI-written deeper advice on a
+          scan (Pro accounts and single-scan purchases only).</li>
         <li><strong>Stripe</strong> — handles all payment processing for paid plans and single-scan
           purchases, including the email address you provide at checkout for
           an anonymous single scan. Foreground never stores your card number

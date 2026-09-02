@@ -1,8 +1,8 @@
 # Foreground
 
 Checks whether a business shows up when AI search engines (ChatGPT, Gemini,
-via Perplexity's Agent API) are asked about their category, scores the
-result, and tracks it over time.
+Claude, Grok — each queried directly against its own provider's API) are
+asked about their category, scores the result, and tracks it over time.
 
 Two separate tools live in this repo — this README covers both, with a
 focus on how to click/run through them for manual testing (there's no

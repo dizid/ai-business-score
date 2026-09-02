@@ -37,8 +37,9 @@ now-primary domain pointed at the same site, not a rename of it.
 ## What this is
 
 Foreground: checks whether a business shows up when AI search engines (ChatGPT,
-Gemini, via Perplexity's Agent API) are asked about their category. Two
-implementations share one core:
+Gemini, Claude, Grok — each queried directly against its own provider's API,
+see `shared/CLAUDE.md`'s "Multi-provider model client" entry) are asked
+about their category. Two implementations share one core:
 
 - **`proof-script/`** (Approach A) — a local CLI, run manually by one person
   against a hand-curated prospect list. No server, no DB, no accounts. Still
