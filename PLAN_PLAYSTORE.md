@@ -1,10 +1,16 @@
 # Foreground — Play Store App: Planning
 
-## Status (created 2026-09-02)
+## Status (updated 2026-09-02)
 
 Planning only. No code changed yet. This doc lays out the approach, what's
 already in place, what's missing, and the decisions that need Marc before
 implementation starts.
+
+**Decided by Marc (2026-09-02):** domain registration happens **before**
+the TWA work (not after, not in parallel) — see M0 below. The Play
+Console developer account will be Marc's standard/personal Google
+account, not a new one created for this — no new-account setup needed on
+that front, just confirming access when M3 starts.
 
 ## Current state relevant to this
 
@@ -72,15 +78,16 @@ the Play Store with the smallest surface area to maintain, and reuses
    signing key exists, then needs deploying as a static file (trivial —
    `public/.well-known/assetlinks.json` alongside `robots.txt`).
 3. **Domain stability** — Digital Asset Links are bound to the exact
-   origin serving the app. Shipping this against `aivis-scan.netlify.app`
-   works, but a later domain move (once a real domain is registered, per
-   the open question in root `CLAUDE.md`) means regenerating
-   `assetlinks.json` **and** shipping a new Android app update pointing at
-   the new `start_url` — not a redirect-friendly migration. Worth deciding
-   the domain question before or shortly after this ships, not long after.
-4. **Google Play Console developer account** — one-time $25 registration,
-   owned by Marc (Claude has no path to create or pay for this). Required
-   before any app can be uploaded, even to internal testing.
+   origin serving the app. Resolved: domain gets registered first (M0),
+   so the TWA is built against the real domain from the start — no
+   redo-Asset-Links-and-ship-an-update churn.
+4. **Google Play Console developer account** — one-time $25 registration
+   (or already paid, if Marc's Google account has a developer account from
+   a prior app). Resolved: Marc's existing standard Google account is the
+   one to use — no new account needed. Still worth Marc confirming before
+   M3 that account has (or gets) the $25 registration and identity
+   verification Play requires, since that's a Marc-only step Claude can't
+   do on his behalf.
 5. **Store listing assets** — short/long description, feature graphic
    (1024×500), phone screenshots (min 2), app icon (512×512, already
    have), content rating questionnaire, target audience/age declaration.
@@ -98,6 +105,21 @@ the Play Store with the smallest surface area to maintain, and reuses
 
 ## Proposed milestones
 
+- **M0 — Domain registration** (blocking, do first): register a real
+  domain, point it at Netlify (custom domain + DNS, Netlify manages free
+  TLS via Let's Encrypt once DNS is verified), then repoint every
+  canonical/OG/JSON-LD/sitemap/robots/llms.txt URL currently hardcoded to
+  `aivis-scan.netlify.app` (per root `CLAUDE.md`, these were left pointing
+  there deliberately, "until a domain nobody owns yet" — that condition is
+  now being resolved) and update Neon Auth's `trusted_origins` to include
+  the new domain. Netlify itself can register domains directly from the
+  dashboard, or an external registrar (Namecheap, Google Domains/Squarespace,
+  Cloudflare) works equally well with Netlify as the DNS/host target —
+  Claude has no tool access to actually purchase a domain, so this step
+  needs Marc to either buy it directly or hand over registrar credentials/
+  a name choice for Claude to wire up DNS afterward. **Blocks M2** (Digital
+  Asset Links are bound to this exact origin) — doing it after M2 means
+  redoing Asset Links and shipping an Android app update.
 - **M1 — PWA hardening**: add a minimal service worker + registration,
   confirm/add `<link rel="manifest">` in `app.html`, add a maskable icon
   variant, verify with a Lighthouse PWA audit. No behavior change to the
@@ -115,12 +137,9 @@ the Play Store with the smallest surface area to maintain, and reuses
 
 ## Open questions for Marc
 
-- Is `aivis-scan.netlify.app` acceptable as the shipping origin for v1, or
-  should domain registration happen first? (Affects M2/M3 sequencing —
-  doing the domain first avoids a same-week Asset Links + app-update
-  redo.)
-- Who owns/pays for the Play Console account — confirm before M3 so it's
-  not a last-minute blocker.
+- **What domain name?** M0 is now the next actionable step and needs an
+  actual name to register (e.g. something in the "Foreground"/AI-search-
+  visibility space) before anything else here can proceed.
 - Any preference on "Foreground" as the Play Store listing name, given the
   rename history in root `CLAUDE.md` (checked clean against direct
   competitors at rename time, but that check didn't include Play Store
