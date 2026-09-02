@@ -280,6 +280,29 @@ export function deriveFailureRows(payload: ValidatedPayload): FailureRow[] {
   }));
 }
 
+// xAI/Grok's citation annotations carry a real, resolvable `url` but a
+// bare footnote-index string ("1", "2", "3"...) in the `title` field —
+// confirmed against a live scan row's stored payload (own_site_citations
+// for xai/grok-4.6 had title "2"/"5", matching the [[N]](url) markers in
+// that model's own response text), while openai/gpt-5-mini citations on
+// the exact same scan carried real page titles. This is xAI's API
+// genuinely not returning a resolvable title for some citations, not a
+// wrong-field bug in aivis-core.mjs's extractCitations() — it reads
+// exactly the field the provider sends. Treat a bare-digits title as "no
+// usable title" and fall back to a readable host+path instead of showing
+// the raw index number with no label.
+const BARE_NUMBER_TITLE = /^\d+$/;
+export function resolveCitationTitle(title: string, url: string): string {
+  if (title && !BARE_NUMBER_TITLE.test(title.trim())) return title;
+  try {
+    const u = new URL(url);
+    const path = u.pathname.replace(/\/+$/, '');
+    return path ? `${u.hostname}${path}` : u.hostname;
+  } catch {
+    return url || title;
+  }
+}
+
 export type CitationTier = 'sole-source' | 'primary-source' | 'one-of-several';
 export interface OwnCitationRow { url: string; title: string; model: string; promptLabel: string; tier: CitationTier; totalCitations: number; }
 export function deriveOwnSiteCitationRows(payload: ValidatedPayload): OwnCitationRow[] {
@@ -293,7 +316,7 @@ export function deriveOwnSiteCitationRows(payload: ValidatedPayload): OwnCitatio
     const tier: CitationTier = totalCitations <= 1 ? 'sole-source' : totalCitations <= 3 ? 'primary-source' : 'one-of-several';
     return {
       url: c.url,
-      title: c.title || c.url,
+      title: resolveCitationTitle(c.title, c.url),
       model: c.model,
       promptLabel: PROMPT_LABELS[c.promptIndex] || `Prompt ${c.promptIndex + 1}`,
       tier,
