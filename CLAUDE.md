@@ -143,33 +143,53 @@ enterprise deal requiring a DPA).
   `STRIPE_WEBHOOK_SECRET` (Pro subscription billing, shipped commit
   `5f47127`) were missing from this list until now — a pre-existing doc gap
   backfilled here, not a change to the vars themselves.
-  **`STRIPE_SECRET_KEY` is a Stripe *test-mode* key
-  (`sk_test_...`), confirmed 2026-08-24** — every Checkout/subscription
-  this app has ever completed, including the "live in production" Pro
-  plan, has been fake money. Nobody can pay a real dollar until this
-  switches to a live-mode key (requires activating live mode on the Stripe
-  account — business details, banking — then re-creating live-mode
-  equivalents of every Price below and swapping them in). Not done as part
-  of this session; a deliberate CEO decision, not an oversight.
-  **`STRIPE_PRICE_ID` corrected 2026-08-24**: a direct Stripe API check
-  found the existing Price actually charged **$29/month**, not the
-  intended amount — a stale placeholder from whenever the subscription
-  checkout was first built. Stripe Prices are immutable, so a new Price
-  (`price_1U7s8r8gBja0qkMxwx4bqoSD`) was created at the now-decided
-  **$199/month** and the env var swapped to it (verified live via a direct
-  curl to `create-checkout-session`'s sibling function pattern — see
-  `netlify/functions/CLAUDE.md`'s "Billing (Stripe)" section).
-  **`STRIPE_TOPUP_PRICE_ID`** (added 2026-08-23) — **created and set
-  2026-08-24**: `price_1U7s9K8gBja0qkMx9TV9czH4`, $19/10 scans.
-  **`STRIPE_SINGLE_SCAN_PRICE_ID`** (new 2026-08-24, Milestone 2 of
-  `~/.claude/plans/we-need-alot-of-transient-floyd.md`) — `price_1U7s9C8gBja0qkMxi4bLhk3X`,
-  $19 one-time. All three Price creations and the env var updates were
-  followed by a fresh manual deploy (`netlify build && netlify deploy
-  --prod`) and verified live: curled all three checkout-session functions
-  post-deploy (none 500 anymore), and for the single-scan one, completed a
-  full valid anonymous request and fetched the resulting Checkout session
-  back from Stripe's API to confirm `amount_total: 1900` and the correct
-  webhook-matching metadata shape.
+  **Stripe mode history (corrected 2026-09-02 — this section had drifted
+  badly out of date, still describing the 2026-08-24 test-mode state two
+  real transitions later):** test-mode at launch (2026-08-24, `$199/month`
+  Pro) → **went live 2026-08-28** (Free + $99/mo Pro + $19 single-scan
+  only, top-up cut; `STRIPE_SECRET_KEY` a live restricted key scoped to
+  Checkout Sessions: Write) → **reverted to test mode 2026-09-02**, at
+  Marc's explicit request, once beta testers started being able to reach
+  real Pro/single-scan checkout. All three checkout-creating functions
+  were briefly hard-disabled (`checkoutTemporarilyDisabled()` in
+  `_shared/stripe.mts`) between those two events while a proper test-mode
+  swap was arranged — see that function's comment for the exact dates.
+  **Current state**: `STRIPE_SECRET_KEY` is a **restricted test-mode key**
+  (`rk_test_...`, named "Foreground (test mode)" in the Stripe dashboard),
+  created and scoped by Marc himself (Write-only on Checkout Sessions,
+  Products, Prices, Webhook Endpoints/Event Destinations — nothing else)
+  specifically so it can't touch any other Dizid product's data on the same
+  shared Stripe account, live or test. Fresh test-mode Prices were created
+  to match current live pricing exactly: `STRIPE_PRICE_ID` =
+  `price_1UB2Kc8gBja0qkMxTjhDuW3f` ($99/month) and
+  `STRIPE_SINGLE_SCAN_PRICE_ID` = `price_1UB2Kc8gBja0qkMxaS9o1Uqs` ($19
+  one-time) — both `livemode: false`, confirmed via the Price objects
+  Stripe returned. A fresh test-mode webhook endpoint was also created
+  (`we_1UB2XX8gBja0qkMxUnfWahq3`, pointed at this site's real
+  `/stripe-webhook` URL, same three event types the live one used) and its
+  signing secret set as `STRIPE_WEBHOOK_SECRET`. All four vars are set
+  across every real Netlify context (dev/branch-deploy/deploy-preview/
+  production) via the Netlify env-var API — `dev-server` couldn't be
+  reached the same way (not one of that API's supported contexts) and was
+  left as whatever test-mode value it already had, which is harmless since
+  it was never live in the first place. **`STRIPE_TOPUP_PRICE_ID` is
+  deliberately NOT part of this swap** — top-up packs are already slated
+  for removal (see `TODO.md`'s "Remove the top-up-pack purchase path"),
+  its production value is still a stray *live* Price from an unrelated
+  concurrent-session mistake on 2026-08-28, and `create-topup-checkout-session.mts`
+  is the one checkout function still hard-disabled via
+  `checkoutTemporarilyDisabled()` rather than being wired up to test mode
+  too.
+  **Verified**: `npm run build`/`npm run test:run` clean; a direct Stripe
+  API check confirmed both new Prices' `livemode: false` and correct
+  amounts before wiring them in (same "verify against the real API before
+  trusting" discipline as every other key/Price change in this file). A
+  full end-to-end test Checkout (create → pay with a test card → webhook
+  fires) was deliberately NOT run automatically — completing one for the
+  single-scan SKU would create a real `companies`/`scans` row and spend
+  real Perplexity API credits even though the Stripe charge itself is fake,
+  the same reasoning `netlify/functions/CLAUDE.md`'s Milestone 2 entry
+  already used to justify not doing this without asking first.
   **`VITE_GA4_MEASUREMENT_ID`** (new 2026-08-25, Google Analytics) — Marc
   created the GA4 property himself (Claude has no Analytics Admin API
   access or browser/OAuth session to do this) and provided the Measurement

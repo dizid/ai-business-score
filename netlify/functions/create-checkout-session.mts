@@ -6,7 +6,7 @@
 import type { Config } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
-import { stripe, checkoutTemporarilyDisabled } from './_shared/stripe.mts';
+import { stripe } from './_shared/stripe.mts';
 import { isPro } from './_shared/plan.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
@@ -18,8 +18,6 @@ export default async (req: Request) => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
-
-  return checkoutTemporarilyDisabled();
 
   let userId: string;
   try {

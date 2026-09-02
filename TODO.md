@@ -54,6 +54,15 @@ assuming nothing else is in flight.
       item below for the actual code cleanup this still needs, and a flag
       about a second concurrent session that set a live top-up Price
       anyway before this decision was final.
+      > **Editor's note (2026-09-02): reverted back to test mode.** Once
+      > beta testers could actually reach live checkout, Marc asked for
+      > Stripe back in test mode so none of them get charged real money —
+      > see the "Reverted Stripe to test mode" entry in the Claude
+      > checklist below for the full detail (new scoped restricted test
+      > key, fresh test Prices, top-up left disabled since it's already
+      > slated for removal). This item's "went live" history above is
+      > still accurate as a record of what happened on 2026-08-28; it's
+      > just no longer the current state.
 - [x] ~~Create the GA4 property~~ **Done 2026-08-25** — Marc created it,
       provided `G-HZKLBPKH81`, set live on Netlify, confirmed baked into
       the deployed pages. Still open: no cookie-consent mechanism exists on
@@ -71,6 +80,28 @@ assuming nothing else is in flight.
 
 ## Claude
 
+- [x] ~~Reverted Stripe to test mode~~ **Done 2026-09-02** — Marc asked for
+      Stripe back in test mode specifically so beta testers can't be
+      charged real money, and separately asked for it to touch only
+      Foreground, not any other Dizid product sharing the same Stripe
+      account. All three checkout-creating functions were hard-disabled
+      first (`checkoutTemporarilyDisabled()`, `netlify/functions/_shared/stripe.mts`)
+      the moment the risk was confirmed, then properly restored: Marc
+      created a new restricted key ("Foreground (test mode)", `rk_test_...`,
+      Write-only on Checkout Sessions/Products/Prices/Webhook Endpoints —
+      nothing else, so it can't see or touch any other app's data even in
+      test mode) via the Stripe Dashboard, since no API can create or
+      retrieve a key across the test/live boundary. That key was then used
+      to create fresh test-mode Prices matching current live pricing
+      exactly ($99/mo Pro `price_1UB2Kc8gBja0qkMxTjhDuW3f`, $19 one-time
+      single scan `price_1UB2Kc8gBja0qkMxaS9o1Uqs`, both confirmed
+      `livemode: false`) and a fresh test-mode webhook endpoint pointed at
+      this site's real `/stripe-webhook` URL. `create-checkout-session.mts`
+      and `create-single-scan-checkout-session.mts` were then re-enabled;
+      `create-topup-checkout-session.mts` was deliberately left disabled —
+      see the "Remove the top-up-pack purchase path" item below, which this
+      doesn't replace. See root `CLAUDE.md`'s Deployment section for the
+      full current env var values and verification detail.
 - [x] ~~Build the $39 Starter pack (10 scans, one-time)~~ **Cancelled
       2026-08-28** — superseded by the same day's Free/Pro-only
       simplification (see Marc's "Decide on Stripe live mode" entry

@@ -17,18 +17,20 @@ export function stripe(): Stripe {
   return cachedStripe;
 }
 
-// Temporary safety gate (added 2026-09-02, remove once resolved): Marc
-// asked for Stripe back in test mode so beta testers can never be charged
-// real money, but STRIPE_SECRET_KEY is currently a LIVE restricted key
-// (rk_live_..., scoped to Checkout Sessions: Write only) with live Price
-// IDs behind it — no test-mode secret key is available in this environment
-// to do the real swap (Stripe never lets a key see the other mode's
-// objects, and a fresh test key/Prices can only come from Marc via the
-// Stripe Dashboard). Until that swap happens, every checkout-creating
-// function hard-refuses instead of risking one more real charge.
-// stripe-webhook.mts is deliberately untouched — any already-real
-// subscription's lifecycle events (renewal/cancellation) must keep
-// processing correctly; this only blocks *creating new* checkout sessions.
+// Added 2026-09-02 as a safety gate on ALL THREE checkout-creating
+// functions while STRIPE_SECRET_KEY was still live-mode. STRIPE_SECRET_KEY/
+// STRIPE_PRICE_ID/STRIPE_SINGLE_SCAN_PRICE_ID/STRIPE_WEBHOOK_SECRET are now
+// back to a scoped test-mode restricted key + fresh test Prices (Marc
+// created "Foreground (test mode)", Write-only on Checkout Sessions/
+// Products/Prices/Webhook Endpoints — isolated from every other Dizid
+// product on the same Stripe account, at his explicit request), so
+// create-checkout-session.mts and create-single-scan-checkout-session.mts
+// were re-enabled the same day. STRIPE_TOPUP_PRICE_ID was NOT part of that
+// swap — top-up packs are already slated for removal (see TODO.md's "Remove
+// the top-up-pack purchase path") and production's STRIPE_TOPUP_PRICE_ID is
+// still a stray live Price from an unrelated concurrent-session mistake —
+// so create-topup-checkout-session.mts keeps using this gate rather than
+// being wired up to test mode too. Remove this once that cleanup lands.
 export function checkoutTemporarilyDisabled(extraHeaders: Record<string, string> = {}): Response {
   return new Response(
     JSON.stringify({ error: 'Checkout is temporarily unavailable during beta testing — please check back soon.' }),
