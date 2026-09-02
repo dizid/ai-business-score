@@ -546,13 +546,45 @@ export default async (req: Request) => {
   // send is logged but never changes the scan's own already-persisted
   // status above — the scan itself succeeded or failed independently of
   // whether we could tell anyone about it.
+  //
+  // Fixed 2026-09-02: this was an INNER JOIN on companies.owner_user_id,
+  // which silently sent NO email at all for scans on ownerless companies —
+  // the anonymous $19 single-scan purchase flow (companies.owner_user_id
+  // became nullable 2026-08-24 for exactly this case, per this file's own
+  // DB-schema doc comment) creates the company/scan before any account
+  // exists to own it, and stays ownerless until claim-single-scan.mts runs.
+  // The buyer's email IS captured pre-claim though — stripe-webhook.mts
+  // writes it into single_scan_purchases.email (NOT NULL) at the same time
+  // it inserts the scan row, keyed by scan_id — so this is now a LEFT JOIN
+  // with a fallback to that purchase email instead of a silent no-op.
+  // Live-DB check (2026-09-02, Neon MCP against project `aivis`): 0 of 36
+  // companies currently have owner_user_id NULL and 0 rows exist in
+  // single_scan_purchases at all, so no real user has ever hit this gap —
+  // the anonymous checkout path exists in code but hasn't produced a live
+  // purchase yet. Also confirmed owner_user_id only ever goes NULL->set,
+  // never back to NULL (claim-single-scan.mts has no unclaim path), so this
+  // was never a latent risk for normal logged-in-owner scans.
   try {
-    const owners = await db`
-      SELECT u.email FROM neon_auth."user" u
-      JOIN public.companies c ON c.owner_user_id = u.id
+    const recipients = await db`
+      SELECT
+        u.email AS owner_email,
+        ssp.email AS purchase_email
+      FROM public.companies c
+      LEFT JOIN neon_auth."user" u ON u.id = c.owner_user_id
+      LEFT JOIN public.single_scan_purchases ssp ON ssp.scan_id = ${scanId}
       WHERE c.id = ${scanRow.company_id}
     `;
-    if (owners.length > 0) {
+    const recipientEmail: string | null =
+      recipients[0]?.owner_email ?? recipients[0]?.purchase_email ?? null;
+    const isPreClaimPurchase = !recipients[0]?.owner_email && !!recipients[0]?.purchase_email;
+
+    if (recipientEmail) {
+      if (isPreClaimPurchase) {
+        console.log(
+          `run-scan-background: scan ${scanId} has no owner yet (pre-claim anonymous single-scan purchase) — using single_scan_purchases.email for the completion notification`
+        );
+      }
+
       // Most recent PRIOR completed scan's score, for the "your score
       // changed" line in the email — excludes this scan itself so a
       // company's very first scan correctly has nothing to compare against.
@@ -564,7 +596,7 @@ export default async (req: Request) => {
       const origin = new URL(req.url).origin;
       const companyUrl = `${origin}/app/companies/${scanRow.company_id}`;
       const result = await sendScanCompleteEmail({
-        to: owners[0].email,
+        to: recipientEmail,
         brand: company.brand,
         companyUrl,
         status: finalStatus,
@@ -586,7 +618,7 @@ export default async (req: Request) => {
         previousScore - finalScore >= REGRESSION_ALERT_THRESHOLD
       ) {
         const regressionResult = await sendScoreRegressionEmail({
-          to: owners[0].email,
+          to: recipientEmail,
           brand: company.brand,
           companyUrl,
           score: finalScore,
@@ -609,6 +641,15 @@ export default async (req: Request) => {
           console.error(`run-scan-background: score_alerts insert failed for scan ${scanId}:`, err);
         }
       }
+    } else {
+      // Genuinely no email available for this scan: ownerless company with
+      // no matching single_scan_purchases row either (e.g. the one-off
+      // legacy-import path, or a company created directly and never
+      // claimed/purchased). Log clearly rather than leaving this a silent
+      // no-op, so a real gap here is at least visible in function logs.
+      console.log(
+        `run-scan-background: scan ${scanId} (company ${scanRow.company_id}) has no owner and no single_scan_purchases record — skipping scan-complete email, no recipient address available`
+      );
     }
   } catch (err) {
     console.error(`run-scan-background: scan-complete email lookup failed for scan ${scanId}:`, err);
