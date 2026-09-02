@@ -6,6 +6,7 @@
 <title>Foreground — See if AI search recommends your business</title>
 <meta name="description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. Foreground checks whether your business gets mentioned — or a competitor does instead — and tracks it over time." />
 <link rel="canonical" href="https://foreground.info/" />
+<!--#include:llms-link-->
 
 <!-- Favicon: the Spotlight score-ring glyph (gold arc over a graphite
      track, echoing public/marketing-theme.css's score-ring motif) —
@@ -152,10 +153,16 @@
      drift out of sync across pages again. See brand/BRAND.md. -->
 <!--#include:marketing-theme-link-->
 
+<!-- Cookie consent — gates the GA4 script below behind an accept/decline
+     banner; must sit immediately before the ga4 include, see
+     partials/consent.html for the mechanism. -->
+<!--#include:consent-->
+
 <!-- Google Analytics (GA4) — no-ops until VITE_GA4_MEASUREMENT_ID is set as
      a Netlify env var (needs a GA4 property created first — see CLAUDE.md's
-     Deployment section). See privacy.html's Cookies section for the
-     user-facing disclosure. -->
+     Deployment section). Also no-ops until cookie consent is granted (see
+     partials/consent.html above). See privacy.html's Cookies section for
+     the user-facing disclosure. -->
 <!--#include:ga4-->
 </head>
 <body>

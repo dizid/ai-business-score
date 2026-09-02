@@ -21,3 +21,6 @@ User-agent: CCBot
 Allow: /
 
 Sitemap: https://foreground.info/sitemap.xml
+
+# llms.txt (informal AI-agent-context convention, see llmstxt.org):
+# https://foreground.info/llms.txt

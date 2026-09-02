@@ -218,10 +218,35 @@ enterprise deal requiring a DPA).
   real new commit forced a genuine git-triggered rebuild. If an env var
   change ever seems not to be taking effect on this site, push a real
   commit rather than trusting a manual redeploy call to pick it up.
-  **Known gap, not built**: no cookie-consent mechanism exists anywhere on
-  the site, which is a real question mark for EU visitors now that a
-  non-essential tracking cookie is in play, same spirit as the
-  privacy/terms hardening pass's own disclaimer.
+  **Cookie consent — shipped 2026-09-02.** A self-built (no vendor, no new
+  dependency) accept/decline banner now gates the GA4 script above behind
+  consent, closing the gap this section used to flag as open. Default is
+  no tracking: `partials/ga4.html` only calls `window.__fgLoadGA4()` if
+  `localStorage['fg_consent'] === 'granted'`; the new `partials/consent.html`
+  (included immediately before `ga4` on all four marketing entries,
+  `app.html`, and `scripts/build-blog.mjs`'s blog shell) owns that state
+  (`window.__fgConsent.get/set`) and renders a raw-DOM banner on the static
+  pages — except `app.html`, which detects its own `#app` mount point and
+  skips the raw banner, since `src/app/components/ConsentBanner.vue`
+  renders the same choice as a small Vue component styled with the app's
+  calm theme tokens instead of the marketing site's gold/glass ones (see
+  `src/app/CLAUDE.md`). Accepting later than initial page load still
+  records the current page/route correctly with zero extra code: it's the
+  same `gtag('config', GA_ID)` call `router.ts`'s own comment already
+  documented as sending an automatic page_view, just invoked at
+  consent-grant time instead of page-load time. A "Cookie settings" link in
+  both footers (`partials/footer.html` and `App.vue`) reopens the banner to
+  change a stored decision. `result.html` is untouched — it never carried
+  GA4 to begin with. Verified via a real browser (`browse` skill) against a
+  `dist/` build with a fake `VITE_GA4_MEASUREMENT_ID`: no
+  `googletagmanager.com` request before a decision, Accept fires it and
+  persists `granted` across reloads, Decline fires nothing and persists
+  `declined`, and the two banners (raw-DOM vs. Vue) never both render on
+  `app.html` — an early version of `isAppShell()`'s `#app` check ran too
+  early (before `<body>` parses, so `#app` doesn't exist yet on *any* page
+  at that point) and briefly showed both banners at once on `app.html`
+  before being caught by that same manual pass and fixed to wait for
+  `DOMContentLoaded`.
 
 ## Commands
 

@@ -1,0 +1,113 @@
+<script>
+(function () {
+  var KEY = 'fg_consent'; // localStorage value: 'granted' | 'declined'
+
+  function getConsent() {
+    try { return localStorage.getItem(KEY); } catch (e) { return null; }
+  }
+
+  function setConsent(value) {
+    try { localStorage.setItem(KEY, value); } catch (e) {}
+    if (value === 'granted' && typeof window.__fgLoadGA4 === 'function') {
+      window.__fgLoadGA4();
+    }
+    hideBanner();
+    window.dispatchEvent(new CustomEvent('fg-consent-changed', { detail: value }));
+  }
+
+  // Exposed globally so the Vue app shell's own ConsentBanner.vue (a small
+  // component, not this raw-DOM banner — see App.vue) can read/write the
+  // same stored decision instead of duplicating the logic.
+  window.__fgConsent = { get: getConsent, set: setConsent };
+
+  var bannerEl = null;
+
+  function hideBanner() {
+    if (bannerEl) { bannerEl.remove(); bannerEl = null; }
+  }
+
+  function showBanner() {
+    if (bannerEl) return;
+    bannerEl = document.createElement('div');
+    bannerEl.className = 'fg-consent-banner';
+    bannerEl.setAttribute('role', 'region');
+    bannerEl.setAttribute('aria-label', 'Cookie consent');
+    bannerEl.innerHTML =
+      '<p>We use one non-essential analytics cookie to see which pages get ' +
+      'visited. <a href="/privacy#cookies">Learn more</a></p>' +
+      '<div class="fg-consent-actions">' +
+      '<button type="button" class="fg-consent-decline">Decline</button>' +
+      '<button type="button" class="fg-consent-accept">Accept</button>' +
+      '</div>';
+    document.body.appendChild(bannerEl);
+    bannerEl.querySelector('.fg-consent-accept').addEventListener('click', function () { setConsent('granted'); });
+    bannerEl.querySelector('.fg-consent-decline').addEventListener('click', function () { setConsent('declined'); });
+  }
+
+  // Small "cookie settings" reopen link, wired up from partials/footer.html.
+  window.__fgOpenConsentBanner = showBanner;
+
+  // Raw-DOM banner is for the static marketing/blog pages only — app.html
+  // has its own #app mount point and renders ConsentBanner.vue instead, so
+  // this partial skips auto-showing itself there (it still needs including,
+  // for __fgConsent/__fgOpenConsentBanner, just not the banner markup).
+  // This script runs in <head>, before <body> (and #app) exist on ANY
+  // page, so the #app check has to wait until parsing is done — checking
+  // it immediately would always see no #app yet and show the raw banner
+  // on app.html too, racing Vue's own ConsentBanner.vue.
+  function isAppShell() {
+    return !!document.getElementById('app');
+  }
+
+  function init() {
+    if (getConsent() === null && !isAppShell()) showBanner();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+
+<style>
+.fg-consent-banner {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 9999;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px 20px;
+  padding: 16px 22px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line-bright);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.fg-consent-banner p { margin: 0; max-width: 640px; color: var(--muted); }
+.fg-consent-banner a { color: var(--gold); }
+.fg-consent-actions { display: flex; gap: 10px; flex-shrink: 0; }
+.fg-consent-banner button {
+  border: 1px solid var(--line-bright);
+  background: transparent;
+  color: var(--ink);
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.fg-consent-accept {
+  background: var(--gold) !important;
+  color: var(--accent-ink) !important;
+  border-color: var(--gold) !important;
+  font-weight: 700;
+  box-shadow: var(--shadow);
+}
+@media (max-width: 640px) {
+  .fg-consent-banner { flex-direction: column; align-items: stretch; text-align: center; padding: 14px 16px; }
+  .fg-consent-actions { justify-content: center; }
+}
+</style>

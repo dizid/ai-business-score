@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { user, signOut } from './lib/auth';
 import Icon from '../shared/Icon.vue';
 import AccountMenu from './components/AccountMenu.vue';
+import ConsentBanner from './components/ConsentBanner.vue';
 
 const router = useRouter();
+const consentBanner = ref<InstanceType<typeof ConsentBanner> | null>(null);
 
 async function handleSignOut() {
   await signOut();
@@ -39,8 +42,13 @@ async function handleSignOut() {
       <p class="footer-note">
         Your data is stored securely and never sold — see our
         <a href="/privacy">Privacy Policy</a> for details.
+        <button type="button" class="cookie-settings-link" @click="consentBanner?.open()">
+          Cookie settings
+        </button>
       </p>
     </footer>
+
+    <ConsentBanner ref="consentBanner" />
   </div>
 </template>
 
@@ -82,4 +90,10 @@ async function handleSignOut() {
 .footer-support a { color: var(--muted); }
 .footer-note { margin: 0; max-width: 480px; margin-inline: auto; }
 .footer-note a { color: var(--muted); }
+.cookie-settings-link {
+  border: none; background: none; padding: 0; margin-left: 4px;
+  font: inherit; font-size: inherit; color: var(--muted); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.cookie-settings-link:hover { color: var(--fg); }
 </style>

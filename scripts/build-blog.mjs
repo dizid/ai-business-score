@@ -19,6 +19,7 @@
 
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { marked } from 'marked';
 import { resolveIncludes } from './html-includes.mjs';
@@ -76,6 +77,7 @@ function pageShell({ title, description, canonicalPath, ogImagePath = '/og-image
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}" />
 <link rel="canonical" href="${canonicalUrl}" />
+<!--#include:llms-link-->
 
 <!--#include:favicon-->
 <meta name="theme-color" content="#0a0a0d" />
@@ -95,9 +97,14 @@ function pageShell({ title, description, canonicalPath, ogImagePath = '/og-image
 <link rel="stylesheet" href="/blog-theme.css" />
 __EXTRA_HEAD__
 
+<!-- Cookie consent — see partials/consent.html; must precede the ga4
+     include immediately below. -->
+<!--#include:consent-->
+
 <!-- Google Analytics (GA4) — see partials/ga4.html. Its measurement-ID
      token is substituted directly below via process.env, since this script
-     runs as plain Node after vite build, not through Vite's htmlEnvHook. -->
+     runs as plain Node after vite build, not through Vite's htmlEnvHook.
+     Also no-ops until cookie consent is granted. -->
 <!--#include:ga4-->
 </head>
 <body>
@@ -144,16 +151,40 @@ function loadPosts() {
 }
 
 function buildPostPage(post) {
+  // Self-contained @graph, not a flat BlogPosting: this page is a separate
+  // HTTP document from index.html, so a publisher @id-only reference would
+  // point at a WebSite/Organization node most JSON-LD parsers can't
+  // resolve unless it's also defined right here — same reasoning
+  // privacy.html/terms.html's own comments give for duplicating these
+  // nodes per document.
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: post.title,
-    description: post.description,
-    datePublished: post.date,
-    dateModified: post.date,
-    author: { '@type': 'Person', name: 'Marc de Ruijter' },
-    publisher: { '@id': `${siteUrl}/#organization`, '@type': 'Organization', name: 'Foreground' },
-    mainEntityOfPage: `${siteUrl}/blog/${post.slug}/`,
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        '@id': `${siteUrl}/#website`,
+        url: `${siteUrl}/`,
+        name: 'Foreground',
+        publisher: { '@id': `${siteUrl}/#organization` },
+      },
+      {
+        '@type': 'Organization',
+        '@id': `${siteUrl}/#organization`,
+        name: 'Foreground',
+        url: `${siteUrl}/`,
+        logo: `${siteUrl}/og-image.png`,
+      },
+      {
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description: post.description,
+        datePublished: post.date,
+        dateModified: post.date,
+        author: { '@type': 'Person', name: 'Marc de Ruijter' },
+        publisher: { '@id': `${siteUrl}/#organization` },
+        mainEntityOfPage: `${siteUrl}/blog/${post.slug}/`,
+      },
+    ],
   };
   const bodyHtml = `
   <article class="blog-post">
@@ -192,12 +223,95 @@ function buildIndexPage(posts) {
 ${items}
     </div>
   </section>`;
+
+  // Same self-contained-@graph pattern as buildPostPage() and the four
+  // static marketing pages — see buildPostPage()'s comment for why.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        '@id': `${siteUrl}/#website`,
+        url: `${siteUrl}/`,
+        name: 'Foreground',
+        publisher: { '@id': `${siteUrl}/#organization` },
+      },
+      {
+        '@type': 'Organization',
+        '@id': `${siteUrl}/#organization`,
+        name: 'Foreground',
+        url: `${siteUrl}/`,
+        logo: `${siteUrl}/og-image.png`,
+      },
+      {
+        '@type': 'CollectionPage',
+        '@id': `${siteUrl}/blog/#webpage`,
+        url: `${siteUrl}/blog/`,
+        name: 'Blog — Foreground',
+        isPartOf: { '@id': `${siteUrl}/#website` },
+        publisher: { '@id': `${siteUrl}/#organization` },
+      },
+      {
+        '@type': 'ItemList',
+        itemListElement: posts.map((post, i) => ({
+          '@type': 'ListItem',
+          position: i + 1,
+          url: `${siteUrl}/blog/${post.slug}/`,
+          name: post.title,
+        })),
+      },
+    ],
+  };
+
   return pageShell({
     title: 'Blog — Foreground',
     description: 'Notes on AI search visibility, GEO vs SEO, and what actually changes whether ChatGPT and Gemini mention your business.',
     canonicalPath: '/blog/',
     bodyHtml,
+    extraHead: `<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>`,
   });
+}
+
+// The 4 root marketing pages' <lastmod> in public/sitemap.xml is hand-set
+// and goes stale the moment any of them is edited again. Rewrite it here
+// at build time from each file's real last-commit date, so it self-updates
+// instead of silently drifting. Falls back to today (the build date) if
+// git has no history for a path (e.g. a shallow CI checkout) — still more
+// accurate than a permanently frozen date.
+const STATIC_PAGES = [
+  { file: 'index.html', url: `${siteUrl}/` },
+  { file: 'how-it-works.html', url: `${siteUrl}/how-it-works` },
+  { file: 'privacy.html', url: `${siteUrl}/privacy` },
+  { file: 'terms.html', url: `${siteUrl}/terms` },
+];
+
+function lastCommitDate(file) {
+  try {
+    const out = execFileSync('git', ['log', '-1', '--format=%cs', '--', file], {
+      cwd: rootDir,
+      encoding: 'utf8',
+    }).trim();
+    return out || null;
+  } catch {
+    return null;
+  }
+}
+
+function updateStaticPageLastmods() {
+  const sitemapPath = path.join(distDir, 'sitemap.xml');
+  if (!existsSync(sitemapPath)) {
+    console.warn('build-blog: dist/sitemap.xml not found, skipping static-page lastmod update');
+    return;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  let xml = readFileSync(sitemapPath, 'utf8');
+  for (const { file, url } of STATIC_PAGES) {
+    const date = lastCommitDate(file) || today;
+    const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(<loc>${escapedUrl}</loc>\\s*<lastmod>)[^<]*(</lastmod>)`);
+    xml = xml.replace(re, `$1${date}$2`);
+  }
+  writeFileSync(sitemapPath, xml);
 }
 
 function updateSitemap(posts) {
@@ -218,6 +332,12 @@ function updateSitemap(posts) {
 
 function main() {
   const posts = loadPosts();
+
+  // Runs even with zero posts — the sitemap's 4 static-page <lastmod>
+  // values need to stay fresh independent of whether content/blog/ has
+  // anything in it.
+  updateStaticPageLastmods();
+
   if (posts.length === 0) {
     console.warn('build-blog: no posts found in content/blog/, nothing to do');
     return;

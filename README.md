@@ -122,6 +122,21 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
     `vite build`, not a Vite dev-server entry, so testing it needs a real
     build: `npm run build && npx serve dist` (or any static file server),
     then check `/blog/` and one post page. Content in `content/blog/*.md`.
+14. **Cookie consent (since 2026-09-02)** — with `localStorage` cleared,
+    load any marketing page, `/blog`, or `/app.html`: a bottom banner
+    should appear ("We use one non-essential analytics cookie…") and no
+    request to `googletagmanager.com` should fire yet (check devtools'
+    network panel). Click **Accept** — the banner closes and a
+    `googletagmanager.com/gtag/js` request fires; reload and it should
+    fire again immediately with no banner flash. Clear storage again and
+    click **Decline** instead — no request ever fires, and it stays that
+    way across a reload. Either way, a **Cookie settings** link in the
+    footer reopens the banner. On `app.html` specifically, the banner is a
+    different (Vue) component styled with the app's calm theme, not the
+    marketing site's gold one — needs `VITE_GA4_MEASUREMENT_ID` set to a
+    real-looking `G-...` value locally to see the actual network request;
+    with it unset the banner still shows/hides correctly, it just never
+    has anything to load.
 
 ### Known quirks (expected, not bugs)
 

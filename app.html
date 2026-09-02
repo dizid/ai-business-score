@@ -23,10 +23,20 @@
          stays on the pre-redesign "legacy" visual treatment. -->
     <!--#include:fonts-->
 
+    <!-- Cookie consent — see partials/consent.html. Only exposes
+         window.__fgConsent/__fgLoadGA4 here; the raw-DOM banner that
+         partial renders on static pages skips itself on this page (detects
+         the #app mount point) since ConsentBanner.vue (src/app/components)
+         renders the in-app equivalent instead — see App.vue. -->
+    <!--#include:consent-->
+
     <!-- Google Analytics (GA4) — see index.html's identical snippet for the
-         no-op-until-configured guard and rationale. router.ts's afterEach
-         sends a manual page_view on every client-side route change, since
-         gtag's automatic pageview only fires once on initial load. -->
+         no-op-until-configured guard and rationale. Also no-ops until
+         cookie consent is granted. router.ts's afterEach sends a manual
+         page_view on every client-side route change, since gtag's
+         automatic pageview only fires once on initial load — including the
+         one it fires when consent is granted after initial load, so a late
+         "Accept" still records whatever route the visitor is on then. -->
     <!--#include:ga4-->
   </head>
   <body>

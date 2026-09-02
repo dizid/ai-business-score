@@ -6,6 +6,7 @@
 <title>How Foreground works — AI search visibility scoring explained</title>
 <meta name="description" content="How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
 <link rel="canonical" href="https://foreground.info/how-it-works" />
+<!--#include:llms-link-->
 <!--#include:favicon-->
 <!-- Matches --stage-black in public/marketing-theme.css. -->
 <meta name="theme-color" content="#0a0a0d" />
@@ -90,8 +91,13 @@
      block (this page had drifted onto an already-retired palette). -->
 <!--#include:marketing-theme-link-->
 
+<!-- Cookie consent — see partials/consent.html; must precede the ga4
+     include immediately below. -->
+<!--#include:consent-->
+
 <!-- Google Analytics (GA4) — see index.html's identical snippet for the
-     no-op-until-configured guard and rationale. -->
+     no-op-until-configured guard and rationale. Also no-ops until cookie
+     consent is granted. -->
 <!--#include:ga4-->
 </head>
 <body>

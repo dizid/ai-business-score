@@ -2,13 +2,29 @@
 (function () {
   var GA_ID = '%VITE_GA4_MEASUREMENT_ID%';
   if (!GA_ID || GA_ID.charAt(0) === '%' || GA_ID.indexOf('G-') !== 0) return;
-  var s = document.createElement('script');
-  s.async = true;
-  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
-  document.head.appendChild(s);
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function () { dataLayer.push(arguments); };
-  gtag('js', new Date());
-  gtag('config', GA_ID);
+
+  // Gated behind cookie consent (partials/consent.html, included right
+  // before this partial on every surface). __fgLoadGA4 is exposed so that
+  // partial's "Accept" handler can call it later, after a page load where
+  // no decision was stored yet — gtag('config', ...) below sends GA4's own
+  // automatic page_view for whatever the current page/route is at the
+  // moment it actually runs, which is what makes a late "Accept" still
+  // record the page the visitor is currently on without any extra code.
+  window.__fgLoadGA4 = function () {
+    if (window.__fgGaLoaded) return;
+    window.__fgGaLoaded = true;
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', GA_ID);
+  };
+
+  var stored = null;
+  try { stored = localStorage.getItem('fg_consent'); } catch (e) {}
+  if (stored === 'granted') window.__fgLoadGA4();
 })();
 </script>

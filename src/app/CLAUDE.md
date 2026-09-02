@@ -29,6 +29,11 @@ root `CLAUDE.md` for overall project context.
   works, "Made by Dizid" (external), a `dev@dizid.com` contact line, and a
   one-line data-handling note. Renders on every authenticated and
   unauthenticated app page alike, since it's in the shell, not per-view.
+  **Added 2026-09-02**: renders `components/ConsentBanner.vue` (a template
+  ref, `consentBanner`) and a "Cookie settings" button in the footer that
+  calls `consentBanner?.open()`. This is the in-app half of the cookie
+  consent feature — see root `CLAUDE.md`'s GA4 entry for the full mechanism
+  and `ConsentBanner.vue`'s own entry below.
 - **`views/PrivacyView.vue` / `TermsView.vue`** — added 2026-08-12, then
   **deleted 2026-08-14** (commit `555e3f4`) and converted to standalone
   static HTML at the repo root (`privacy.html`, `terms.html`) because
