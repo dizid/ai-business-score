@@ -76,7 +76,7 @@ async function load() {
     const res = await authFetch(`/companies/${route.params.id}`);
     const data = await res.json();
     if (!data.ok) {
-      loadError.value = data.error || 'Failed to load company.';
+      loadError.value = data.error || 'Failed to load brand.';
       return;
     }
     company.value = data.company;
@@ -91,7 +91,13 @@ async function load() {
       document.title = `${company.value.brand} — Foreground`;
     }
   } catch (err) {
-    loadError.value = (err as Error).message;
+    // Network/DNS/CORS-level failures land here (not a clean HTTP error
+    // response, which is handled above via `!data.ok` and is already a
+    // real, informative server-authored message). Log the raw exception for
+    // debugging but never surface it verbatim — a bare "TypeError: Failed to
+    // fetch" means nothing to a non-technical user.
+    console.error('Failed to load company:', err);
+    loadError.value = "Couldn't load this brand right now — check your connection and try again.";
   } finally {
     loading.value = false;
   }
@@ -413,7 +419,10 @@ watch(() => route.params.id, load);
 
 <template>
   <main>
-    <p class="status error" v-if="loadError">{{ loadError }}</p>
+    <div class="status error" v-if="loadError">
+      {{ loadError }}
+      <button type="button" class="inline-upgrade" @click="load">Try again</button>
+    </div>
     <div class="skeleton" v-else-if="loading" aria-hidden="true">
       <div class="skeleton-bar skeleton-crumb"></div>
       <div class="skeleton-bar skeleton-title"></div>
@@ -421,7 +430,7 @@ watch(() => route.params.id, load);
     </div>
 
     <template v-else-if="company">
-      <Breadcrumb :crumbs="[{ label: 'Companies', to: '/app' }, { label: company.brand }]" />
+      <Breadcrumb :crumbs="[{ label: 'Brands', to: '/app' }, { label: company.brand }]" />
       <div class="head-row">
         <div>
           <h1>
@@ -474,7 +483,7 @@ watch(() => route.params.id, load);
       </div>
 
       <p class="empty" v-if="scans.length === 0 && !scanError && !scanning">
-        No scans yet for this company — click "Run new scan" to check its AI search visibility.
+        No scans yet for this brand — click "Run new scan" to check its AI search visibility.
       </p>
 
       <CompanyProgressChart v-if="scans.length >= 2" :scans="scanTrend" @select-point="selectScanById" />
@@ -552,10 +561,31 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .scan-trigger button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .auto-scan-toggle {
   margin-top: 8px; margin-left: 0;
-  background: transparent !important; color: var(--muted) !important;
-  border: 1px solid var(--border) !important; box-shadow: none !important;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--card) !important; color: var(--fg) !important;
+  border: 1px solid var(--border) !important; box-shadow: var(--shadow) !important;
 }
-.auto-scan-toggle.active { border-color: var(--accent) !important; color: var(--fg) !important; }
+/* CSS-only toggle-switch track+knob, drawn as a pseudo-element so no extra
+   markup is needed — a hard-edged radial-gradient "dot" inside a pill track,
+   sliding from left (off) to right (active) via background-position math. */
+.auto-scan-toggle::before {
+  content: ''; flex: none; width: 30px; height: 17px; border-radius: 999px;
+  background-color: var(--border);
+  background-image: radial-gradient(circle 6px at 8px 8.5px, var(--faint) 100%, transparent 100%);
+  transition: background-color 0.15s ease, background-image 0.15s ease;
+}
+.auto-scan-toggle:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 6%, var(--card)) !important;
+}
+.auto-scan-toggle.active {
+  border-color: var(--accent) !important; color: var(--fg) !important;
+  background: color-mix(in srgb, var(--accent) 10%, var(--card)) !important;
+}
+.auto-scan-toggle.active::before {
+  background-color: var(--accent);
+  background-image: radial-gradient(circle 6px at 22px 8.5px, var(--accent-ink) 100%, transparent 100%);
+}
 .scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 280px; }
 .scan-status.error { color: var(--critical); }
 .inline-upgrade {

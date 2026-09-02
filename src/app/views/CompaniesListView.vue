@@ -155,7 +155,7 @@ async function loadCompanies() {
     const res = await authFetch('/companies');
     const data = await res.json();
     if (!data.ok) {
-      loadError.value = data.error || 'Failed to load companies.';
+      loadError.value = data.error || 'Failed to load brands.';
       return;
     }
     companies.value = data.companies;
@@ -276,7 +276,7 @@ async function onCreate() {
     });
     const data = await res.json();
     if (!data.ok) {
-      createError.value = data.error || 'Failed to create company.';
+      createError.value = data.error || 'Failed to create brand.';
       createUpgradeRequired.value = !!data.upgradeRequired;
       return;
     }
@@ -301,7 +301,7 @@ onMounted(loadCompanies);
   <main>
     <div class="head-row">
       <div>
-        <h1>Companies</h1>
+        <h1>Brands</h1>
         <p class="sub">Track AI search visibility over time for each business you're watching.</p>
       </div>
       <div class="head-actions">
@@ -311,7 +311,7 @@ onMounted(loadCompanies);
         <button type="button" class="upgrade-btn" v-if="profile.plan_tier !== 'pro'" :disabled="upgrading" @click="startCheckout">
           {{ upgrading ? 'Redirecting…' : 'Upgrade to Pro' }}
         </button>
-        <button type="button" @click="toggleCreate">{{ showCreate ? 'Cancel' : '+ New company' }}</button>
+        <button type="button" @click="toggleCreate">{{ showCreate ? 'Cancel' : '+ New brand' }}</button>
       </div>
     </div>
     <p class="status error" v-if="upgradeError">{{ upgradeError }}</p>
@@ -377,7 +377,7 @@ onMounted(loadCompanies);
           <div class="summary-row"><span class="summary-label">Segment</span><span>{{ form.customer_segment }}</span></div>
           <div class="summary-row"><span class="summary-label">Competitors</span><span>{{ form.competitors }}</span></div>
         </div>
-        <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'Create company' }}</button>
+        <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'Create brand' }}</button>
         <button type="button" class="edit-details-link" @click="editDetails">Edit details first</button>
       </template>
 
@@ -435,9 +435,9 @@ onMounted(loadCompanies);
           <path d="M6.5 10.5l2.3 2.3L13.5 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"></path>
         </svg>
       </div>
-      <h2>No companies yet</h2>
+      <h2>No brands yet</h2>
       <p>Add a business to see whether it shows up when AI search engines are asked about its category.</p>
-      <button type="button" class="empty-cta" @click="toggleCreate">+ Add your first company</button>
+      <button type="button" class="empty-cta" @click="toggleCreate">+ Add your first brand</button>
       <button type="button" class="example-link" @click="showExample = true">See what a report looks like →</button>
     </div>
 
@@ -622,7 +622,7 @@ p.sub { color: var(--muted); margin: 0; }
 }
 .summary-row:last-child { border-bottom: none; }
 .summary-label { flex: none; color: var(--muted); font-weight: 600; }
-.summary-row span:last-child { text-align: right; overflow-wrap: anywhere; }
+.summary-row span:last-child { flex: 1 1 auto; min-width: 0; text-align: right; overflow-wrap: anywhere; }
 .edit-details-link {
   display: block; margin: 10px auto 0; padding: 0; border: none; background: none;
   color: var(--muted); font-size: 0.85rem; text-decoration: underline; cursor: pointer;

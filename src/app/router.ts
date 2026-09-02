@@ -11,7 +11,7 @@ import { isAuthenticated, restoreSession } from './lib/auth';
 // avoids a duplicate-content SEO penalty. App.vue's footer now links to the
 // static pages with plain <a> tags instead of router-link.
 const routes = [
-  { path: '/app', name: 'companies', component: () => import('./views/CompaniesListView.vue'), meta: { requiresAuth: true, title: 'Your companies — Foreground' } },
+  { path: '/app', name: 'companies', component: () => import('./views/CompaniesListView.vue'), meta: { requiresAuth: true, title: 'Your brands — Foreground' } },
   { path: '/app/login', name: 'login', component: () => import('./views/LoginView.vue'), meta: { title: 'Log in — Foreground' } },
   { path: '/app/signup', name: 'signup', component: () => import('./views/SignupView.vue'), meta: { title: 'Sign up — Foreground' } },
   {

@@ -45,8 +45,8 @@ onUnmounted(() => {
       </template>
       <template v-else-if="status === 'active'">
         <h1>You're on Pro 🎉</h1>
-        <p class="sub">Unlimited companies and 20 scans a month are unlocked.</p>
-        <router-link class="cta" to="/app">Go to your companies</router-link>
+        <p class="sub">Unlimited brands and 20 scans a month are unlocked.</p>
+        <router-link class="cta" to="/app">Go to your brands</router-link>
       </template>
       <template v-else>
         <h1>Still activating</h1>
@@ -54,7 +54,7 @@ onUnmounted(() => {
           Payment went through, but the upgrade is taking longer than usual to show up.
           It'll apply automatically — check back in a minute.
         </p>
-        <router-link class="cta" to="/app">Back to your companies</router-link>
+        <router-link class="cta" to="/app">Back to your brands</router-link>
       </template>
     </div>
   </main>
