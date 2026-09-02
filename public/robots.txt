@@ -20,4 +20,4 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
-Sitemap: https://aivis-scan.netlify.app/sitemap.xml
+Sitemap: https://foreground.info/sitemap.xml

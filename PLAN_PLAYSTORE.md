@@ -59,6 +59,17 @@ As of 2026-09-02, this is a **live blocker**, not a future task:
   changes have been made yet in this pass; the only artifact from this
   session so far is this planning doc.
 
+**Resolved 2026-09-02**: all four steps above are done. All 10 hardcoded
+`aivis-scan.netlify.app` references swapped to `foreground.info`
+(`index.html`, `how-it-works.html`, `privacy.html`, `terms.html`,
+`public/sitemap.xml`, `public/robots.txt`, `public/llms.txt`,
+`scripts/build-blog.mjs`, `shared/entityPresence.mjs`,
+`netlify/functions/scheduled-rescan.mts`'s comment). `https://foreground.info`
+added to Neon Auth's `trusted_origins` via the Neon MCP (confirmed present
+in a follow-up `list_auth_trusted_domains` call, alongside the untouched
+`aivis-scan.netlify.app` entry). Root `CLAUDE.md` updated. M1 (PWA
+hardening) is next, not started as part of this pass.
+
 ## Current state relevant to this
 
 - `app.html` is the real product: an authenticated vue-router SPA

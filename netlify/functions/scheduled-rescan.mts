@@ -50,7 +50,7 @@ export default async () => {
   // No incoming Request to derive an origin from the way scan.mts does
   // (new URL(req.url).origin) — Netlify's injected primary site URL is the
   // equivalent for a non-request context. Needs live verification post-
-  // deploy that this resolves to https://aivis-scan.netlify.app.
+  // deploy that this resolves to https://foreground.info.
   const origin = Netlify.env.get('URL');
   if (!origin) {
     console.error('scheduled-rescan: URL env var not set, cannot trigger scans');

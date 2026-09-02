@@ -23,10 +23,16 @@ entries throughout this repo's journal-style docs (`TODO.md`,
 `REPORTPLAN.md`, `docs/*`, the nested `netlify/functions/CLAUDE.md`/
 `shared/CLAUDE.md`/`proof-script/CLAUDE.md`) still say "AIVis" where that was the product's
 actual name on that date — intentional, not an oversight; only
-current-state prose was updated. The site still lives at
-`aivis-scan.netlify.app`; a real domain hasn't been registered yet, so
-every canonical/OG/JSON-LD/sitemap/robots/llms.txt URL still intentionally
-points there, not at a domain nobody owns yet.
+current-state prose was updated. **Update 2026-09-02**: the site now also
+has a real custom domain, `foreground.info` (registered on Porkbun,
+attached to the Netlify site, DNS propagated — confirmed via `curl -I` →
+`200`). Every canonical/OG/JSON-LD/sitemap/robots/llms.txt URL, plus
+`scripts/build-blog.mjs`'s `siteUrl` and `shared/entityPresence.mjs`'s
+outbound `USER_AGENT`, was swapped from `aivis-scan.netlify.app` to
+`foreground.info` the same day. The underlying Netlify site host
+(`aivis-scan.netlify.app`) still resolves and is left as the internal
+identifier per the "left as-is" reasoning above — this is a second,
+now-primary domain pointed at the same site, not a rename of it.
 
 ## What this is
 
@@ -105,7 +111,10 @@ enterprise deal requiring a DPA).
   JWKS at `.../auth/.well-known/jwks.json`. `https://aivis-scan.netlify.app`
   is in Neon Auth's `trusted_origins` (was empty at provisioning time —
   required for browser sign-up/sign-in to work from the deployed site, not
-  just `localhost`).
+  just `localhost`). **`https://foreground.info` added 2026-09-02** (via
+  the Neon MCP `add_auth_trusted_domain`, `better_auth` provider) once the
+  custom domain went live — both origins stay trusted, the old Netlify URL
+  wasn't removed.
 - Env vars on the Netlify site (all non-secret, per standing rule):
   `PERPLEXITY_API_KEY`, `DATABASE_URL` (Neon pooled connection string),
   `NEON_AUTH_JWKS_URL`, `RESEND_API_KEY`/`RESEND_FROM_EMAIL` (added

@@ -47,7 +47,7 @@ Paid ("Pro"): $99/month — unlimited companies, 20 scans/month (fair use, top-u
 
 ## Links
 
-- Product: https://aivis-scan.netlify.app/
-- How it works: https://aivis-scan.netlify.app/how-it-works
-- Sign up: https://aivis-scan.netlify.app/app/signup
-- Blog: https://aivis-scan.netlify.app/blog/
+- Product: https://foreground.info/
+- How it works: https://foreground.info/how-it-works
+- Sign up: https://foreground.info/app/signup
+- Blog: https://foreground.info/blog/

@@ -23,7 +23,7 @@ const EXTLINKS_TIMEOUT_MS = 8000;
 // more aggressively. Easy to forget, and forgetting it would silently
 // degrade every scan's Wikipedia check to "not found" rather than erroring
 // loudly, so it's called out here rather than left as an unexplained header.
-const USER_AGENT = 'Foreground-AI-Visibility-Scanner/1.0 (https://aivis-scan.netlify.app; dev@dizid.com)';
+const USER_AGENT = 'Foreground-AI-Visibility-Scanner/1.0 (https://foreground.info; dev@dizid.com)';
 
 function withTimeout(ms) {
   const controller = new AbortController();

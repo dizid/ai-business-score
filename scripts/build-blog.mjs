@@ -27,7 +27,7 @@ const rootDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const contentDir = path.join(rootDir, 'content', 'blog');
 const distDir = path.join(rootDir, 'dist');
 const partialsDir = path.join(rootDir, 'partials');
-const siteUrl = 'https://aivis-scan.netlify.app';
+const siteUrl = 'https://foreground.info';
 
 // --- frontmatter: plain `key: value` lines between `---` fences. Simple on
 // purpose — content/blog/*.md only ever needs title/description/date, no
