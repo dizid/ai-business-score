@@ -1,13 +1,13 @@
 ---
 title: What to actually do this week if AI doesn't know you exist
 description: A free, 40-minute checklist for checking and improving how your business shows up in ChatGPT and Gemini answers, no tool required for the first four steps.
-date: 2026-08-24
+date: 2026-09-02
 ---
 
 Somewhere in the last year, "check how your business shows up on Google"
-quietly stopped being enough, and most people haven't updated the habit
-yet. So here's the version of this I'd actually tell a friend to do this
-week — no tool required for the first step.
+quietly stopped being enough. Most people haven't updated the habit yet.
+So here's the version I'd actually tell a friend to do this week — no tool
+required for the first step.
 
 **Ask the question yourself, more than once.** Open ChatGPT, Gemini,
 whatever you've got, and type the question a real customer would type —
@@ -54,12 +54,12 @@ or everything to do with it. Treat this like something you glance at
 occasionally, not a box you tick once.
 
 That's genuinely most of it. None of this requires a tool, a budget, or an
-agency — the first four steps are free and take maybe forty minutes if
+agency. The first four steps are free and take maybe forty minutes if
 you're honest with yourself about how vague your "about" page actually is.
 I built Foreground because doing this by hand, across several AI models,
-every few weeks, for more than one business, gets tedious fast. But the
-checklist above works fine with nothing but a browser and twenty honest
-minutes.
+every few weeks, for more than one business, gets tedious fast. The
+checklist above still works fine with nothing but a browser and twenty
+honest minutes.
 
 New here? This post is the last of a series — start from the beginning:
 [Google isn't the front page anymore](/blog/ai-is-the-new-front-page/).
