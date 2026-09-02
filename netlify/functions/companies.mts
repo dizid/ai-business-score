@@ -4,7 +4,7 @@
 import type { Config } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
-import { normalizeUrl, SUPPORTED_LANGUAGES } from '../../shared/aivis-core.mjs';
+import { isValidWebsiteUrl, normalizeUrl, SUPPORTED_LANGUAGES } from '../../shared/aivis-core.mjs';
 import { FREE_PLAN_COMPANY_LIMIT, isPro } from './_shared/plan.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 
@@ -134,6 +134,21 @@ export default async (req: Request) => {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
       });
+    }
+    // Real bug found in production (Issue #8): nothing downstream of this
+    // insert re-validates website's shape, so a typo like "reuters com"
+    // (space instead of dot) previously sailed through normalizeUrl()'s
+    // deliberately-lenient https:// prefixing and got persisted verbatim —
+    // a URL the WHATWG parser itself considers invalid, which then made
+    // harmonia.mjs's `new URL(website)` throw at scan time. This is the
+    // actual data-writing boundary regardless of how the request got here
+    // (the enrich-first flow, a skipped-enrich manual fill, or a direct API
+    // call), so it's the right place to fail closed rather than insert.
+    if (!isValidWebsiteUrl(website)) {
+      return new Response(
+        JSON.stringify({ error: 'Please enter a valid website URL (e.g. acme.com or https://acme.com).' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+      );
     }
     const category = (body.category || '').trim();
     const useCase = (body.use_case || '').trim();

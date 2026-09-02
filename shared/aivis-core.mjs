@@ -146,9 +146,40 @@ function escapeRegex(s) {
 
 // Accepts either a bare domain ("acme.com") or a full URL
 // ("https://acme.com/path") and normalizes to a full clickable URL.
+// Deliberately does NOT validate the result is a well-formed URL — that's
+// isValidWebsiteUrl's job below, kept separate so every existing caller
+// that only wants the https:// prefix added keeps working unchanged.
 export function normalizeUrl(input) {
   const trimmed = input.trim();
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+// Rejects input that can't possibly be a real business website, after
+// normalizeUrl() has had a chance to add the https:// prefix — e.g. a typo
+// like "reuters com" (space instead of dot, most likely a mobile
+// autocorrect swallowing the period) previously sailed straight through
+// normalizeUrl() into "https://reuters com" and got persisted as-is: a
+// stored URL the WHATWG URL parser itself considers invalid (space is a
+// forbidden host code point), which is exactly what later made
+// harmonia.mjs's `new URL(website)` throw at scan time. normalizeUrl() is
+// deliberately lenient (bare-domain support), so the actual validation has
+// to happen here, one layer up, at every place user input becomes a
+// company's website: enrich.mts (before spending a Perplexity call on an
+// unresearchable URL) and companies.mts (the actual insert boundary, the
+// authoritative gate regardless of how a request reached it).
+export function isValidWebsiteUrl(input) {
+  if (typeof input !== 'string' || !input.trim()) return false;
+  let url;
+  try {
+    url = new URL(normalizeUrl(input));
+  } catch {
+    return false;
+  }
+  if (!/^https?:$/i.test(url.protocol)) return false;
+  // Require a real-looking domain (at least one dot) — a bare single-label
+  // host almost always means the input was malformed rather than a real
+  // business website, and this product has no use for anything else.
+  return url.hostname.includes('.');
 }
 
 // Full URL or bare domain -> bare hostname, no protocol/www/path.

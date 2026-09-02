@@ -8,6 +8,7 @@ import {
   findBrandMention,
   findMentions,
   isAmbiguousBrandName,
+  isValidWebsiteUrl,
   parseAnthropicResponse,
   parseGoogleResponse,
   parseSentimentJudgeResponse,
@@ -38,6 +39,43 @@ describe('isAmbiguousBrandName', () => {
 
   it('never flags multi-word names, even if a word is on the stoplist', () => {
     expect(isAmbiguousBrandName('Best Buy')).toBe(false);
+  });
+});
+
+// Regression: Issue #8 — a real production company ("Reuters", added by
+// piettest3@dizid.com) ended up with website "https://reuters com" (space
+// instead of dot, most likely a mobile-autocorrect typo) because nothing
+// downstream of normalizeUrl() ever checked the result was a well-formed
+// URL before it got persisted — the WHATWG URL parser itself considers a
+// space a forbidden host code point, so this later made harmonia.mjs's
+// `new URL(website)` throw at scan time. isValidWebsiteUrl() is the fix,
+// wired into both enrich.mts and companies.mts's POST handler.
+describe('isValidWebsiteUrl', () => {
+  it('accepts a bare domain and a full URL', () => {
+    expect(isValidWebsiteUrl('acme.com')).toBe(true);
+    expect(isValidWebsiteUrl('https://acme.com')).toBe(true);
+    expect(isValidWebsiteUrl('http://acme.com/path?q=1')).toBe(true);
+    expect(isValidWebsiteUrl('www.acme.com')).toBe(true);
+  });
+
+  it('rejects the exact real-world typo that caused Issue #8', () => {
+    expect(isValidWebsiteUrl('reuters com')).toBe(false);
+    expect(isValidWebsiteUrl('https://reuters com')).toBe(false);
+  });
+
+  it('rejects empty/whitespace-only input', () => {
+    expect(isValidWebsiteUrl('')).toBe(false);
+    expect(isValidWebsiteUrl('   ')).toBe(false);
+  });
+
+  it('rejects a single-label host with no dot', () => {
+    expect(isValidWebsiteUrl('localhost')).toBe(false);
+    expect(isValidWebsiteUrl('reuters')).toBe(false);
+  });
+
+  it('rejects a non-http(s) scheme', () => {
+    expect(isValidWebsiteUrl('javascript:alert(1)')).toBe(false);
+    expect(isValidWebsiteUrl('ftp://acme.com')).toBe(false);
   });
 });
 

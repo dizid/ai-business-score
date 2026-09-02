@@ -12,7 +12,7 @@
 // previously a shared SCAN_PASSPHRASE, now any authenticated user.
 
 import type { Config } from '@netlify/functions';
-import { callModelWithRetry, buildEnrichPrompt, parseEnrichmentResponse, normalizeUrl } from '../../shared/aivis-core.mjs';
+import { callModelWithRetry, buildEnrichPrompt, parseEnrichmentResponse, isValidWebsiteUrl, normalizeUrl } from '../../shared/aivis-core.mjs';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 
@@ -49,6 +49,23 @@ export default async (req: Request) => {
       status: 400,
       headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
+  }
+
+  // Real bug found in production (Issue #8): a malformed website (e.g.
+  // "reuters com" — a typo, space instead of dot) used to sail straight
+  // through to normalizeUrl(), get echoed back as `website` in the 200
+  // response below, and silently pre-fill CompaniesListView.vue's review
+  // step with a URL the WHATWG parser itself considers invalid — the
+  // company then got created with that exact broken value. Caught here,
+  // before spending a Perplexity call researching an unresearchable URL,
+  // using the same ok:false / 200-status contract every other enrichment
+  // failure already uses (never fatal — the caller falls back to a blank,
+  // manually-filled form).
+  if (!isValidWebsiteUrl(website)) {
+    return new Response(
+      JSON.stringify({ ok: false, error: "That doesn't look like a valid website URL — check for typos and try again." }),
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+    );
   }
 
   const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');
