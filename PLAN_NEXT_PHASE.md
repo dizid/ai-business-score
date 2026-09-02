@@ -1,6 +1,8 @@
 # AIVis — Next Phase: Reliability, Model Coverage, Product Depth & Monetization
 
-## Status (updated 2026-08-13)
+## Status (updated 2026-08-13, header date corrected 2026-09-02 — table
+cells below were kept current through 2026-08-24, but the header itself
+was never bumped to match)
 
 | Milestone | Status |
 |---|---|
@@ -67,12 +69,14 @@ loops, not feature-count — see Milestones F and G below.
   (`openai/gpt-5-mini`) asking the model to research the URL — no HTML
   fetch/parse of the site itself happens anywhere in the app today.
 - **Billing**: Stripe subscription is live — Free (1 company/3 scans total)
-  vs Pro (unlimited companies, 20 scans/calendar-month fair-use with
-  top-up packs available, **$199/month**, price set 2026-08-24 — see
-  `TODO.md`'s 2026-08-24 entry). A $19 one-time single-scan SKU (no
-  account required) also shipped 2026-08-24. Deep advice **is now
-  plan-gated** (since 2026-08-24) — requires Pro or a matching single-scan
-  purchase, returning `402 {upgradeRequired: true}` otherwise.
+  vs Pro (unlimited companies, 20 scans/calendar-month fair-use, **$199/month
+  at the time this section was written (2026-08-24) — dropped to $99/month
+  2026-08-27, commit `0494ded`, which also removed the top-up-purchase CTA
+  from the logged-in app; see `TODO.md`'s 2026-08-27 History entry**). A
+  $19 one-time single-scan SKU (no account required) also shipped
+  2026-08-24. Deep advice **is now plan-gated** (since 2026-08-24) —
+  requires Pro or a matching single-scan purchase, returning
+  `402 {upgradeRequired: true}` otherwise.
 - **Recently shipped, now unwanted**: a public opt-in leaderboard
   (`companies.is_public`, commit `1b0c7a9`) and multi-URL-per-company
   tracking (`company_urls` table, commit `dd95291`). Both fully committed

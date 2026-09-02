@@ -6,8 +6,19 @@ split same as specified here, but with the Details tab further broken into
 collapsible accordion sections (a "harmonica bars" request from the same
 day, layered on top of this plan rather than replacing it) and extended
 with a new secondary "Harmonia" technical/SEO score. **Change 2 (agency
-portfolio view) is still not implemented** — untouched, remains the
-approved-but-pending plan below.
+portfolio view) shipped its core on 2026-08-27** (commit `0494ded`, "Add
+portfolio dashboard...") — **but not as specified below.**
+`CompaniesListView.vue` is now a portfolio cockpit with a summary strip
+(Portfolio average / Best–{brand} / Worst–{brand} / Needing attention,
+not this doc's Companies/Leading/Needs attention/No data tile set) and
+sort by score/last-scanned/regression, plus new delta badges this doc
+never proposed. **Still genuinely open, not shipped by that commit**:
+search and filter controls (this doc's `.includes()`-based
+brand/category search, the 4-bucket filter, "click a tile to filter").
+See `TODO.md`'s 2026-08-27 History entry for the full commit detail and
+the corrected doc-sweep note. The spec below is kept as the original
+record and as the still-accurate spec for the remaining search/filter
+gap — it is not a description of current `CompaniesListView.vue` state.
 
 ## Context
 

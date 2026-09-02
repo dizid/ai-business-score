@@ -183,12 +183,27 @@ Grouped by what they'd actually move.
 1. ~~Concurrency re-test~~ — shipped 2026-08-23 (anthropic/google/xai) and
    2026-08-26 (openai), see above.
 2. ~~Streaming scan progress~~ — shipped 2026-08-17, see above.
-3. Scheduled scans + regression alerts — biggest product-value lever for
-   retention/subscription justification. **The top open item on this whole
-   list as of 2026-08-26.**
+3. ~~Scheduled scans + regression alerts~~ — **shipped 2026-08-26**
+   (commit `5277b82`, the same day this line still called it "the top open
+   item on this whole list" — this list wasn't updated again until this
+   doc-sweep pass on 2026-09-02). Pro users can opt a company into weekly
+   auto-rescans; a 15+-point score drop sends a regression-alert email.
+   Currently opt-in, not opt-out — see `TODO.md`'s 2026-08-26 History entry
+   and `PLAN_COMPETITIVE.md`'s P1 item 7 for the still-open default-flip.
 4. Competitor-benchmarking view — biggest lever for new-customer conviction.
+   **Confirmed still open** as of 2026-09-02 — no matching code found.
 5. ~~Gate deep advice~~ — shipped 2026-08-24.
 6. Team/agency access — opens a new buyer segment, bigger lift (invite
    flow, permission checks on top of the existing schema scaffold).
-7. Ops/failure-rate visibility + automated tests — not glamorous, but the
-   debt this repo's own incident history says is real.
+   **Confirmed still open** as of 2026-09-02 — `company_members` remains a
+   schema-only scaffold, zero code references outside `CLAUDE.md`. Distinct
+   from the lighter portfolio-dashboard view shipped 2026-08-27 (see
+   `REPORTPLAN.md`'s updated header) — that shipped a summary/sort view for
+   one owner's own companies, not multi-user sharing.
+7. ~~Ops/failure-rate visibility~~ — **shipped 2026-08-27** (commit
+   `bc7e2e0`, new `ops-failure-digest.mts`, a daily scheduled email when the
+   24h scan failure rate crosses a threshold — no admin dashboard, just the
+   digest). The same commit added real test coverage for
+   `callModelWithRetry`/`runWithConcurrency` to `tests/aivis-core.test.mjs`,
+   partially addressing this item's "automated tests" half — broader
+   coverage of the scoring/retry surface is still open.

@@ -71,10 +71,17 @@ assuming nothing else is in flight.
 - [ ] **Netlify function log access**, so QA-FIXES-PLAN #3b (root cause of
       the scan-polling failures — suspected Netlify concurrency ceiling)
       can actually be confirmed instead of guessed at from static code.
-- [ ] **Priority call on `REPORTPLAN.md` Change 2** (agency portfolio
-      view — summary strip, search/sort/filter, "needs attention first"
-      default). Fully scoped, not started — still worth building given
-      how much of the userbase is actually multi-company?
+- [x] ~~Priority call on `REPORTPLAN.md` Change 2~~ (agency portfolio
+      view). **Partially shipped 2026-08-27** (commit `0494ded`) —
+      `CompaniesListView.vue` is now a portfolio cockpit (avg/best/worst/
+      needs-attention header, delta badges, sort by score/last-scanned/
+      regression), so the priority call resolved itself via direct
+      shipping rather than a discussion. **Still open**: no search or
+      filter controls exist yet, and the shipped tile set differs from
+      this doc's original Companies/Leading/Needs attention/No data spec
+      — see `REPORTPLAN.md`'s updated header for detail. A smaller
+      follow-up (add search + filter to what's already live), not the
+      original build-from-scratch ask.
 - [x] ~~Pricing-tier restructure decision (Phase 3 of the report/roadmap
       plan)~~ **Decided 2026-08-26** — see the Starter-pack item below.
 
@@ -167,8 +174,10 @@ assuming nothing else is in flight.
       `enrich.mts`/`stripe-webhook.mts`/`judge-sentiment.mts`/
       `generate-deep-advice.mts` were reverted to Perplexity-only on
       purpose — re-verified `enrich.mts` works again after reverting.
-- [ ] **Build `REPORTPLAN.md` Change 2** (see Marc's priority-call item
-      above — don't start until that's a yes).
+- [x] ~~Build `REPORTPLAN.md` Change 2~~ **Mostly shipped 2026-08-27**
+      (commit `0494ded`, "Add portfolio dashboard..."). See the Marc
+      checklist item above for what shipped vs. the search/filter gap
+      that's still genuinely open.
 - [x] ~~Shared header/footer partial~~ **Done 2026-08-26** — new
       `partials/*.html` (favicon, fonts, marketing-theme-link, ga4, nav,
       footer) plus `scripts/html-includes.mjs`, wired into all 6 places via
@@ -189,6 +198,99 @@ assuming nothing else is in flight.
 
 Everything below this line is the former `TODOS.md`, moved here verbatim
 (headings demoted one level) as part of the 2026-08-26 merge. Newest first.
+
+### STATUS 2026-08-27: Scan-polling fix, retry/concurrency test coverage, ops failure-rate digest — SHIPPED (commit `bc7e2e0`)
+
+**Backfilled 2026-09-02**, during a doc-sweep pass cross-referencing
+`DEEPSEEK-REASONER.md`/`PLAN_COMPETITIVE.md` against actual shipped code —
+this commit had no History entry. The `pollScan()` fix half was already
+noted in the Claude checklist above; the ops-digest half had no record
+anywhere in this file, and `docs/improvement-roadmap.md` still listed
+"ops/failure-rate visibility" as its priority-#7 open item, unaware it had
+shipped the same week.
+
+**What shipped:**
+1. `CompanyDetailView.vue`'s `pollScan()` now re-syncs via `load()` before
+   showing a terminal error when retries exhaust, so a scan that actually
+   completed server-side displays normally instead of dead-ending
+   (QA-FIXES-PLAN.md #3a) — already covered by the Claude checklist entry
+   above.
+2. `tests/aivis-core.test.mjs` gained real coverage for
+   `callModelWithRetry` (429-only retry, escalating backoff,
+   external-signal short-circuit) and `runWithConcurrency` (order
+   preservation, concurrency-limit enforcement, sequential-at-limit-1) —
+   previously untested despite being the exact surface behind this repo's
+   429/timeout incident history.
+3. **New `ops-failure-digest.mts`** — a daily scheduled function emailing
+   (via the existing Resend integration) when the last 24h's scan failure
+   rate crosses a threshold. Deliberately no admin dashboard/access-control
+   build-out, since none exists in this app yet. This is
+   `docs/improvement-roadmap.md`'s priority-#7 item — that doc's priority
+   list has been corrected to mark it shipped.
+
+### STATUS 2026-08-27: Portfolio dashboard, onboarding simplification, Pro price drop to $99/mo, score-drop alerts — SHIPPED (commit `0494ded`)
+
+**Backfilled 2026-09-02**, same doc-sweep pass — this commit had no
+History entry, and `REPORTPLAN.md` still called its Change 2 "not
+implemented" a week after it shipped.
+
+**What shipped:**
+1. **Onboarding**: create-company flow now shows a one-click confirm card
+   after URL lookup instead of a mandatory 7-field form; added an
+   example-report entry point on the empty state.
+2. **Portfolio dashboard** — `CompaniesListView.vue` is now a cockpit:
+   portfolio avg/best/worst/needs-attention header, delta badges, sort by
+   score/last-scanned/regression, via an extended `GET /companies`
+   (prev_score/delta/status/last-scanned, LATERAL joins, live-verified
+   against production data). This functionally ships the core of
+   `REPORTPLAN.md`'s Change 2 (agency portfolio view) — see the Marc
+   checklist item above and `REPORTPLAN.md`'s updated header. **Not
+   shipped as part of this**: search and filter controls, and the tile set
+   differs from `REPORTPLAN.md`'s original spec (Companies/Leading/Needs
+   attention/No data) — it ships as Portfolio average/Best/Worst/Needing
+   attention instead.
+3. **Pricing**: new $99/mo Stripe Price (test-mode at the time of this
+   commit — see root `CLAUDE.md`'s Stripe-mode-history note for the full
+   later live/test timeline), same product as the old $199 one — all
+   marketing/legal copy updated. Removed the single-scan/top-up CTAs from
+   the logged-in app (Free/Pro is now the only in-app purchase choice)
+   while keeping the redirect-completion banners for any purchase already
+   in flight — this is why `CompanyDetailView.vue` still has top-up-banner
+   code even though the top-up feature is separately slated for removal
+   (see the "Remove the top-up-pack purchase path" item above — this
+   commit did not fulfill that item).
+4. **Alerts**: new `score_alerts` table + write path
+   (`run-scan-background.mts`, alongside the existing regression email) +
+   an Alerts section on the dashboard surfacing recent drops that used to
+   be email-only.
+
+### STATUS 2026-08-26: Scheduled weekly re-scans + score-regression alerts (Pro) — SHIPPED (commit `5277b82`)
+
+**Backfilled 2026-09-02**, same doc-sweep pass — `docs/improvement-roadmap.md`
+called this "the top open item on this whole list" as of 2026-08-26, the
+same day it shipped, and was never updated to reflect that.
+
+**What shipped:** Pro users can opt a company into automatic weekly
+re-scans via a new toggle (`PATCH /companies/:id`), driven by this repo's
+first scheduled Netlify Function (`scheduled-rescan.mts`, daily cron
+checking each company's own last-scan date). Reuses `scan.mts`'s existing
+insert-then-trigger pattern and the same monthly fair-use cap so
+auto-scans can't bypass the margin guardrail. Any scan (manual or
+scheduled) that drops score by 15+ points now also sends a distinct
+regression-alert email alongside the routine scan-complete one. Requires
+`companies.scan_frequency` and `scans.trigger_source` (Neon MCP migration,
+already live).
+
+**Not yet verified** (per the commit message itself): the cron trigger's
+origin resolution (`Netlify.env.get('URL')`) wasn't live-verified
+post-deploy at ship time — check `netlify/functions/CLAUDE.md`'s
+`scheduled-rescan.mts` entry for current status before assuming it's
+confirmed working.
+
+**Currently opt-in, not opt-out**: making Pro auto-weekly by default
+(opt-out) rather than opt-in, as `PLAN_COMPETITIVE.md`'s P1 item 7
+proposes, is still a live, unshipped follow-up — this entry ships the
+scheduling infrastructure, not that default-flip.
 
 ### STATUS 2026-08-26: openai-lane concurrency raised 1 → 3 — SHIPPED, live-verified against the direct API, not yet against a full production scan
 
