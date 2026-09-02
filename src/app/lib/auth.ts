@@ -85,6 +85,29 @@ async function signOut() {
   jwt.value = null;
 }
 
+// Password reset, added 2026-09-02 — better-auth's email/password plugin
+// ships these two endpoints by default; nothing extra to enable server-side
+// beyond the email provider Neon Auth already has configured (confirmed via
+// Neon MCP's get_neon_auth_config before building this: a shared
+// "auth@mail.myneon.app" sender is live). `requestPasswordReset` emails a
+// link that round-trips through Neon Auth's own domain first
+// (`/reset-password/:token?callbackURL=...`) before redirecting the
+// browser back to `redirectTo` with the real token appended as a `?token=`
+// query param — ResetPasswordView.vue reads that, it's not something this
+// function receives directly.
+async function requestPasswordReset(email: string) {
+  const { error } = await authClient.requestPasswordReset({
+    email,
+    redirectTo: `${window.location.origin}/app/reset-password`,
+  });
+  if (error) throw new Error(error.message || 'Failed to send reset email');
+}
+
+async function resetPassword(newPassword: string, token: string) {
+  const { error } = await authClient.resetPassword({ newPassword, token });
+  if (error) throw new Error(error.message || 'Failed to reset password');
+}
+
 function authHeaders(): Record<string, string> {
   return jwt.value ? { Authorization: `Bearer ${jwt.value}` } : {};
 }
@@ -117,6 +140,8 @@ export {
   signUp,
   signIn,
   signOut,
+  requestPasswordReset,
+  resetPassword,
   authHeaders,
   authFetch,
 };

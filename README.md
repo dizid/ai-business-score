@@ -137,6 +137,16 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
     real-looking `G-...` value locally to see the actual network request;
     with it unset the banner still shows/hides correctly, it just never
     has anything to load.
+15. **Password reset (since 2026-09-02)** — from `/app/login`, click
+    **Forgot password?**, enter the account's email, submit — always shows
+    a generic "check your inbox" confirmation regardless of whether the
+    address has an account. The real email link lands on
+    `/app/reset-password?token=...`; visiting that route with no `token`
+    query param instead shows an "invalid or expired" state. With a valid
+    token, setting a new password (with a matching confirm field) redirects
+    to a success state, and logging in with the new password should work
+    immediately. A second attempt with the same token should fail —
+    tokens are single-use.
 
 ### Known quirks (expected, not bugs)
 

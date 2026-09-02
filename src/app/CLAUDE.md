@@ -58,6 +58,33 @@ root `CLAUDE.md` for overall project context.
   "create a free account" CTA) and calls `POST /claim-single-scan` right
   after a successful signup, before navigating on — best-effort, a claim
   failure still lands the new user on `/app` rather than blocking signup.
+  **`LoginView.vue` gained a "Forgot password?" link 2026-09-02**, see
+  below.
+- **`views/ForgotPasswordView.vue` / `ResetPasswordView.vue`** — added
+  2026-09-02 (`routes` `/app/forgot-password`/`/app/reset-password`,
+  `lib/auth.ts`'s new `requestPasswordReset`/`resetPassword`, both thin
+  wrappers around `better-auth`'s own client methods — no server-side
+  config needed, confirmed via Neon MCP's `get_neon_auth_config` that a
+  shared email provider was already live). Flow: `ForgotPasswordView.vue`
+  posts an email, always shows the same "check your inbox" confirmation
+  regardless of whether the address has an account (no enumeration via this
+  form). The emailed link round-trips through Neon Auth's own domain first
+  (`GET /reset-password/:token?callbackURL=...`) before redirecting the
+  browser to `redirectTo` (`{origin}/app/reset-password`) with the real
+  token appended as `?token=` — `ResetPasswordView.vue` reads that query
+  param, not anything `requestPasswordReset` itself returns. A missing
+  token renders an "invalid or expired" state with a link back to request a
+  new one; `router.ts` deliberately does **not** gate this route on current
+  auth state (unlike login/signup/forgot-password, which redirect an
+  already-authenticated visitor to `/app`) — a reset link has to work
+  regardless of what session is active in the clicking browser. **Verified
+  fully end-to-end against the real Neon Auth backend**, not mocked: a real
+  request → the real token retrieved via Neon MCP from
+  `neon_auth.verification` (identifier `reset-password:<token>`, value =
+  user id, 1-hour expiry) → reset succeeded (`POST .../reset-password →
+  200`) → logging in with the new password succeeded → replaying the same
+  token a second time correctly 400s ("Invalid token"), confirming
+  single-use enforcement.
 - **`views/PublicScanView.vue`** — added 2026-08-24 (Milestone 2 of the
   monetization plan), route `/app/scan`, `meta: {requiresAuth: false}` — the
   one page in this app shell a signed-out visitor can see real scan data

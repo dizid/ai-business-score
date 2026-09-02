@@ -14,6 +14,17 @@ const routes = [
   { path: '/app', name: 'companies', component: () => import('./views/CompaniesListView.vue'), meta: { requiresAuth: true, title: 'Your companies — Foreground' } },
   { path: '/app/login', name: 'login', component: () => import('./views/LoginView.vue'), meta: { title: 'Log in — Foreground' } },
   { path: '/app/signup', name: 'signup', component: () => import('./views/SignupView.vue'), meta: { title: 'Sign up — Foreground' } },
+  { path: '/app/forgot-password', name: 'forgot-password', component: () => import('./views/ForgotPasswordView.vue'), meta: { title: 'Reset your password — Foreground' } },
+  {
+    // No requiresAuth/redirect-if-authenticated guard, unlike login/signup —
+    // this page is driven by the token in the URL, not the current session
+    // (someone could click a reset link from a device that's also logged
+    // into a different account in another tab; the token still has to work).
+    path: '/app/reset-password',
+    name: 'reset-password',
+    component: () => import('./views/ResetPasswordView.vue'),
+    meta: { title: 'Set a new password — Foreground' },
+  },
   {
     path: '/app/companies/:id',
     name: 'company',
@@ -53,7 +64,7 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth && !isAuthenticated.value) {
     return { name: 'login', query: { redirect: to.fullPath } };
   }
-  if ((to.name === 'login' || to.name === 'signup') && isAuthenticated.value) {
+  if ((to.name === 'login' || to.name === 'signup' || to.name === 'forgot-password') && isAuthenticated.value) {
     return { name: 'companies' };
   }
   return true;

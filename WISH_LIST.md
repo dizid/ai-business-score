@@ -88,9 +88,15 @@ aivis-scan.netlify.app`) first; if Neon Auth only accepts exact matches,
 this'll need a per-PR entry, which probably isn't worth doing routinely —
 plan to test auth-touching changes against production instead.
 
-**7. No password-reset flow.** `LoginView.vue`/`auth.ts` have no
-forgot-password link, route, or handler — confirmed by reading the code,
-not a bug, just never built. Better Auth (what Neon Auth runs on) supports
-password reset, but wiring it up needs both new UI (a "forgot password"
-route + form) and email-sending configured on the Neon Auth project side,
-which also needs Neon console access this session doesn't have.
+**7. No password-reset flow.** ~~`LoginView.vue`/`auth.ts` have no
+forgot-password link, route, or handler~~ — **DONE 2026-09-02.** Confirmed
+via Neon MCP's `get_neon_auth_config` (not the console — faster, no access
+gap) that a shared email provider was already live
+(`auth@mail.myneon.app`), so nothing needed changing project-side. Added
+`requestPasswordReset`/`resetPassword` to `auth.ts`, two new views
+(`ForgotPasswordView.vue`, `ResetPasswordView.vue`), a "Forgot password?"
+link on `LoginView.vue`, and two new routes. Verified fully end-to-end
+against the real Neon Auth backend (not mocked): request → real token
+found in `neon_auth.verification` via Neon MCP → reset succeeded → login
+with the new password succeeded → reusing the same token correctly 400s
+with "Invalid token". See `src/app/CLAUDE.md` for the flow detail.

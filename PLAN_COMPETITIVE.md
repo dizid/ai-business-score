@@ -63,9 +63,8 @@ engine-count parity with funded competitors (not realistic for a solo team).
    place (historical data, matches repo convention). Check with Marc before
    touching the stray live `STRIPE_TOPUP_PRICE_ID` env var.
 
-5. **Password reset** — `better-auth` already has the primitives, just never
-   wired up. First confirm Neon Auth's console actually has reset-email
-   delivery turned on, then add the client calls + two new views.
+5. ~~**Password reset**~~ — **DONE 2026-09-02.** See `WISH_LIST.md`'s #7
+   for the full shipped/verified detail.
 
 6. **Cookie consent banner** — small custom banner (fits the brand better
    than a library), gates the GA4 script load behind consent, stored in

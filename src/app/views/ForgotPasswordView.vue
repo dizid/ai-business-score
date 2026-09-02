@@ -1,24 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { signIn } from '../lib/auth';
+import { requestPasswordReset } from '../lib/auth';
 import Icon from '../../shared/Icon.vue';
 
-const router = useRouter();
-const route = useRoute();
-
 const email = ref('');
-const password = ref('');
 const submitting = ref(false);
 const error = ref('');
+const sent = ref(false);
 
 async function onSubmit() {
   submitting.value = true;
   error.value = '';
   try {
-    await signIn(email.value.trim(), password.value);
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/app';
-    router.push(redirect);
+    await requestPasswordReset(email.value.trim());
+    // Always show the same confirmation regardless of whether the address
+    // has an account — don't let this form become a way to check which
+    // emails are registered.
+    sent.value = true;
   } catch (err) {
     error.value = (err as Error).message;
   } finally {
@@ -32,19 +30,24 @@ async function onSubmit() {
     <div class="brand-mark" aria-hidden="true">
       <Icon name="logo" />
     </div>
-    <h1>Log in</h1>
-    <form class="card" @submit.prevent="onSubmit">
+    <h1>Reset your password</h1>
+
+    <div class="card" v-if="sent">
+      <p class="status success">
+        If an account exists for <strong>{{ email }}</strong>, a password reset
+        link is on its way — check your inbox.
+      </p>
+    </div>
+
+    <form class="card" v-else @submit.prevent="onSubmit">
+      <p class="hint-text">Enter your email and we'll send you a link to set a new password.</p>
       <label>Email</label>
-      <input type="email" v-model="email" required autocomplete="email" />
+      <input type="email" v-model="email" required autocomplete="email" autofocus />
 
-      <label>Password</label>
-      <input type="password" v-model="password" required autocomplete="current-password" />
-
-      <button type="submit" :disabled="submitting">{{ submitting ? 'Logging in…' : 'Log in' }}</button>
+      <button type="submit" :disabled="submitting">{{ submitting ? 'Sending…' : 'Send reset link' }}</button>
       <div class="status error" v-if="error">{{ error }}</div>
-      <p class="forgot"><router-link to="/app/forgot-password">Forgot password?</router-link></p>
     </form>
-    <p class="switch">No account yet? <router-link to="/app/signup">Sign up</router-link></p>
+    <p class="switch"><router-link to="/app/login">Back to log in</router-link></p>
   </main>
 </template>
 
@@ -56,6 +59,7 @@ main { max-width: 420px; margin: 0 auto; padding: var(--space-2xl) var(--space-m
 .brand-mark :deep(.icon) { width: 26px; height: 26px; }
 h1 { font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.01em; text-align: center; margin: 0 0 28px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 30px 28px; box-shadow: var(--shadow); }
+.hint-text { color: var(--muted); font-size: 0.9rem; margin: 0 0 18px; }
 label { display: block; font-size: 0.83rem; font-weight: 600; color: var(--muted); margin-top: 18px; margin-bottom: 6px; }
 label:first-child { margin-top: 0; }
 input {
@@ -77,8 +81,11 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   background: color-mix(in srgb, var(--critical) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--critical) 28%, transparent);
 }
+.status.success {
+  margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 0.9rem; color: var(--good);
+  background: color-mix(in srgb, var(--good) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--good) 28%, transparent);
+}
 .switch { text-align: center; margin-top: 24px; font-size: 0.9rem; color: var(--muted); }
 .switch a { font-weight: 600; }
-.forgot { text-align: center; margin: 14px 0 0; font-size: 0.85rem; }
-.forgot a { color: var(--muted); }
 </style>
