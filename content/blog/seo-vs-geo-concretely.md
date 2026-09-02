@@ -1,6 +1,6 @@
 ---
 title: SEO and AI visibility are not the same job
-description: SEO wins a ranking. AI visibility wins a sentence. Why the two are mechanically different — and what actually changes what a model says about you.
+description: SEO wins a ranking. AI visibility wins a sentence. Why the two are mechanically different, and what actually changes what a model says about you.
 date: 2026-08-24
 ---
 

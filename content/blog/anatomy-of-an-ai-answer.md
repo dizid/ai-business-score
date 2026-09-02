@@ -1,6 +1,6 @@
 ---
 title: What happens between "best dentist near me" and the answer you get
-description: An AI answer isn't a ranking of your website — it's a candidate cloud compressed into one sentence. How that compression actually works, and why it favors specific, quotable businesses.
+description: An AI answer isn't a ranking, it's a cloud of candidate businesses compressed into one sentence, and vague businesses lose that compression first.
 date: 2026-08-24
 ---
 

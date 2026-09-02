@@ -1,6 +1,6 @@
 ---
 title: What to actually do this week if AI doesn't know you exist
-description: A free, 40-minute checklist for checking and improving how your business shows up in ChatGPT and Gemini answers — no tool required for the first four steps.
+description: A free, 40-minute checklist for checking and improving how your business shows up in ChatGPT and Gemini answers, no tool required for the first four steps.
 date: 2026-08-24
 ---
 

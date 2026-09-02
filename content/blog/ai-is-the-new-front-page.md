@@ -1,6 +1,6 @@
 ---
 title: Google isn't the front page anymore
-description: AI answers don't have a results page — just a foreground and everyone else. Here's what that means for how a business gets found now.
+description: AI answers don't give you a ranked list, just one or two names, and good SEO doesn't guarantee your business is one of them.
 date: 2026-08-24
 ---
 
