@@ -12,6 +12,53 @@ Console developer account will be Marc's standard/personal Google
 account, not a new one created for this — no new-account setup needed on
 that front, just confirming access when M3 starts.
 
+**Domain chosen: `foreground.info`** (registered 2026-09-02 by Marc).
+
+## Handoff — resume here
+
+As of 2026-09-02, this is a **live blocker**, not a future task:
+
+- `foreground.info` is registered but **not yet attached to the Netlify
+  site**. Checked via the Netlify MCP `get-project` call against site
+  `aivis-scan` (`70e29675-6562-4245-831a-7a3392e51980`) — its
+  `primarySiteUrl` still reads `aivis-scan.netlify.app`, no custom domain
+  configured.
+- The Netlify MCP tools available in this session have no domain-write
+  operation (checked `netlify-project-services-updater`'s op list) — this
+  step needs Marc directly in the Netlify dashboard:
+  1. Netlify dashboard → site `aivis-scan` → Domain management → Add a
+     domain → `foreground.info`.
+  2. DNS: if registered through Netlify, it auto-configures. If through
+     an external registrar, Netlify shows either nameservers to delegate
+     (simplest — Netlify then manages DNS + free Let's Encrypt TLS) or an
+     A/ALIAS + CNAME pair to add at the registrar instead.
+  3. Wait for Netlify to confirm DNS + issue the cert (minutes to a few
+     hours).
+- **Once `foreground.info` actually resolves to the site**, come back and
+  ask Claude to (this session or a fresh one — this doc has the full
+  context):
+  1. Swap all 18 hardcoded `aivis-scan.netlify.app` references (found via
+     `grep -r aivis-scan.netlify.app`) to `foreground.info` — canonical/OG/
+     JSON-LD tags in `index.html`, `how-it-works.html`, `privacy.html`,
+     `terms.html`; `public/sitemap.xml`, `public/robots.txt`,
+     `public/llms.txt`; `scripts/build-blog.mjs`'s blog template;
+     `shared/entityPresence.mjs`; `netlify/functions/scheduled-rescan.mts`.
+     (`proof-script/OUTREACH.md`, `TODO.md`, `WISH_LIST.md`, `README.md`,
+     `TODO-MARKETING.md`, `CLAUDE.md`, `DASHBOARD.md` are historical/journal
+     entries — leave those as-is per this repo's own dated-entry
+     convention, same reasoning as the AIVis→Foreground rename note at the
+     top of root `CLAUDE.md`.)
+  2. Add `https://foreground.info` to Neon Auth's `trusted_origins`
+     (dashboard step — no Neon MCP server available in this session; give
+     Marc exact instructions if still unavailable next time, or check
+     again in case Neon MCP has connected by then).
+  3. Update root `CLAUDE.md`'s Deployment section to record the domain
+     (matching how it already documents every other infra decision here).
+  4. Then proceed to M1 (PWA hardening) below.
+- The Netlify site itself is currently unaffected either way — no code
+  changes have been made yet in this pass; the only artifact from this
+  session so far is this planning doc.
+
 ## Current state relevant to this
 
 - `app.html` is the real product: an authenticated vue-router SPA
