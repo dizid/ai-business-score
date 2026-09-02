@@ -30,8 +30,12 @@ interface CompanyRow {
 const REGRESSION_ALERT_THRESHOLD = 15;
 const LONG_UNSCANNED_DAYS = 14;
 
-type SortMode = 'recent' | 'score' | 'regression';
-const sortMode = ref<SortMode>('recent');
+type SortMode = 'attention' | 'recent' | 'score' | 'regression';
+const sortMode = ref<SortMode>('attention');
+
+type FilterMode = 'all' | 'attention' | 'leading' | 'no-data';
+const filterMode = ref<FilterMode>('all');
+const searchQuery = ref('');
 
 interface Profile {
   plan_tier: string;
@@ -120,8 +124,34 @@ const portfolioStats = computed(() => {
   return { avg, best, worst, attentionCount };
 });
 
+// Search/filter controls only render at companies.length > 1
+// (CompaniesListView's own template), but the computeds below stay
+// unconditional — harmless no-ops at 0-1 companies since the default
+// search/filter state matches everything.
+const filteredCompanies = computed(() => {
+  let rows = companies.value;
+  const q = searchQuery.value.trim().toLowerCase();
+  if (q) {
+    rows = rows.filter((c) => c.brand.toLowerCase().includes(q) || c.category.toLowerCase().includes(q));
+  }
+  if (filterMode.value === 'attention') {
+    rows = rows.filter(needsAttention);
+  } else if (filterMode.value === 'leading') {
+    rows = rows.filter((c) => typeof c.latest_score === 'number' && scoreBand(c.latest_score) === 'leading');
+  } else if (filterMode.value === 'no-data') {
+    rows = rows.filter((c) => typeof c.latest_score !== 'number');
+  }
+  return rows;
+});
+
 const sortedCompanies = computed(() => {
-  const rows = [...companies.value];
+  const rows = [...filteredCompanies.value];
+  if (sortMode.value === 'attention') {
+    return rows.sort((a, b) => {
+      const attentionDiff = Number(needsAttention(b)) - Number(needsAttention(a));
+      return attentionDiff !== 0 ? attentionDiff : (a.delta ?? 0) - (b.delta ?? 0);
+    });
+  }
   if (sortMode.value === 'score') {
     return rows.sort((a, b) => (b.latest_score ?? -1) - (a.latest_score ?? -1));
   }
@@ -130,6 +160,11 @@ const sortedCompanies = computed(() => {
   }
   return rows.sort((a, b) => new Date(b.last_scanned_at ?? b.created_at).getTime() - new Date(a.last_scanned_at ?? a.created_at).getTime());
 });
+
+function clearFilters() {
+  searchQuery.value = '';
+  filterMode.value = 'all';
+}
 
 function formatAlertAge(iso: string): string {
   const age = daysSince(iso);
@@ -329,10 +364,15 @@ onMounted(loadCompanies);
         <span class="portfolio-value" :style="{ color: scoreColor(portfolioStats.worst.latest_score) }">{{ portfolioStats.worst.latest_score }}</span>
         <span class="portfolio-label">Worst — {{ portfolioStats.worst.brand }}</span>
       </div>
-      <div class="portfolio-stat" :class="{ warn: portfolioStats.attentionCount > 0 }">
+      <button
+        type="button"
+        class="portfolio-stat portfolio-stat-clickable"
+        :class="{ warn: portfolioStats.attentionCount > 0, active: filterMode === 'attention' }"
+        @click="filterMode = filterMode === 'attention' ? 'all' : 'attention'"
+      >
         <span class="portfolio-value">{{ portfolioStats.attentionCount }}</span>
         <span class="portfolio-label">Needing attention</span>
-      </div>
+      </button>
     </div>
 
     <div class="alerts-section" v-if="alerts.length > 0 && !showCreate && !showExample">
@@ -448,15 +488,33 @@ onMounted(loadCompanies);
     </div>
 
     <template v-else-if="companies.length > 0">
-      <div class="list-controls">
-        <label for="sort-select">Sort by</label>
-        <select id="sort-select" v-model="sortMode">
-          <option value="recent">Last scanned</option>
-          <option value="score">Score</option>
-          <option value="regression">Biggest drop first</option>
-        </select>
+      <div class="list-controls" v-if="companies.length > 1">
+        <input
+          type="search"
+          v-model="searchQuery"
+          class="search-input"
+          placeholder="Search brand or category…"
+          aria-label="Search companies"
+        />
+        <div class="filter-sort-group">
+          <label for="filter-select">Filter</label>
+          <select id="filter-select" v-model="filterMode">
+            <option value="all">All</option>
+            <option value="attention">Needs attention</option>
+            <option value="leading">Leading</option>
+            <option value="no-data">No data</option>
+          </select>
+          <label for="sort-select">Sort by</label>
+          <select id="sort-select" v-model="sortMode">
+            <option value="attention">Needs attention first</option>
+            <option value="recent">Last scanned</option>
+            <option value="score">Score</option>
+            <option value="regression">Biggest drop first</option>
+          </select>
+        </div>
       </div>
-      <div class="list">
+
+      <div class="list" v-if="sortedCompanies.length > 0">
         <router-link
           v-for="company in sortedCompanies"
           :key="company.id"
@@ -489,6 +547,10 @@ onMounted(loadCompanies);
             <Icon name="chevron" class="chevron" />
           </div>
         </router-link>
+      </div>
+      <div class="empty-state no-match" v-else>
+        <p>No companies match your filters.</p>
+        <button type="button" class="empty-cta" @click="clearFilters">Clear filters</button>
       </div>
     </template>
   </main>
@@ -532,6 +594,12 @@ p.sub { color: var(--muted); margin: 0; }
 .portfolio-value { display: block; font-size: 1.5rem; font-weight: 700; font-variant-numeric: proportional-nums; }
 .portfolio-stat.warn .portfolio-value { color: var(--critical); }
 .portfolio-label { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.portfolio-stat-clickable {
+  cursor: pointer; font: inherit; text-align: left; color: inherit; width: 100%;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.portfolio-stat-clickable:hover { transform: translateY(-1px); border-color: var(--accent); }
+.portfolio-stat-clickable.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
 
 .alerts-section {
   background: color-mix(in srgb, var(--critical) 6%, var(--card));
@@ -547,9 +615,16 @@ p.sub { color: var(--muted); margin: 0; }
 .alert-row:hover { color: var(--critical); }
 
 .list-controls {
-  display: flex; align-items: center; gap: 8px; justify-content: flex-end;
-  margin-bottom: 10px; font-size: 0.85rem; color: var(--muted);
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; justify-content: space-between;
+  margin-bottom: 14px; font-size: 0.85rem; color: var(--muted);
 }
+.search-input {
+  flex: 1 1 200px; min-width: 160px; padding: 7px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--card); color: var(--fg); font-size: 0.85rem;
+}
+.search-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent); }
+.filter-sort-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .list-controls select {
   padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--card); color: var(--fg); font-size: 0.85rem;
