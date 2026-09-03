@@ -37,7 +37,17 @@ Change 1, extended):** a local `viewMode: 'overview' | 'details'` ref
 score card — zero new props, so it works unchanged in both `result.html`
 and `CompanyDetailView.vue`. **Overview** keeps the AI score ring, headline,
 warning banners, scoreboard, advice cards, deep advice, and a compact
-Harmonia summary (see below). **Details** holds the denser sections —
+Harmonia summary (see below), and — **added 2026-08-25**, now the first
+thing shown in the tab — an **Executive Summary** card
+(`deriveExecutiveSummary()` in `src/shared/scanDerived.ts`): a
+skim-in-10-seconds `{verdict, vulnerability, quickWin}` synthesis, pure
+re-derivation of data computed elsewhere (score band, category breakdown,
+Harmonia's AI-crawler/schema findings), no new LLM call. The same commit
+added **share-of-voice %** to the scoreboard (`shareOfVoicePct()`, same
+file) — distinct from the existing presence-rate percentage
+(`scoreboardRowPct`, mentions ÷ completed calls): share of voice is
+mentions ÷ total mentions across brand + competitors, "of everyone who got
+mentioned, what fraction was you." **Details** holds the denser sections —
 Harmonia breakdown, "Your site, cited," check-by-check — each wrapped in
 the new `src/shared/CollapsibleSection.vue` (a `<details>`/`<summary>`
 "harmonica bar": summary row with a status/count, expands to reveal

@@ -173,6 +173,12 @@ for (const model of candidates) {
 
 ## Next steps
 
+**RESOLVED, same day (2026-08-17)** — Option 1 was taken: `run-scan-background.mts`
+now defines `CALL_TIMEOUT_MS_BY_MODEL`, giving `xai/grok-4.6` 100000ms
+instead of the shared 60000ms `CALL_TIMEOUT_MS` (per `TODO.md`'s
+2026-08-17 entry, matching step 3 below). The steps below are kept as the
+investigation's original record, not a still-open decision.
+
 1. Run the smoke-test script above (or similar) with real API keys against
    the Option 2 candidates — confirm which model IDs are actually valid and
    how fast they really are, before writing any code that depends on them.

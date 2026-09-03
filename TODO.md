@@ -72,16 +72,17 @@ assuming nothing else is in flight.
       the scan-polling failures — suspected Netlify concurrency ceiling)
       can actually be confirmed instead of guessed at from static code.
 - [x] ~~Priority call on `REPORTPLAN.md` Change 2~~ (agency portfolio
-      view). **Partially shipped 2026-08-27** (commit `0494ded`) —
+      view). **Shipped 2026-08-27** (commit `0494ded`) —
       `CompaniesListView.vue` is now a portfolio cockpit (avg/best/worst/
       needs-attention header, delta badges, sort by score/last-scanned/
       regression), so the priority call resolved itself via direct
-      shipping rather than a discussion. **Still open**: no search or
-      filter controls exist yet, and the shipped tile set differs from
+      shipping rather than a discussion. The shipped tile set differs from
       this doc's original Companies/Leading/Needs attention/No data spec
-      — see `REPORTPLAN.md`'s updated header for detail. A smaller
-      follow-up (add search + filter to what's already live), not the
-      original build-from-scratch ask.
+      — see `REPORTPLAN.md`'s updated header for detail. **Search + filter
+      (the one gap left after `0494ded`) shipped 2026-09-02** (commit
+      `4f1a2b8`) — brand/category search and a 4-bucket filter, both
+      client-side over the already-fetched list. Nothing left open from
+      this item.
 - [x] ~~Pricing-tier restructure decision (Phase 3 of the report/roadmap
       plan)~~ **Decided 2026-08-26** — see the Starter-pack item below.
 

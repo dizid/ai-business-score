@@ -12,13 +12,14 @@ portfolio dashboard...") — **but not as specified below.**
 (Portfolio average / Best–{brand} / Worst–{brand} / Needing attention,
 not this doc's Companies/Leading/Needs attention/No data tile set) and
 sort by score/last-scanned/regression, plus new delta badges this doc
-never proposed. **Still genuinely open, not shipped by that commit**:
-search and filter controls (this doc's `.includes()`-based
-brand/category search, the 4-bucket filter, "click a tile to filter").
-See `TODO.md`'s 2026-08-27 History entry for the full commit detail and
-the corrected doc-sweep note. The spec below is kept as the original
-record and as the still-accurate spec for the remaining search/filter
-gap — it is not a description of current `CompaniesListView.vue` state.
+never proposed. **Search and filter (the one gap left after `0494ded`)
+shipped 2026-09-02** (commit `4f1a2b8`) — `.includes()`-based brand/category
+search, a 4-bucket filter, and the "click a tile to filter" toggle this
+doc specified, matching the spec below item-for-item including the
+default-sort recommendation. See `TODO.md`'s 2026-08-27 and 2026-09-02
+History entries for the full commit detail. Nothing from this plan remains
+open — the spec below is kept as the original design record, not a
+description of remaining work.
 
 ## Context
 

@@ -5,6 +5,24 @@ Written after a full repo read (architecture docs, `scanPayload.ts`/`ScanDetail.
 This is the planning document for the requested engagement across three tracks:
 **dashboard/report work, marketing/content, and one known-gap cleanup.**
 
+*(Filename note, added during a 2026-09-02 doc-accuracy sweep: despite the
+name, this file has nothing to do with DeepSeek — `grep -i deepseek` on its
+own contents returns nothing. `TODO-MARKETING.md`/`REPORTPLAN.md` separately
+reference a different, actually-DeepSeek-related `DEEPSEEK.md` handoff file
+that doesn't currently exist in the repo. Left as-is rather than renamed,
+since nothing else references this exact filename — but don't assume DeepSeek
+involvement from the name.)*
+
+**Status as of 2026-09-02**: Track C shipped in full, closely matching this
+doc's design (commit `ad620c9`). Track A's core shipped (commits `0494ded`,
+`4f1a2b8`), though the exact tile set differs from A1's spec below — see
+`REPORTPLAN.md`'s own corrected header for the precise delta. Track B is
+still blocked on B1 (Marc's read of the 4 posts) — B3 (nav/footer blog
+links) shipped anyway (`partials/nav.html`/`footer.html` both link `/blog/`
+now), ahead of this doc's own recommended A → C → B ordering and its "no
+internal links without a CEO read first" spirit. Sections below are kept as
+the original plan record.
+
 ## 0. Orientation & decision gates first
 
 Everything below is buildable with the codebase as it stands. Before any

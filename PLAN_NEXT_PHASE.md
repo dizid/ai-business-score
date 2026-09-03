@@ -8,8 +8,8 @@ was never bumped to match)
 |---|---|
 | A — Correctness & trust | **Shipped**, pushed to `master` (`8af2803`). Live scan not yet re-verified due to a sandbox network limitation during testing — see `TODO.md`'s 2026-08-12 entry. |
 | B — Remove leaderboard + multi-URL | **Shipped**, pushed to `master`. |
-| C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13**, confirmed live in production 2026-08-14 via a real end-to-end scan — but that same live scan found a new cascading-timeout reliability gap (15/20 calls lost on one scan), not yet fixed. See `TODO.md`'s 2026-08-14 entry and Milestone C below. C3 (locale-aware prompts) not started. |
-| D — Product depth & trust surfaces | **D3 (footer/legal) and D4 (technical SEO) shipped.** D1 (raw data — likely already satisfied by A3, needs Marc's confirmation) and D2 (competitor click-through) not started. |
+| C — More models, speed, locale-aware prompts | **C1/C2 shipped 2026-08-13**, confirmed live in production 2026-08-14 via a real end-to-end scan — that same live scan found a cascading-timeout reliability gap, since fixed (see `docs/grok-timeout-investigation.md`'s resolution, `CALL_TIMEOUT_MS_BY_MODEL` in `run-scan-background.mts`). **C3 (locale-aware prompts) shipped 2026-08-25** (commit `3d12679`, EN+NL, see `shared/CLAUDE.md`). |
+| D — Product depth & trust surfaces | **D3 (footer/legal) and D4 (technical SEO) shipped.** **D2 (competitor click-through) shipped 2026-08-25** (commit `3d12679` — per-check click-through plus `CompetitorTrendChart.vue`). D1 (raw data — likely already satisfied by A3, needs Marc's confirmation) still open. |
 | F — Differentiation | **Both picks shipped** (row updated 2026-08-20). Citation-URL attribution shipped 2026-08-15 (Milestone F1). Sentiment-aware judge shipped 2026-08-15 as on-demand-only, then extended 2026-08-20 to auto-run on every scan — see `shared/CLAUDE.md`'s "Sentiment judge" entry for the full history. |
 | E — Monetization | **Superseded 2026-08-24** by `~/.claude/plans/we-need-alot-of-transient-floyd.md` — Marc explicitly waived E0 (the manual sales test below never ran) and decided pricing directly ($199/mo Pro, $19 one-time scan) instead. Deep-advice gating (E2/E3 below) and a one-time purchase SKU (E1, though shaped as a $19 single-scan product, not the €499 report this section originally proposed) both shipped 2026-08-24 — see `TODO.md`'s entry that date. E4 ("book a call" CTA) not built. |
 | G — Growth loop | Not started. No longer strictly gated on E0 (waived), but still sensibly gated on a first *real* payment — and `STRIPE_SECRET_KEY` is a test-mode key as of 2026-08-24 (see root `CLAUDE.md`), so no real payment can land yet regardless. |
@@ -233,7 +233,7 @@ full cleanup.
 3. Update CLAUDE.md's Database schema section so it doesn't re-drift once
    these features are gone from the UI but their columns remain.
 
-### Milestone C — More models, speed, locale-aware prompts — C1/C2 ✅ SHIPPED 2026-08-13, verified live 2026-08-14 (found a new gap, unfixed), C3 not started
+### Milestone C — More models, speed, locale-aware prompts — C1/C2 ✅ SHIPPED 2026-08-13, verified live 2026-08-14 (found a gap, since fixed — see `docs/grok-timeout-investigation.md`), C3 ✅ SHIPPED 2026-08-25
 
 **2026-08-14 live verification:** a real end-to-end scan (ASML, via a
 throwaway test account) confirmed the score/detection/email pieces below
@@ -273,15 +273,16 @@ Marc's call, logged for later prioritization rather than fixed inline.
    top of a large fraction of calls silently failing. A scan-complete
    notification (so a user isn't stuck watching a multi-minute scan) is
    identified as necessary follow-up, not yet built.
-3. **Locale-aware prompts**: capture a `language` field at
-   enrichment/company-creation time (extend `buildEnrichPrompt` to infer
-   it too). Maintain a small set of parallel-translated `PROMPT_TEMPLATES`
-   for the languages Marc's customers actually need (start with Dutch +
-   English fallback, expand as needed) rather than a live translation call
-   per scan — keeps cost/latency down and lets the wording be reviewed for
-   quality since these are real queries sent to grounded search.
+3. **✅ Shipped 2026-08-25** (commit `3d12679`). `companies.language`
+   (`'en'`|`'nl'`, set at company-creation time in `companies.mts`) selects
+   between `PROMPT_TEMPLATES` (English) and the new `PROMPT_TEMPLATES_NL`
+   via `promptTemplatesForLanguage()` — a maintained parallel-translated
+   set, not a live translation call per scan, matching this item's original
+   cost/quality reasoning exactly. `buildEnrichPrompt` was not extended to
+   infer language automatically — it's set explicitly at creation time
+   instead. See `shared/CLAUDE.md` for the full detail.
 
-### Milestone D — Product depth & trust surfaces — D3/D4 ✅ SHIPPED 2026-08-12, D1/D2 not started
+### Milestone D — Product depth & trust surfaces — D3/D4 ✅ SHIPPED 2026-08-12, D2 ✅ SHIPPED 2026-08-25, D1 still open (needs Marc's confirmation)
 
 1. **Raw data**: Milestone A3 already restores per-prompt/per-model failure
    detail; combined with the existing "check-by-check" `<details>` UI
@@ -289,21 +290,19 @@ Marc's call, logged for later prioritization rather than fixed inline.
    `ScanDetail.vue:221-244`), this likely satisfies "I would still like to
    see that." Confirm with Marc once shipped whether anything more (e.g. a
    JSON/CSV export) is wanted, rather than assuming more UI is needed.
-2. **Competitor analysis depth**, including fixing the "numbers don't add
-   up" confusion (screenshot 10, Apple scan: Samsung 12/13, Microsoft 3/13,
-   Google 0/13, with "ranked first in 11, beaten in 2, not mentioned in 0"
-   summarized separately). The tallies likely *are* internally consistent —
-   the 2 checks where Apple was beaten are almost certainly 2 of Samsung's
-   12 mentions — but nothing today lets a user verify that, which reads as
-   the numbers not adding up. Fix: make each competitor's tally
-   click-through to the specific prompts they appeared in (join
-   `competitor_tallies` against `per_prompt_rank`/`raw_responses` by
-   index), so "Samsung beat you 2x" links directly to *which* 2 of the 13
-   checks. Also add a competitor-mention trend alongside the existing
-   score-over-time chart, and surface a representative snippet from
-   `raw_responses` near each competitor's mention so the user sees *why*
-   that competitor got cited (echoes the deep-advice text that already
-   says "worth understanding what makes them citable").
+2. **✅ Shipped 2026-08-25** (commit `3d12679`), all three asks. Competitor
+   tallies click through to the specific checks they won
+   (`deriveCompetitorAppearances()` in `src/shared/scanDerived.ts`, joined
+   by index against `raw_responses`/`perPromptRank` — no backend join
+   needed, `GET /companies/:id` already returns both index-aligned), each
+   appearance carrying a ~240-char text snippet around the mention
+   (`CompetitorAppearance.snippet`, rendered in `ScanDetail.vue`) —
+   directly satisfying the "surface a representative snippet... so the user
+   sees *why* that competitor got cited" ask. A new multi-series
+   competitor-mention trend chart (`CompetitorTrendChart.vue`) sits
+   alongside the existing score-over-time chart. Together this addresses
+   the original "numbers don't add up" confusion this item was written to
+   fix.
 3. **Footer + legal pages**: add a shared footer once, inside
    `src/app/App.vue` (wraps every `/app/*` route already), and extend
    `index.html`'s existing bare-bones `<footer>` (currently just copyright +

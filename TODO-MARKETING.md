@@ -29,10 +29,14 @@ this app," wanting a low one-time scan fee plus subscriptions/Pro, and a
 marketing/PR/sales strategy. Full plan:
 `~/.claude/plans/we-need-alot-of-transient-floyd.md`.
 
-**Pricing decided and shipped**: Pro subscription **$199/month** (a
-deliberate premium position, above Otterly's $29 and Peec AI's $95 entry
+**Pricing decided and shipped**: Pro subscription launched at **$199/month**
+(a deliberate premium position, above Otterly's $29 and Peec AI's $95 entry
 points per the existing competitor research — no longer "cheapest in
-category," a real repositioning), one-time single scan **$19**. Synced
+category," a real repositioning), one-time single scan **$19**. **Stale as
+of 2026-08-27 — Pro is now $99/month**, and Stripe itself has since been
+live briefly (2026-08-28) then reverted to test mode (2026-09-02); root
+`CLAUDE.md`'s Deployment section is the current source of truth for
+price/mode, not this entry. Synced
 across `index.html` (pricing cards, JSON-LD, FAQ), `llms.txt`,
 `README.md`, `terms.html`, and the app itself (deep advice now actually
 Pro-gated — see `TODO.md`'s 2026-08-24 entry for the engineering side).

@@ -172,6 +172,27 @@ See the root `CLAUDE.md` for overall project context.
   checks `EXISTS (... WHERE scan_id = $scanId)`), the free-cap-bypass
   record, and — for anonymous purchases — the pending-claim record until
   `claim-single-scan.mts` sets `user_id`.
+- **`companies.language`** — added 2026-08-25 (Milestone C3, EN/NL prompt
+  support), `text`, `'en'`|`'nl'`|`null`. Set at creation time by
+  `companies.mts` from `SUPPORTED_LANGUAGES`; read by
+  `run-scan-background.mts` (`promptTemplatesForLanguage(company.language ??
+  'en')`) to pick which language's prompt-template set a scan draws its
+  5-prompt slice from.
+- **`scans.entity_presence`** — added 2026-08-25, `jsonb`, nullable/additive
+  (same pattern as `harmonia`/`own_site_citations`). An off-site authority
+  signal — a Wikipedia/Wikidata lookup for the scanned brand, computed by
+  `shared/entityPresence.mjs`'s `analyzeEntityPresence()` and written
+  alongside the scan's other jsonb columns; read via `scanRow.mts` and
+  rendered in `ScanDetail.vue`.
+- **`score_alerts`** — new table, added 2026-08-27 (the portfolio-dashboard
+  pass). One row per detected score regression: `company_id`/`scan_id` FKs,
+  `prior_score`, `new_score`, `delta`, `created_at`. Written by
+  `run-scan-background.mts` alongside (not instead of)
+  `sendScoreRegressionEmail` — the email alone is invisible until someone
+  checks their inbox, so this row backs the portfolio dashboard's "Alerts"
+  section instead (`companies.mts`'s `GET /companies`: last 30 days, most
+  recent first, capped at 10, no read/dismissed state — out of scope for
+  that pass).
 
 Schema and Neon Auth were provisioned via the Neon MCP tools
 (`create_project`, `provision_neon_auth`, `prepare_database_migration` →
@@ -197,6 +218,15 @@ for the exact migration SQL if it needs revisiting.
   `validatePayload()` expects (the same shape the old stateless-link
   `/scan` used to write into the URL fragment) — this is what lets
   `ScanDetail.vue` render DB-backed data completely unchanged.
+- **`scoreHistory.mts`** — `getPreviousCompletedScore(db, companyId,
+  excludeScanId)`: most recent *other* completed scan's score for a
+  company, `null` if there isn't one. Called by `run-scan-background.mts`
+  to decide whether a just-finished scan counts as a score regression
+  (feeds `score_alerts` + the regression email); `companies.mts`'s
+  portfolio-dashboard list query re-expresses the same "previous score"
+  definition as a raw SQL `LATERAL` join instead of calling this function
+  (a per-row list query, not a single lookup) — its own comment points
+  back here so the two definitions don't drift apart.
 - **Frontend** (`src/app/lib/auth.ts`): wraps `better-auth`'s
   framework-agnostic client (`createAuthClient` from `'better-auth/client'`,
   cross-origin against Neon Auth's own domain — the client handles that
@@ -267,37 +297,45 @@ gap this update fixes rather than something built this session.
   frontend (`CompanyDetailView.vue`/`ScanDetail.vue`'s new
   `deepAdviceLocked` prop) shows an "Upgrade to Pro" CTA in place of the
   generate button for non-Pro users instead of hiding the section outright.
-  The Pro subscription price is now decided and live: **$199/month**,
-  reflected in `index.html`'s pricing card, FAQ, and JSON-LD `Offer`, and
-  `llms.txt`. **Confirmed 2026-08-24**: a direct Stripe API check found the
-  original `STRIPE_PRICE_ID` actually charged $29/month, a stale
-  placeholder — a new Price (`price_1U7s8r8gBja0qkMxwx4bqoSD`) was created
-  at $199/month and the env var swapped (see root `CLAUDE.md`'s Deployment
-  section for the full correction). Note `STRIPE_SECRET_KEY` is still a
-  Stripe *test-mode* key, so "live" here means the pricing/config matches
-  reality, not that real payments are being accepted yet.
+  The Pro subscription price was decided and shipped live on 2026-08-24 at
+  **$199/month**, reflected in `index.html`'s pricing card, FAQ, and
+  JSON-LD `Offer`, and `llms.txt`. **Confirmed 2026-08-24**: a direct
+  Stripe API check found the original `STRIPE_PRICE_ID` actually charged
+  $29/month, a stale placeholder — a new Price
+  (`price_1U7s8r8gBja0qkMxwx4bqoSD`) was created at $199/month and the env
+  var swapped. **Superseded — do not treat the figures above as current**:
+  Pro dropped to $99/month on 2026-08-27, then Stripe itself went through a
+  live→test-mode round trip (live 2026-08-28, back to test mode
+  2026-09-02, new test-mode Price IDs both times). Root `CLAUDE.md`'s
+  Deployment section is the single canonical source for the current
+  price, Price ID, and Stripe mode — check there, not here; this paragraph
+  is kept only as the historical record of the original $29→$199
+  placeholder-price correction.
 - **Scan top-up packs** (added 2026-08-23) — Pro users who hit the
   monthly cap can buy a one-time $19/10-scan pack instead of waiting for
   the reset. See the `scan_credit_purchases` schema entry above for the
   accounting model (insert-only, rolling 2-month window, no decrementing
-  balance). **Live as of 2026-08-24**: `STRIPE_TOPUP_PRICE_ID` was created
-  and set (`price_1U7s9K8gBja0qkMx9TV9czH4`, $19/10 scans) —
-  `create-topup-checkout-session.mts` no longer 500s. This is a distinct
-  SKU from the still-unbuilt one-time report purchase below — same
-  architectural shape (separate one-time Stripe Price + additive purchases
-  table), different product.
+  balance). Went live 2026-08-24 (`STRIPE_TOPUP_PRICE_ID` set,
+  `create-topup-checkout-session.mts` stopped 500ing) but this is now
+  **stale — the feature is currently disabled, not live**: the frontend
+  top-up CTA was removed from the app 2026-08-27, and
+  `create-topup-checkout-session.mts` is currently hard-gated by
+  `checkoutTemporarilyDisabled()` (`_shared/stripe.mts`) — its production
+  `STRIPE_TOPUP_PRICE_ID` is a stray live Price left over from an unrelated
+  concurrent-session mistake, not a value to trust. Full removal of this
+  purchase path is tracked in `TODO.md`.
 - **Single-scan purchase — shipped 2026-08-24** (Milestone 2 of
   `~/.claude/plans/we-need-alot-of-transient-floyd.md`): a $19 one-time
   scan, serving both an anonymous lead-gen entry point and a logged-in
   free-tier fallback for a user out of scans who doesn't want to
-  subscribe, bundling deep advice for that one scan. **Live as of
-  2026-08-24**: `STRIPE_SINGLE_SCAN_PRICE_ID` was created and set
-  (`price_1U7s9C8gBja0qkMxi4bLhk3X`, $19 one-time) and live-verified with a
-  full anonymous Checkout session (`amount_total: 1900`) —
-  `create-single-scan-checkout-session.mts` no longer 500s. The E0
-  manual-sales-validation gate from `PLAN_NEXT_PHASE.md` was explicitly
-  waived by Marc for this round; pricing was decided directly instead
-  ($199/mo Pro, $19 one-time).
+  subscribe, bundling deep advice for that one scan. Still live and still
+  $19, but the **Price ID has since changed** — `price_1U7s9C8gBja0qkMxi4bLhk3X`
+  above was superseded during the 2026-09-02 live→test-mode reversion; see
+  root `CLAUDE.md`'s Deployment section for the current
+  `STRIPE_SINGLE_SCAN_PRICE_ID`. The E0 manual-sales-validation gate from
+  `PLAN_NEXT_PHASE.md` was explicitly waived by Marc for this round;
+  pricing was decided directly instead (originally $199/mo Pro, now
+  $99/mo; $19 one-time unchanged).
 
 ### `netlify/functions/` — one function per file, all auth-scoped except `enrich`
 
@@ -412,8 +450,15 @@ gap this update fixes rather than something built this session.
   `shared/CLAUDE.md`'s "Deep advice" section.
 - **`judge-sentiment.mts`** — POST `/scans/:id/judge-sentiment`, body
   `{promptIndex, model}`, see `shared/CLAUDE.md`'s "Sentiment judge" section.
-- **`companies.mts`** — GET (list, with per-company `scan_count`/
-  `latest_score`) and POST (create) `/companies`, auth-scoped.
+- **`companies.mts`** — GET (list) and POST (create) `/companies`,
+  auth-scoped. **Expanded 2026-08-27** for the portfolio dashboard: `GET`
+  now returns, per company, `scan_count`/`latest_score` plus `prev_score`/
+  `delta`/`latest_scan_status`/`last_scanned_at` (`LEFT JOIN LATERAL`
+  subqueries against `scans`, same "previous score" definition as
+  `scoreHistory.mts` — see that entry above), and the response also
+  carries a top-level `alerts` array (last 30 days of `score_alerts` rows
+  across the caller's whole portfolio, capped at 10) backing the
+  dashboard's "Alerts" section.
 - **`company.mts`** — GET `/companies/:id` (via Netlify's URLPattern path
   syntax, `context.params.id`), returns the company plus its full scan
   history via `toScanPayload`. **Added 2026-08-26**: `PATCH /companies/:id`,
@@ -445,6 +490,23 @@ gap this update fixes rather than something built this session.
   derive one from the way `scan.mts` does) — **not yet live-verified
   post-deploy** that this resolves correctly, per this file's own
   "verify live before trusting" discipline.
+- **`ops-failure-digest.mts`** — added 2026-08-31 for
+  `docs/improvement-roadmap.md`'s long-standing reliability gap (the
+  `xai/grok-4.6` timeout incident was only caught via a user screenshot —
+  no aggregate view of `scans.failures` across users/time existed). This
+  repo's second scheduled/cron function, same shape as
+  `scheduled-rescan.mts` above (`config.schedule = '0 7 * * *'`, an hour
+  after that one's 06:00 run so they don't compete for the same DB
+  connections; no `path`, only reachable via Netlify's scheduler). Reads
+  every `completed`/`failed` scan from the last 24 hours, computes an
+  overall call-failure rate, failed-scan count, and per-provider failure
+  breakdown, and emails a digest (`sendOpsFailureDigestEmail`,
+  `_shared/email.mts`) only if one of three hardcoded thresholds is
+  crossed (15% call-failure rate, 3+ fully-failed scans, or 5+ failures
+  from a single provider) — silent no-op otherwise. Deliberately an email
+  digest, not a new admin dashboard route, since this app has no
+  admin/role system today. Thresholds are a judgment call, not tuned
+  against real incident data — the alert has never fired yet.
 - **`enrich.mts`** — POST `/enrich`, auth-gated (not company-scoped — it's a
   stateless research helper with no DB/company concept). Always returns 200
   even on internal failure (`{ ok: false, error }`); nothing here is

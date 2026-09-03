@@ -5,15 +5,16 @@ Claude, Grok — each queried directly against its own provider's API) are
 asked about their category, scores the result, and tracks it over time.
 
 Two separate tools live in this repo — this README covers both, with a
-focus on how to click/run through them for manual testing (there's no
-automated test suite, see "Why there's no test suite" below).
+focus on how to click/run through them for manual testing, since most of
+what breaks in practice is UI/integration behavior a unit test wouldn't
+catch (see "Automated tests" below for what *is* covered that way).
 
 | | `proof-script/` | repo root (this app) |
 |---|---|---|
 | What | A local CLI you run yourself | A hosted, self-serve, multi-tenant web app |
 | Who uses it | One person, hand-picked prospect list | Anyone who signs up |
 | State | None — writes local files | Neon Postgres, per-user accounts |
-| Deployed? | No — `node index.mjs` on your machine | Yes — `aivis-scan.netlify.app` |
+| Deployed? | No — `node index.mjs` on your machine | Yes — `foreground.info` (also still reachable at the underlying `aivis-scan.netlify.app` host) |
 
 If you just want to poke at the real app, skip to **"Testing the hosted
 app"** below. If you're running outbound checks against a prospect list,
@@ -28,19 +29,29 @@ npm install
 npm run dev
 ```
 
-Opens on `http://localhost:5173`. There's no `/` page — go straight to
-`/app` (redirects to login/signup automatically). `@netlify/vite-plugin`
-emulates Netlify Functions, and pulls env vars (`PERPLEXITY_API_KEY`,
-`DATABASE_URL`, `NEON_AUTH_JWKS_URL`) from the linked Netlify site
+Opens on `http://localhost:5173`. `/` is the public marketing landing page
+(reintroduced 2026-08-24 for the monetization push — see root `CLAUDE.md`
+if this looks odd, it used to redirect); the app itself lives at `/app`
+(redirects to login/signup automatically). `@netlify/vite-plugin` emulates
+Netlify Functions, and pulls env vars from the linked Netlify site
 automatically — this repo is already linked (see `.netlify/state.json`),
 so no local `.env` file is needed. If you ever clone fresh and it's not
 linked, run `netlify link` first (or ask whoever has access to the
-`aivis-scan` Netlify site).
+`aivis-scan` Netlify site). The full set of env vars the functions need:
+`DATABASE_URL`, `NEON_AUTH_JWKS_URL`, and — since the 2026-08-15
+direct-provider migration — one key per AI provider actually called
+(`PERPLEXITY_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
+`XAI_API_KEY`, `OPENAI_API_KEY`); a missing provider key just fails that
+provider's calls for the scan, it doesn't fail the whole request. See root
+`CLAUDE.md`'s Deployment section for the full current list (Stripe,
+Resend, GA4, PageSpeed).
 
-### Manual walkthrough (the de facto test plan)
+### Manual walkthrough
 
-There's no automated test suite, so this is the checklist to run through
-after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`:
+`npm run test:run` (see "Automated tests" below) covers pure-function
+logic, not UI/integration behavior — this is the checklist to run through
+by hand after any change to `src/app/`, `netlify/functions/`, or
+`shared/aivis-core.mjs`:
 
 1. **Sign up** — `/app/signup`, any real-looking email/password (min 8
    chars) works, no email verification step, you're logged in immediately.
@@ -52,21 +63,30 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
    straight to the new company's detail page and its first scan starts
    automatically — you won't land back on the list.
 3. **Watch the auto-triggered scan** (or click "Run new scan" on any
-   existing company). **Since 2026-08-13, expect 5-8 minutes, not
-   30-45 seconds** — it's making 20 real Perplexity calls (a 5-prompt slice
-   × 4 models) fully sequentially (`CONCURRENCY_LIMIT = 1` — Perplexity's
-   real per-key concurrency limit turned out to be ~1, confirmed via a live
-   smoke test; anything higher silently dropped a large fraction of calls
-   to HTTP 429) and polls every 2s. The status line will say "Queued…" then
-   "Running checks (~5-8 min)…". A scan-complete notification (so you don't
-   have to sit and watch this) is planned but not yet built.
-4. **Check the result** — an **Overview tab** (since 2026-08-19) with the
-   score ring, scoreboard (your brand vs. competitors), advice cards, a
-   compact sentiment-classification summary (since 2026-08-20 — see point 5
-   below), and the secondary "Harmonia" technical/SEO score (also since
-   2026-08-19, its own 4-pillar breakdown — schema/JSON-LD, crawlability,
-   Core Web Vitals, security headers — never blended into the main AI
-   Visibility Score); and a **Details tab** with the check-by-check
+   existing company) — a 5-prompt slice × 4 models = 20 checks, each model
+   called directly against its own provider's API since the 2026-08-15
+   direct-provider migration (only `openai/gpt-5-mini` still has a
+   Perplexity-gateway fallback). **Originally 5-8 minutes** (2026-08-13,
+   when everything ran through a single Perplexity key with a ~1-concurrent
+   real limit); **down to ~4 minutes (233.5s live-verified)** since the
+   2026-08-23 per-provider concurrency change — see
+   `netlify/functions/CLAUDE.md`'s `run-scan-background.mts` entry for the
+   current per-provider concurrency values. Polls every 2s; the status line
+   shows live progress ("Running checks: 12/20 done — checking
+   anthropic/claude-haiku-4-5…", since 2026-08-17) instead of a static
+   message. A scan-complete email (Resend) also fires once it finishes.
+4. **Check the result** — an **Overview tab** (since 2026-08-19) with an
+   Executive Summary card (since 2026-08-25 — a skim-in-10-seconds verdict/
+   vulnerability/quick-win synthesis, first thing shown), the score ring,
+   scoreboard (your brand vs. competitors, including a share-of-voice %
+   since 2026-08-25), advice cards, a compact sentiment-classification
+   summary (since 2026-08-20 — see point 5 below), and the secondary
+   **"Site Health"** technical/SEO score (renamed from "Harmonia" in the UI
+   2026-08-23 — that name only survives internally, in code/comments; look
+   for "Site Health" on screen, not "Harmonia") — its own 4-pillar
+   breakdown (schema/JSON-LD, crawlability, Core Web Vitals, security
+   headers), never blended into the main AI Visibility Score; and a
+   **Details tab** with the check-by-check
    breakdown grouped by prompt (per-model raw text, expandable) inside
    collapsible sections, and — **since 2026-08-12** — a list of exactly
    which prompt/model failed and why, if any did, instead of just an
@@ -155,10 +175,13 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
   prompt/model failed and why (since 2026-08-12) instead of hiding it
   behind an aggregate count. A scan with most of the 20 calls succeeding
   is normal; occasional failures don't invalidate the score.
-- **Scans take 5-8 minutes, not under a minute** (since 2026-08-13). This
-  is a deliberate reliability tradeoff, not a regression to "fix" by
-  raising concurrency back up — see `shared/CLAUDE.md`'s "Update 2026-08-13"
-  note (moved there from root `CLAUDE.md` on 2026-08-20 via `/doctor`).
+- **Scans take a few minutes, not under a minute** (~4 min as of the
+  2026-08-23 per-provider concurrency tuning, was 5-8 min before that). A
+  deliberate reliability tradeoff each time it's been tuned, not a
+  regression to "fix" by blindly raising concurrency further — see
+  `shared/CLAUDE.md`'s "Update 2026-08-13" note and
+  `netlify/functions/CLAUDE.md`'s `run-scan-background.mts` entry for the
+  full concurrency-tuning history and current per-provider values.
 - **Score shows "unavailable", never a fake 0**, if every call in a scan
   failed. A 0 always means "genuinely invisible," never "the API broke."
 - **Brand names that are actual common words** (e.g. "Best", "Pro") get
@@ -173,19 +196,24 @@ after any change to `src/app/`, `netlify/functions/`, or `shared/aivis-core.mjs`
   `aivis-qa-test-20260811@dizid.com`) from building/verifying this app —
   ignore them, sign up with your own email.
 
-### Why there's no test suite
+### Automated tests
 
-Deliberately deferred from day one (see `CLAUDE.md`) — `--dry-run` covers
-`proof-script/`'s pipeline with zero network calls, and the hosted app
-relies on `npm run type-check` (`vue-tsc`, covers `netlify/functions/**`
-too) plus this manual walkthrough. Revisit if a regression slips through
-that the walkthrough should have caught.
+`npm run test` / `npm run test:run` (vitest, added 2026-08-27) —
+`tests/aivis-core.test.mjs` and `tests/harmonia.test.mjs` cover pure-function
+logic in `shared/` (retry/backoff/concurrency, Harmonia's HTML/sitemap/PSI
+parsing). This isn't component/UI coverage — that's still the manual
+walkthrough above plus `npm run type-check` (`vue-tsc`, covers
+`netlify/functions/**` too). `--dry-run` covers `proof-script/`'s pipeline
+with zero network calls. Run `npm run test:run` after touching anything in
+`shared/`; re-run the manual walkthrough after touching `src/app/` or
+`netlify/functions/`.
 
 ## Testing `proof-script/`
 
 ```bash
 cd proof-script
-cp .env.example .env        # fill in PERPLEXITY_API_KEY
+cp .env.example .env        # fill in PERPLEXITY_API_KEY, ANTHROPIC_API_KEY,
+                             # GOOGLE_API_KEY, XAI_API_KEY, OPENAI_API_KEY
 cp prospects.example.json prospects.json   # fill in real prospects
 node index.mjs --dry-run    # sanity check — no network calls, no cost
 node index.mjs --prospects prospects.json  # the real run

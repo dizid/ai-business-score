@@ -27,8 +27,8 @@ curated list and the whole hook only works if the finding is real.
    authenticated multi-tenant app; every scan now lives behind login +
    company ownership, on purpose, so don't hunt for a `/result.html#d=...`
    link for anything scanned after that date, it won't exist. `proof-script`
-   stays the qualifier either way — more thorough, 8 prompts vs. the hosted
-   app's 3.)
+   stays the qualifier either way — more thorough, 10 prompts vs. the hosted
+   app's 5-prompt slice.)
 4. Pull the one-line hook from `results/<slug>.md`'s **"Directional email
    draft"** section — don't write your own claim, that section already
    exists specifically so the wording stays honest about what was actually

@@ -101,17 +101,35 @@ root `CLAUDE.md` for overall project context.
   shows a persistent "create a free account" banner linking to
   `/app/signup?claim=<token>`.
 - **`views/CompaniesListView.vue`** — lists the caller's companies
-  (`GET /companies`), each with `scan_count`/`latest_score` computed
-  server-side via correlated subqueries; a two-step "+ New company" form —
-  URL first, `POST /enrich` pre-fills brand/category/use_case/region/
-  customer_segment/competitors, then an editable review step before
-  `POST /companies` — falling back to a blank editable form on enrichment
-  failure (`enrich.mts` always returns 200 even on internal failure).
-  **Changed 2026-08-12**: on successful creation, `onCreate()` now
-  navigates straight to the new company's detail view with `?autoscan=1`
-  instead of just closing the form and staying on the list — a brand-new,
-  never-scanned company used to show the same bare `0` a real zero score
-  would, which read as broken.
+  (`GET /companies`), each with `scan_count`/`latest_score`/`prev_score`/
+  `delta`/`latest_scan_status`/`last_scanned_at` computed server-side (see
+  `netlify/functions/CLAUDE.md`'s `companies.mts` entry). **Reworked
+  2026-08-27 into a portfolio dashboard** ("cockpit," per its own commit
+  message): a summary strip (`portfolioStats` — portfolio average, best/
+  worst company by score, an "attention" tile that doubles as a filter
+  toggle), an `alerts` section (`score_alerts` rows from the same
+  `GET /companies` response), and `sortMode`
+  (`attention`/`recent`/`score`/`regression`, default `attention`) plus
+  (**added 2026-09-02**, same day as several other doc updates)
+  `filterMode` (`all`/`attention`/`leading`/`no-data`) and a plain
+  `.includes()` brand/category `searchQuery` — all client-side over the
+  already-fetched list, no extra request. Also new that day: an
+  `EXAMPLE_REPORT` link on the empty state ("See what a report looks
+  like →") that renders a canned `ScanDetail` payload in place, for a
+  brand-new account with zero companies.
+  The "+ New company" form itself changed shape too: URL first, `POST
+  /enrich` pre-fills brand/category/use_case/region/customer_segment/
+  competitors (falling back to a blank editable form on enrichment
+  failure — `enrich.mts` always returns 200 even on internal failure), but
+  the step after that is now a one-click **summary/confirm card by
+  default** (`showSummary`) — editing the pre-filled fields is an extra
+  opt-in click ("Edit details first," `editingDetails`), not the always-
+  shown editable review step this doc used to describe. **Changed
+  2026-08-12**: on successful creation, `onCreate()` navigates straight to
+  the new company's detail view with `?autoscan=1` instead of just closing
+  the form and staying on the list — a brand-new, never-scanned company
+  used to show the same bare `0` a real zero score would, which read as
+  broken.
 - **`views/CompanyDetailView.vue`** — one company's master-detail dashboard:
   `CompanyProgressChart.vue` (score-over-time, shown once a company has 2+
   scans — a single point isn't a trend) above a scan list, selecting a scan
@@ -122,8 +140,12 @@ root `CLAUDE.md` for overall project context.
   on one network blip). While a scan is `running`, `formatRunningStatus()`
   (added 2026-08-17) renders the live `{completed, total, currentModel}`
   object `scan-status.mts` now returns as "Running checks: 12/20 done —
-  checking anthropic/claude-haiku-4-5…" instead of a static message for
-  the whole 5-8 minute wait — not to be confused with
+  checking anthropic/claude-haiku-4-5…" instead of a static message for the
+  whole wait — **originally 5-8 minutes at the time this was written, since
+  reduced to ~4 minutes (233.5s live-verified) by the 2026-08-23
+  per-provider concurrency change**, see `netlify/functions/CLAUDE.md`'s
+  `run-scan-background.mts` entry for the current figure — not to be
+  confused with
   `CompanyProgressChart.vue` above, which is the unrelated historical
   score-over-time chart. Also owns the "Generate deeper advice" flow (POSTs
   `/scans/:id/deep-advice`, replaces the scan in local state with the

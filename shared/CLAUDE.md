@@ -21,11 +21,16 @@ sometimes longer. `proof-script` runs the full 10 prompts x 4 models = 40
 calls; the hosted site's `run-scan-background.mts` uses a 5-prompt slice (20
 calls) — see `netlify/functions/CLAUDE.md` for why. Each call has a 60s
 per-call timeout (`xai/grok-4.6` gets 100000ms — see that file's
-`CALL_TIMEOUT_MS_BY_MODEL` note). `callModelWithRetry` uses 3 attempts with a
-rate-limit-aware escalating backoff between them (longer for HTTP 429
-specifically than other failures) — the backoff exists specifically to avoid
-re-hammering a live rate limit rather than to guard against generic
-flakiness. The concurrency-limited worker pool (`runWithConcurrency`) and
+`CALL_TIMEOUT_MS_BY_MODEL` note). **Corrected** — `callModelWithRetry`'s
+own default is **2** attempts (dropped from 3 on 2026-08-09;
+`run-scan-background.mts` overrides this with an explicit `maxAttempts=3`,
+which is where "3 attempts" is actually true, not the function's own
+default). Retries are also **HTTP 429-only as of 2026-08-17** — any other
+failure type (`err.status !== 429`) fails immediately with no retry at all,
+it's not "a shorter backoff" for non-429s. The escalating backoff between
+429 retries exists specifically to avoid re-hammering a live rate limit
+rather than to guard against generic flakiness. The concurrency-limited
+worker pool (`runWithConcurrency`) and
 shared `SCAN_DEADLINE_MS` `AbortController` that bound worst-case scan
 latency, plus the full three-incident concurrency-tuning history (10 → 4 →
 1), are documented in `netlify/functions/CLAUDE.md`'s `run-scan-background.mts`
@@ -45,7 +50,15 @@ The single source of truth, imported by every consumer:
   on 2026-08-13 when the model count grew — see this file's "Update
   2026-08-13" note above for why (concurrency dropped to 1, so more calls
   means direct wall-clock cost with no parallelism to hide it behind).
-  `proof-script` still runs the full 10.
+  `proof-script` still runs the full 10. **Added 2026-08-25** (Milestone
+  C3): a second, Dutch translation of the same 10 templates
+  (`PROMPT_TEMPLATES_NL`), selected via `SUPPORTED_LANGUAGES`/
+  `PROMPT_TEMPLATES_BY_LANGUAGE`/`promptTemplatesForLanguage(lang)`.
+  `run-scan-background.mts` calls `promptTemplatesForLanguage(company.language
+  ?? 'en')` before slicing to 5, so a company's `language` field (`'en'`|
+  `'nl'`, set at creation in `companies.mts`) picks which language's prompt
+  set a scan actually asks — still generic brand/competitor substitution
+  only, not per-vertical templating.
 - **Multi-provider model client** (`callModel`) — **rewritten 2026-08-15,
   direct-provider migration.** Until this date every model, regardless of
   its `provider/model-name` string, was routed through Perplexity's Agent
@@ -186,6 +199,20 @@ The single source of truth, imported by every consumer:
   fetching and discarding. Surfaced in `ScanDetail.vue` as a "Your site,
   cited" section plus a per-check "Sources:" line in the check-by-check
   breakdown.
+- **`shared/entityPresence.mjs`** (`analyzeEntityPresence`) — added
+  2026-08-25, a sibling module to `aivis-core.mjs`, not a function inside
+  it. Checks whether a Wikipedia page exists for the scanned brand and, if
+  so, whether it links back to the brand's own website — an "off-site
+  authority" signal genuinely distinct from `harmonia.mjs` (which only ever
+  fetches the scanned business's *own* site) since this is the one module
+  that fetches a third-party site (`en.wikipedia.org`'s API, English-only
+  for now, with a required identifying `User-Agent` per Wikimedia's
+  etiquette policy). Never throws — worst case resolves `{wikipediaFound:
+  false, ...}` plus an `errors` array, same discipline as `harmonia.mjs`
+  and `callModelWithRetry`. Common-word brand names are skipped entirely
+  via the same `isAmbiguousBrandName()` this file already exports. Result
+  is written to `scans.entity_presence` by `run-scan-background.mts` — see
+  that column in `netlify/functions/CLAUDE.md`'s DB schema section.
 - **Sentiment judge** (`buildSentimentJudgePrompt`,
   `parseSentimentJudgeResponse`, `netlify/functions/judge-sentiment.mts`) —
   the other half of Milestone F: a second live grounded Perplexity call
@@ -268,7 +295,9 @@ The single source of truth, imported by every consumer:
   `netlify/functions/enrich.mts`. Asks a model to research a bare URL and
   return the rest of the prospect fields as JSON; always returns every
   field, defaulted to `''`/`[]` rather than throwing. Wired into the app
-  shell's "create company" form since the "URL-first onboarding" work
-  (`CompaniesListView.vue`'s two-step flow: URL → `/enrich` pre-fills the
-  rest → editable review before `POST /companies`) — this doc previously
-  said it was still unwired; it wasn't, that was stale.
+  shell's "create company" form: URL → `/enrich` pre-fills the rest →
+  (since the 2026-08-27 portfolio-dashboard rework) a one-click
+  summary/confirm card by default, with editing the fields now an extra
+  opt-in click ("Edit details first") rather than the original always-shown
+  editable review step — see `src/app/CLAUDE.md`'s `CompaniesListView.vue`
+  entry for the current flow in full.

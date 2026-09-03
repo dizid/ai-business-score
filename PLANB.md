@@ -76,7 +76,10 @@ These are business calls, not engineering gaps.
 1. Run one real live-mode Checkout (Pro or the $19 single scan) with an
    actual card to confirm the live pipeline truly works end-to-end — needs
    Marc, not code. Nothing else about monetization matters until this is
-   confirmed once.
+   confirmed once. **Premise now stale (2026-09-02): Stripe is back in test
+   mode** (reverted 2026-09-02, two days after this was written — see root
+   `CLAUDE.md`'s Deployment section). This item is moot until live mode is
+   restored again; `PLAN_COMPETITIVE.md` item 3 tracks that decision.
 2. The prospect list Marc already committed to (`TODO.md`, "Marc" section)
    is the actual growth lever, explicitly marked "not to be picked up
    proactively until Marc raises it again."

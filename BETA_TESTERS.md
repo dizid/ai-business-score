@@ -19,8 +19,8 @@ Subject: `Quick favor — try something I built?`
 > Hey [name],
 >
 > I've been building **Foreground** — it checks whether a business actually
-> gets mentioned when people ask ChatGPT, Gemini, or Perplexity about their
-> category (e.g. "best plumber in Rotterdam"). Turns out most businesses
+> gets mentioned when people ask ChatGPT, Gemini, Claude, or Grok about
+> their category (e.g. "best plumber in Rotterdam"). Turns out most businesses
 > have no idea whether AI search even knows they exist, let alone
 > recommends them over a competitor.
 >

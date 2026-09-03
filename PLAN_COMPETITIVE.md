@@ -66,9 +66,12 @@ engine-count parity with funded competitors (not realistic for a solo team).
 5. ~~**Password reset**~~ — **DONE 2026-09-02.** See `WISH_LIST.md`'s #7
    for the full shipped/verified detail.
 
-6. **Cookie consent banner** — small custom banner (fits the brand better
-   than a library), gates the GA4 script load behind consent, stored in
-   `localStorage`.
+6. ~~**Cookie consent banner**~~ — **DONE 2026-09-02** (commit `ad620c9`).
+   Self-built banner (`partials/consent.html` for static pages,
+   `src/app/components/ConsentBanner.vue` for the app shell), gates the
+   GA4 script load behind accept/decline, stored in `localStorage`. See
+   root `CLAUDE.md`'s Deployment/cookie-consent section for the full
+   verification detail.
 
 ## P1 — Close the biggest gaps
 
@@ -90,9 +93,11 @@ engine-count parity with funded competitors (not realistic for a solo team).
 
 ## P2 — Growth / moat
 
-10. **Agency/portfolio view** — already fully scoped in `REPORTPLAN.md`
-    Change 2 (lightweight view, explicitly *not* full multi-user sharing —
-    re-read that doc before building).
+10. ~~**Agency/portfolio view**~~ — **DONE.** `REPORTPLAN.md` Change 2
+    shipped in two parts: the portfolio-dashboard core 2026-08-27 (commit
+    `0494ded`) and its remaining search/filter gap 2026-09-02 (commit
+    `4f1a2b8`) — see that doc's own updated header. Explicitly the
+    lightweight version scoped there, not full multi-user sharing.
 
 11. **Embeddable "scored by Foreground" badge** — concept only so far
     (`PLAN_NEXT_PHASE.md` Milestone G), gated on live billing (#3) actually
@@ -115,10 +120,11 @@ engine-count parity with funded competitors (not realistic for a solo team).
 
 ## Suggested order
 
-Domain (1) → password reset + cookie consent (5, 6) → top-up cleanup (4) →
-beta-access flow (2) → **go live with Stripe (3)** → Slack alerts + export
-(8, 9) → continuous tracking (7) → transparency copy (13) → vertical packs
-(12) → agency view (10) → badge (11, after #3 has a real payment).
+Domain (1) → ~~password reset + cookie consent (5, 6)~~ **both done** →
+top-up cleanup (4) → beta-access flow (2) → **go live with Stripe (3)** →
+Slack alerts + export (8, 9) → continuous tracking (7) → transparency copy
+(13) → vertical packs (12) → ~~agency view (10)~~ **done** → badge (11,
+after #3 has a real payment).
 
 Each batch: `npm run build` + `type-check` + `test:run`, manual browser check
 for anything in `src/app/**`. Billing batches additionally need a real

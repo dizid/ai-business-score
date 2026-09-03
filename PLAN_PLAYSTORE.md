@@ -54,7 +54,7 @@ As of 2026-09-02, this is a **live blocker**, not a future task:
      again in case Neon MCP has connected by then).
   3. Update root `CLAUDE.md`'s Deployment section to record the domain
      (matching how it already documents every other infra decision here).
-  4. Then proceed to M1 (PWA hardening) below.
+  4. Then proceed to M1 (PWA hardening) below — done shortly after.
 - The Netlify site itself is currently unaffected either way — no code
   changes have been made yet in this pass; the only artifact from this
   session so far is this planning doc.
@@ -68,7 +68,14 @@ As of 2026-09-02, this is a **live blocker**, not a future task:
 added to Neon Auth's `trusted_origins` via the Neon MCP (confirmed present
 in a follow-up `list_auth_trusted_domains` call, alongside the untouched
 `aivis-scan.netlify.app` entry). Root `CLAUDE.md` updated. M1 (PWA
-hardening) is next, not started as part of this pass.
+hardening) was picked up shortly after in commit `a3a9757` ("Add real PWA
+support to app.html") and **is fully done** — see M1's entry below.
+(A 2026-09-02 doc-sweep pass briefly and incorrectly flagged
+`<link rel="manifest">` as missing from `app.html` based on a grep of the
+raw source file; that grep missed it because the tag is pulled in from
+`partials/favicon.html` via the `<!--#include:favicon-->` marker, resolved
+only at build time. Corrected same-day after checking the actual built
+output — the tag is present, PWA installability is not blocked.)
 
 ## Current state relevant to this
 
@@ -80,10 +87,18 @@ hardening) is next, not started as part of this pass.
 - `public/site.webmanifest` already exists (`name`/`short_name`
   "Foreground", `icon-192.png`/`icon-512.png`, `theme_color`/
   `background_color` `#0a0a0d`, `display: standalone`) and `index.html`
-  sets `theme-color`. This is partial PWA groundwork, not a finished PWA —
-  there's no service worker anywhere in the repo, no offline fallback, and
-  no `<link rel="manifest">` confirmed wired into `app.html`'s `<head>`
-  (needs checking/adding).
+  sets `theme-color`. **Resolved by commit `a3a9757` (2026-08-18)**:
+  `public/sw.js` now exists (cache-nothing install/activate/fetch handler)
+  and is registered from `src/app/main.ts`
+  (`navigator.serviceWorker.register('/sw.js', { scope: '/app' })`); the
+  manifest gained a maskable icon variant (`icon-maskable-512.png`); and
+  `app.html` links the manifest via `partials/favicon.html`'s
+  `<link rel="manifest" href="/site.webmanifest" />`, included through the
+  `<!--#include:favicon-->` marker already in `app.html`'s `<head>` — not a
+  literal tag in `app.html` itself, which is why an earlier same-day docs
+  pass grepped the raw file, found nothing, and briefly (incorrectly)
+  flagged this as missing. Checked in the actual built `dist/app.html`:
+  the tag is there. PWA groundwork is complete.
 - No custom domain is registered yet — the live site is
   `aivis-scan.netlify.app` (see root `CLAUDE.md`). This matters directly
   for the Play path below (Digital Asset Links are bound to a specific
@@ -178,10 +193,12 @@ the Play Store with the smallest surface area to maintain, and reuses
   a name choice for Claude to wire up DNS afterward. **Blocks M2** (Digital
   Asset Links are bound to this exact origin) — doing it after M2 means
   redoing Asset Links and shipping an Android app update.
-- **M1 — PWA hardening**: add a minimal service worker + registration,
-  confirm/add `<link rel="manifest">` in `app.html`, add a maskable icon
-  variant, verify with a Lighthouse PWA audit. No behavior change to the
-  product itself.
+- **M1 — PWA hardening**: add a minimal service worker + registration
+  (✅ done, `a3a9757`), add a maskable icon variant (✅ done, same commit),
+  confirm/add `<link rel="manifest">` in `app.html` (✅ done, same commit —
+  via `partials/favicon.html`, see "Current state" above). Only remaining
+  step: verify with a real Lighthouse PWA audit — not yet run. No behavior
+  change to the product itself.
 - **M2 — TWA generation**: run Bubblewrap against `app.html`'s manifest,
   produce the signed Android project, add `assetlinks.json`, verify the
   app installs and opens chrome-less on a real device/emulator.
