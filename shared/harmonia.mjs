@@ -237,7 +237,7 @@ function validateJsonLdNode(node) {
   return { valid: issues.length === 0, type, issues };
 }
 
-function validateJsonLdBlocks(rawBlocks) {
+export function validateJsonLdBlocks(rawBlocks) {
   const nodes = [];
   for (const raw of rawBlocks) {
     let parsed;
@@ -247,8 +247,19 @@ function validateJsonLdBlocks(rawBlocks) {
       nodes.push({ valid: false, type: null, issues: ['Not valid JSON'] });
       continue;
     }
-    const candidates = Array.isArray(parsed) ? parsed : (Array.isArray(parsed['@graph']) ? parsed['@graph'] : [parsed]);
-    for (const node of candidates) nodes.push(validateJsonLdNode(node));
+    const isGraph = !Array.isArray(parsed) && Array.isArray(parsed['@graph']);
+    const candidates = Array.isArray(parsed) ? parsed : (isGraph ? parsed['@graph'] : [parsed]);
+    // A `@graph` wrapper (the standard Yoast SEO shape) declares @context
+    // once for the whole graph — child nodes inherit it rather than
+    // repeating it. Propagate it down so those nodes aren't falsely flagged
+    // as missing @context.
+    const inheritedContext = isGraph ? parsed['@context'] : undefined;
+    for (const node of candidates) {
+      const nodeToValidate = (inheritedContext !== undefined && node && typeof node === 'object' && node['@context'] === undefined)
+        ? { ...node, '@context': inheritedContext }
+        : node;
+      nodes.push(validateJsonLdNode(nodeToValidate));
+    }
   }
   return nodes;
 }

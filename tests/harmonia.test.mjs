@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractPsiSignals, parseHtml, parseSitemapXml } from '../shared/harmonia.mjs';
+import { extractPsiSignals, parseHtml, parseSitemapXml, validateJsonLdBlocks } from '../shared/harmonia.mjs';
 
 describe('parseHtml — new SEO signals (2026-08-31)', () => {
   const origin = 'https://example.com';
@@ -48,6 +48,48 @@ describe('parseHtml — new SEO signals (2026-08-31)', () => {
     expect(page.faviconHref).toBeNull();
     expect(page.manifestHref).toBeNull();
     expect(page.canonicalUrl).toBe('https://example.com/');
+  });
+});
+
+describe('validateJsonLdBlocks — @graph context inheritance (2026-09-05)', () => {
+  it('treats a @graph node as valid when it inherits the parent @context (Yoast SEO shape)', () => {
+    // Real-world shape: @context declared once on the wrapper, not repeated
+    // on each node inside @graph — this is what Yoast SEO (and many other
+    // JSON-LD generators) emit, and it's valid per the JSON-LD spec.
+    const raw = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [
+        { '@type': 'WebPage', '@id': 'https://example.com/', name: 'Example' },
+        { '@type': 'WebSite', '@id': 'https://example.com/#website', url: 'https://example.com/' },
+      ],
+    });
+    const nodes = validateJsonLdBlocks([raw]);
+    expect(nodes).toHaveLength(2);
+    expect(nodes.every((n) => n.valid)).toBe(true);
+    expect(nodes.map((n) => n.type)).toEqual(['WebPage', 'WebSite']);
+  });
+
+  it('still flags a node missing @context when there is no @graph wrapper to inherit from', () => {
+    const raw = JSON.stringify({ '@type': 'WebPage', name: 'Example' });
+    const nodes = validateJsonLdBlocks([raw]);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].valid).toBe(false);
+    expect(nodes[0].issues).toContain('Missing or non-schema.org @context');
+  });
+
+  it('prefers a node\'s own @context over the wrapper\'s when both are present', () => {
+    const raw = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [{ '@type': 'WebPage', '@context': 'https://not-schema.example', name: 'Example' }],
+    });
+    const nodes = validateJsonLdBlocks([raw]);
+    expect(nodes[0].valid).toBe(false);
+    expect(nodes[0].issues).toContain('Missing or non-schema.org @context');
+  });
+
+  it('flags a block that is not valid JSON, without throwing', () => {
+    const nodes = validateJsonLdBlocks(['{ not valid json ']);
+    expect(nodes).toEqual([{ valid: false, type: null, issues: ['Not valid JSON'] }]);
   });
 });
 
