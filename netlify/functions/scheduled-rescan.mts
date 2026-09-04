@@ -72,13 +72,7 @@ export default async () => {
       JOIN public.companies c ON c.id = s.company_id
       WHERE c.owner_user_id = ${company.owner_user_id} AND s.created_at >= date_trunc('month', now())
     `;
-    const [{ credits }] = await db`
-      SELECT COALESCE(SUM(credits), 0)::int AS credits
-      FROM public.scan_credit_purchases
-      WHERE user_id = ${company.owner_user_id}
-        AND purchased_at >= date_trunc('month', now()) - interval '1 month'
-    `;
-    if (count >= PRO_PLAN_MONTHLY_SCAN_LIMIT + credits) {
+    if (count >= PRO_PLAN_MONTHLY_SCAN_LIMIT) {
       skippedOverLimit++;
       continue;
     }

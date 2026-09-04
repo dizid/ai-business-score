@@ -5,7 +5,6 @@
 import type { Config } from '@netlify/functions';
 import { sql } from './_shared/db.mts';
 import { stripe } from './_shared/stripe.mts';
-import { SCAN_CREDIT_PACK_SIZE } from './_shared/plan.mts';
 import { sendSingleScanReceiptEmail } from './_shared/email.mts';
 import { callModelWithRetry, buildEnrichPrompt, parseEnrichmentResponse } from '../../shared/aivis-core.mjs';
 
@@ -54,37 +53,13 @@ export default async (req: Request) => {
     case 'checkout.session.completed': {
       const session = event.data.object;
 
-      // A Pro scan top-up pack (mode: 'payment') — distinct from the
-      // subscription checkout below (mode: 'subscription'). Both flags
-      // checked as belt-and-suspenders: mode alone is sufficient today
-      // since this is the only one-time SKU, but metadata.type is the
-      // durable disambiguator once a second one-time SKU exists (see
-      // PLAN_NEXT_PHASE.md's Milestone E report_purchases plan).
-      if (session.mode === 'payment' && session.metadata?.type === 'scan_credit_pack') {
-        const topupUserId = session.client_reference_id;
-        const credits = Number(session.metadata.credits) || SCAN_CREDIT_PACK_SIZE;
-        const paymentIntentId =
-          typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
-        if (topupUserId) {
-          await db`
-            INSERT INTO public.scan_credit_purchases
-              (user_id, credits, stripe_checkout_session_id, stripe_payment_intent_id, amount_cents)
-            VALUES (${topupUserId}, ${credits}, ${session.id}, ${paymentIntentId ?? null}, ${session.amount_total ?? null})
-            ON CONFLICT (stripe_checkout_session_id) DO NOTHING
-          `;
-        } else {
-          console.error('checkout.session.completed (top-up) missing client_reference_id', event.id);
-        }
-        break;
-      }
-
       // A $19 one-time single-scan purchase (Milestone 2 of the 2026-08-24
       // monetization plan) — two sub-modes sharing one SKU/table, see
-      // create-single-scan-checkout-session.mts's own comment for why.
-      // Unlike the scan-credit-pack branch above, this one has real side
-      // effects beyond one row (creates a company/scan and triggers real
-      // Perplexity spend), so the idempotency check has to run FIRST —
-      // Stripe's at-least-once webhook delivery must never double-create.
+      // create-single-scan-checkout-session.mts's own comment for why. Has
+      // real side effects beyond one row (creates a company/scan and
+      // triggers real Perplexity spend), so the idempotency check has to
+      // run FIRST — Stripe's at-least-once webhook delivery must never
+      // double-create.
       if (session.mode === 'payment' && session.metadata?.type === 'single_scan_purchase') {
         const existing = await db`
           SELECT id FROM public.single_scan_purchases WHERE stripe_checkout_session_id = ${session.id}

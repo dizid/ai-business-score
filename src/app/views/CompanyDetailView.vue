@@ -42,12 +42,11 @@ const scanStatus = ref('');
 const scanError = ref('');
 const scanUpgradeRequired = ref(false);
 const upgrading = ref(false);
-// topupBanner/singleScanBanner: read-only redirect-completion state (see
-// onMounted's ?topup=/?singlescan= handling below) — kept even though the
-// in-app CTAs that used to *initiate* these purchases were removed
-// (S3 pricing simplification), so anyone who already had a Checkout tab
-// open still gets a graceful confirmation banner on return.
-const topupBanner = ref<'success' | 'cancelled' | ''>('');
+// singleScanBanner: read-only redirect-completion state (see onMounted's
+// ?singlescan= handling below) — kept even though the in-app CTA that used
+// to *initiate* this purchase was removed (S3 pricing simplification), so
+// anyone who already had a Checkout tab open still gets a graceful
+// confirmation banner on return.
 const singleScanBanner = ref<'success' | 'cancelled' | ''>('');
 const autoScanUpdating = ref(false);
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
@@ -374,24 +373,15 @@ onMounted(async () => {
     delete cleanedQuery.autoscan;
     router.replace({ query: cleanedQuery });
   }
-  // Landed back here from a top-up Checkout redirect (?topup=success or
-  // ?topup=cancelled) — same strip-after-read pattern as ?autoscan above.
-  // Deliberately not routed through BillingSuccessView.vue: its poll-until
-  // plan_tier==='pro' logic would resolve instantly for an already-Pro user
-  // regardless of whether the webhook actually landed, so it's the wrong
-  // tool for confirming a top-up purchase.
-  if (route.query.topup === 'success' || route.query.topup === 'cancelled') {
-    topupBanner.value = route.query.topup;
-    const cleanedQuery = { ...route.query };
-    delete cleanedQuery.topup;
-    router.replace({ query: cleanedQuery });
-  }
   // Landed back here from a $19 single-scan Checkout redirect
   // (?singlescan=success or ?singlescan=cancelled) — same strip-after-read
-  // pattern as ?topup above. Unlike a top-up (which just raises a quota,
-  // nothing new to show), a success here means the webhook creates a real
-  // new scan — retry load() a few times so it appears without a manual
-  // refresh, since the webhook runs asynchronously relative to this redirect.
+  // pattern as ?autoscan above. A success here means the webhook creates a
+  // real new scan — retry load() a few times so it appears without a
+  // manual refresh, since the webhook runs asynchronously relative to this
+  // redirect. Deliberately not routed through BillingSuccessView.vue: its
+  // poll-until plan_tier==='pro' logic would resolve instantly for an
+  // already-Pro user regardless of whether the webhook actually landed, so
+  // it's the wrong tool for confirming this purchase.
   if (route.query.singlescan === 'success' || route.query.singlescan === 'cancelled') {
     singleScanBanner.value = route.query.singlescan;
     const cleanedQuery = { ...route.query };
@@ -431,15 +421,7 @@ watch(() => route.params.id, load);
           <p class="sub">{{ company.category }} · {{ company.website }}</p>
         </div>
         <div class="scan-trigger">
-          <div class="scan-status topup-banner" v-if="topupBanner === 'success'">
-            Purchase received — your extra scans are ready.
-            <button type="button" class="dismiss" @click="topupBanner = ''">Dismiss</button>
-          </div>
-          <div class="scan-status" v-else-if="topupBanner === 'cancelled'">
-            Checkout cancelled — no charge was made.
-            <button type="button" class="dismiss" @click="topupBanner = ''">Dismiss</button>
-          </div>
-          <div class="scan-status topup-banner" v-if="singleScanBanner === 'success'">
+          <div class="scan-status purchase-success-banner" v-if="singleScanBanner === 'success'">
             Purchase received — your scan is starting.
             <button type="button" class="dismiss" @click="singleScanBanner = ''">Dismiss</button>
           </div>
@@ -563,7 +545,7 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
   border: 1px solid var(--critical); border-radius: 999px; background: transparent; color: var(--critical); cursor: pointer;
 }
 .inline-upgrade:disabled { opacity: 0.6; cursor: wait; }
-.topup-banner { color: var(--success-text); }
+.purchase-success-banner { color: var(--success-text); }
 .dismiss {
   display: inline; margin-left: 6px; padding: 0; border: none; background: none;
   color: inherit; text-decoration: underline; font-size: inherit; cursor: pointer;

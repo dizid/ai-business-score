@@ -116,23 +116,28 @@ assuming nothing else is in flight.
       above). Never started, so nothing to unwind in code. The plan this
       pointed at (`~/.claude/plans/read-relevant-md-files-linked-wind.md`)
       is now stale — don't resume it without checking with Marc first.
-- [ ] **Remove the top-up-pack purchase path** now that it's cut from the
-      pricing (see above): the "buy 10 more scans" CTA in the app, the
-      `create-topup-checkout-session.mts` function, `stripe-webhook.mts`'s
-      `scan_credit_pack` branch, and the top-up mentions in `index.html`'s
-      pricing/FAQ copy and `llms.txt`. Not urgent — with no live
-      `STRIPE_TOPUP_PRICE_ID` wired in for most contexts the checkout call
-      just fails closed — but it's a dead, half-visible feature until
-      this lands. **Also needs reconciling first:** a second, concurrent
-      Claude Code session set `STRIPE_TOPUP_PRICE_ID`'s *production*
-      value on Netlify to a real live Price (`price_1U9NJJ8gBja0qkMxEmZoQWNJ`)
-      at 11:53 on 2026-08-28, ~13 minutes before this decision to cut
-      top-ups was finalized — so as of this entry, production is
-      inconsistent with every other deploy context (dev/branch-deploy/
-      deploy-preview/dev-server still point at the old test-mode Price).
-      Check with Marc before touching it: either revert production to
-      match (safer, matches the cut decision) or leave it if he's changed
-      his mind back.
+- [x] ~~Remove the top-up-pack purchase path~~ **Done 2026-09-04.**
+      Deleted `create-topup-checkout-session.mts` and
+      `checkoutTemporarilyDisabled()` (`_shared/stripe.mts`, its only
+      caller); removed `stripe-webhook.mts`'s `scan_credit_pack` branch
+      (left the unrelated same-word `metadata.mode === 'topup'` branch
+      inside single-scan-purchase handling untouched — see that file's own
+      comment for the naming-collision detail); removed
+      `SCAN_CREDIT_PACK_*`/`MAX_CREDIT_PACKS_PER_MONTH` from
+      `_shared/plan.mts`; removed the `scan_credit_purchases` credits query
+      from `scan.mts` and `scheduled-rescan.mts`'s fair-use checks; removed
+      the `topupBanner` redirect-completion UI from `CompanyDetailView.vue`
+      (renamed the shared `.topup-banner` CSS class to
+      `.purchase-success-banner` since `singleScanBanner` also used it);
+      dropped "top-up packs available"/"top-ups available" copy from
+      `index.html` (3 spots) and `llms.txt`, and the whole top-up billing
+      paragraph from `terms.html`. `scan_credit_purchases` DB table left in
+      place (dead, not dropped — same precedent as `is_public`/
+      `company_urls`). **Resolved the stray production `STRIPE_TOPUP_PRICE_ID`
+      question without needing Marc's call**: left the env var completely
+      untouched rather than reverting or confirming it — deleting the only
+      function that ever read it makes the value permanently inert either
+      way. Verified: `type-check`/`build`/`test:run` clean throughout.
 - [x] ~~Fix the `stripe-webhook.mts` token-in-URL issue~~ **Partially
       fixed 2026-08-31, rest deliberately accepted as residual risk** — the
       scan-receipt email links to `/app/scan?token=...`, flagged by an
