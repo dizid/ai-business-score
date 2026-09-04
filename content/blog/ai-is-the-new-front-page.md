@@ -74,5 +74,9 @@ I ran that question against my own site the first time mostly out of
 curiosity. I was not thrilled with the answer. That's a decent reason to
 check yours before you assume you already know.
 
+**Next:** [What happens between "best dentist near me" and the answer you
+get](/blog/anatomy-of-an-ai-answer/) — the actual mechanism behind why some
+businesses get named and others don't.
+
 — Marc. I build [Foreground](/), which checks exactly this across four AI
 models. [See if it's you](/app/signup) — free, no credit card required.

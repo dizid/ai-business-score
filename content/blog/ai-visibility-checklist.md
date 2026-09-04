@@ -61,6 +61,9 @@ every few weeks, for more than one business, gets tedious fast. But the
 checklist above works fine with nothing but a browser and twenty honest
 minutes.
 
+New here? This post is the last of a series — start from the beginning:
+[Google isn't the front page anymore](/blog/ai-is-the-new-front-page/).
+
 — Marc. [Foreground](/) automates the checking part above, on a schedule,
 across four models, if you'd rather not do it by hand.
 [Try it free](/app/signup).

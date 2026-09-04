@@ -65,6 +65,10 @@ If you take one thing from this: stop asking "am I mentioned." Ask where.
 The gap between first and fourth is the whole story, and most people asking
 about their AI visibility right now aren't asking that question at all.
 
+**Next:** [SEO and AI visibility are not the same
+job](/blog/seo-vs-geo-concretely/) — why the tactics that win a Google
+ranking don't automatically win a mention.
+
 — Marc. [Foreground](/) runs this exact check — five questions, four
 models, twenty data points — so you're not guessing at the pattern by hand.
 [Try it free](/app/signup).

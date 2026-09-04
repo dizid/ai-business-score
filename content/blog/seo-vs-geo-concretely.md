@@ -67,5 +67,9 @@ the pile of candidates. What happens after that — whether the model
 actually says your name — is a different job, with different rules, and
 right now almost nobody is doing it on purpose.
 
+**Next:** [What to actually do this week if AI doesn't know you
+exist](/blog/ai-visibility-checklist/) — a free, 40-minute checklist to
+start fixing it.
+
 — Marc. I build [Foreground](/), which measures the "does the model say
 your name" part specifically. [Try it free](/app/signup).
