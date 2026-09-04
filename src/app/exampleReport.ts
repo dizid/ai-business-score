@@ -179,6 +179,11 @@ export const EXAMPLE_REPORT: ValidatedPayload = {
     checkedAtDate: GENERATED_AT,
     errors: [],
   },
+  clarityCheck: {
+    hasSpecificClaim: false,
+    quote: null,
+    reasoning: 'Homepage copy is generic ("quality service you can trust") with no named service, credential, or response-time commitment.',
+  },
 };
 
 function PROMPT_LABEL(_index: number): string {

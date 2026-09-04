@@ -79,6 +79,16 @@ export interface EntityPresenceResult {
   errors: string[];
 }
 
+// Clarity check: does the business's own homepage state something specific
+// and quotable, versus only generic marketing filler? See
+// shared/aivis-core.mjs's buildClarityCheckPrompt for the full reasoning —
+// added 2026-09-04 in place of guessing at vertical-specific prompt wording.
+export interface ClarityCheckResult {
+  hasSpecificClaim: boolean;
+  quote: string | null;
+  reasoning: string;
+}
+
 export interface ValidatedPayload {
   id: string;
   brand: string;
@@ -103,6 +113,7 @@ export interface ValidatedPayload {
   deepAdviceGeneratedAtDate: Date | null;
   harmonia: HarmoniaResult | null;
   entityPresence: EntityPresenceResult | null;
+  clarityCheck: ClarityCheckResult | null;
 }
 
 const RANKS = new Set(['ranked-1', 'ranked-2', 'ranked-3', 'mentioned', 'not-mentioned', 'beaten']);
@@ -329,6 +340,19 @@ function asEntityPresence(raw: unknown): EntityPresenceResult | null {
   return { wikipediaFound: r.wikipediaFound, wikipediaUrl, linksToOwnSite, checkedAtDate, errors };
 }
 
+// clarityCheck is new (2026-09-04) — same lenient degrade-to-null treatment
+// as asEntityPresence/asHarmonia above: missing, null, or malformed all
+// degrade to null rather than rejecting the whole payload, since it's a
+// secondary signal, not something the primary AI score depends on.
+function asClarityCheck(raw: unknown): ClarityCheckResult | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, any>;
+  if (typeof r.hasSpecificClaim !== 'boolean') return null;
+  const quote = r.hasSpecificClaim && typeof r.quote === 'string' && r.quote.length <= MAX_TEXT_LEN ? r.quote : null;
+  const reasoning = typeof r.reasoning === 'string' ? r.reasoning.slice(0, MAX_REASONING_LEN) : '';
+  return { hasSpecificClaim: r.hasSpecificClaim, quote, reasoning };
+}
+
 // This validator is the only thing standing between a hostile/forged
 // payload and whatever renders it — fail closed: reject anything that
 // doesn't match the exact shape scan.mts produces, rather than coercing.
@@ -511,5 +535,6 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     deepAdviceGeneratedAtDate,
     harmonia: raw.harmonia !== undefined ? asHarmonia(raw.harmonia) : null,
     entityPresence: raw.entityPresence !== undefined ? asEntityPresence(raw.entityPresence) : null,
+    clarityCheck: raw.clarityCheck !== undefined ? asClarityCheck(raw.clarityCheck) : null,
   };
 }

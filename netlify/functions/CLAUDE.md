@@ -184,6 +184,15 @@ See the root `CLAUDE.md` for overall project context.
   `shared/entityPresence.mjs`'s `analyzeEntityPresence()` and written
   alongside the scan's other jsonb columns; read via `scanRow.mts` and
   rendered in `ScanDetail.vue`.
+- **`scans.clarity_check`** — added 2026-09-04, `jsonb`, nullable/additive
+  (same pattern as `harmonia`/`entity_presence`). `{hasSpecificClaim,
+  quote, reasoning}` — whether the scanned business's own homepage states a
+  specific, quotable claim, computed by a single LLM classification call in
+  `run-scan-background.mts` (see `shared/CLAUDE.md`'s "Clarity check" entry
+  for the full design/reasoning, including why it deliberately doesn't feed
+  back into the scan's own prompts). Read via `scanRow.mts`, rendered in
+  `ScanDetail.vue` as a "Homepage clarity" section. **Not yet calibrated
+  against real homepages** — see `shared/CLAUDE.md`'s entry.
 - **`score_alerts`** — new table, added 2026-08-27 (the portfolio-dashboard
   pass). One row per detected score regression: `company_id`/`scan_id` FKs,
   `prior_score`, `new_score`, `delta`, `created_at`. Written by

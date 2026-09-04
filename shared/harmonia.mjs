@@ -179,14 +179,20 @@ export function parseHtml(html, origin) {
     // origin itself failed to parse — internalLinkCount stays 0
   }
 
-  const wordCount = html
+  // Same tag-stripping pipeline wordCount always used — now also captured
+  // as text (not just counted) so the clarity check (shared/aivis-core.mjs)
+  // has real homepage copy to classify without a second fetch of the same
+  // page. Capped at 3000 chars: plenty for a homepage's hero/intro pitch,
+  // short enough to keep the clarity-check LLM call cheap and fast.
+  const bodyText = html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&[a-z#0-9]+;/gi, ' ')
-    .split(/\s+/)
-    .filter(Boolean).length;
+    .replace(/\s+/g, ' ')
+    .trim();
+  const wordCount = bodyText ? bodyText.split(' ').filter(Boolean).length : 0;
 
   return {
     title,
@@ -206,6 +212,7 @@ export function parseHtml(html, origin) {
     imgsWithAlt,
     internalLinkCount,
     wordCount,
+    bodyText: bodyText.slice(0, 3000),
   };
 }
 
@@ -539,6 +546,7 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
       securityHeaders: [],
       aiCrawlerAccess: { bots: [], blockedCount: 0, checkedCount: 0 },
       additionalSeoSignals: null,
+      homepageText: null,
       errors: ['Invalid website URL — could not analyze'],
     };
   }
@@ -632,6 +640,11 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
       checkedCount: robots.aiCrawlers.length,
     },
     additionalSeoSignals,
+    // Exposed so run-scan-background.mts's clarity check (aivis-core.mjs's
+    // buildClarityCheckPrompt) can classify the homepage's own copy without
+    // fetching the same page a second time. Null when the homepage was
+    // unreachable, same as every other page-derived field above.
+    homepageText: page?.bodyText || null,
     errors,
   };
 }

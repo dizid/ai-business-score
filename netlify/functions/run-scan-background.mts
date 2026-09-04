@@ -56,6 +56,8 @@ import {
   selectAdvice,
   buildSentimentJudgePrompt,
   parseSentimentJudgeResponse,
+  buildClarityCheckPrompt,
+  parseClarityCheckResponse,
 } from '../../shared/aivis-core.mjs';
 import { analyzeHarmonia } from '../../shared/harmonia.mjs';
 import { analyzeEntityPresence } from '../../shared/entityPresence.mjs';
@@ -452,6 +454,26 @@ export default async (req: Request) => {
       return null;
     });
 
+    // Clarity check (added 2026-09-04, see aivis-core.mjs's
+    // buildClarityCheckPrompt comment for the full reasoning) — one short
+    // classification call on the homepage text Harmonia already fetched.
+    // Runs only if Harmonia actually got homepage text (skipped entirely on
+    // an unreachable site) and there's real time left in the shared
+    // deadline; never blocks or fails the scan if it errors.
+    let clarityCheck: { hasSpecificClaim: boolean; quote: string | null; reasoning: string } | null = null;
+    if (harmonia?.homepageText) {
+      const clarityRemainingMs = SCAN_DEADLINE_MS - (Date.now() - scanStartTime);
+      if (clarityRemainingMs > 5000) {
+        try {
+          const prompt = buildClarityCheckPrompt(prospect.brand, harmonia.homepageText);
+          const result = await callModel(apiKeys, 'openai/gpt-5-mini', prompt, Math.min(20000, clarityRemainingMs));
+          clarityCheck = parseClarityCheckResponse(result.text);
+        } catch (err) {
+          console.error(`run-scan-background: clarity check failed for scan ${scanId}:`, (err as Error).message);
+        }
+      }
+    }
+
     // Auto-judge sentiment for every mention (Milestone F, extended
     // 2026-08-20 — was on-demand/manual-only, see aivis-core.mjs's comment
     // above buildSentimentJudgePrompt for the full history and why this
@@ -522,6 +544,7 @@ export default async (req: Request) => {
         advice = ${JSON.stringify(advice)},
         harmonia = ${harmonia ? JSON.stringify(harmonia) : null},
         entity_presence = ${entityPresence ? JSON.stringify(entityPresence) : null},
+        clarity_check = ${clarityCheck ? JSON.stringify(clarityCheck) : null},
         generated_at = now()
       WHERE id = ${scanId}
     `;

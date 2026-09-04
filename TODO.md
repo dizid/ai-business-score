@@ -31,10 +31,8 @@ assuming nothing else is in flight.
       picked (2026-08-28) as the first push for paying users, now that
       Stripe is live — important, but **explicitly deferred for now**,
       not to be picked up proactively until Marc raises it again.
-- [ ] **Read the 4 blog posts** at `/blog` (`content/blog/*.md`) before
-      treating them as final — the source drafts were explicitly marked
-      "needs Marc's read before posting," and only the format was
-      converted, not the substance.
+- [x] ~~Read the 4 blog posts~~ **Done, confirmed 2026-09-04** — Marc
+      read them and gave the go-ahead to cross-link (commit `d3034f9`).
 - [x] ~~Decide on Stripe live mode~~ **Done 2026-08-28** — went live on
       Dizid's existing multi-app Stripe account (KYC already done from
       other Dizid projects, no fresh activation flow needed). Same day,
@@ -88,6 +86,20 @@ assuming nothing else is in flight.
 
 ## Claude
 
+- [ ] **Calibrate the clarity check before fully trusting it.** Shipped
+      2026-09-04 (`shared/aivis-core.mjs`'s `buildClarityCheckPrompt`/
+      `parseClarityCheckResponse`, wired into `run-scan-background.mts`,
+      `scans.clarity_check` column live, `ScanDetail.vue`'s "Homepage
+      clarity" section) — see `shared/CLAUDE.md`'s "Clarity check" entry
+      for the full design. Code is built, type-checked, and unit-tested,
+      but **no live LLM call has confirmed the prompt actually classifies
+      well** — the sentiment judge (a similar classify-given-text feature)
+      was calibrated against 5 hand-labeled real examples (5/5 agreement)
+      before being trusted; do the same here (a handful of real homepages,
+      some clearly specific, some clearly generic) before treating this
+      signal as reliable. Also not yet seen rendered against a real
+      logged-in scan (only verified via `vue-tsc`'s type-check of the data
+      flow, not a live browser check of the new UI section) — do that too.
 - [x] ~~Reverted Stripe to test mode~~ **Done 2026-09-02** — Marc asked for
       Stripe back in test mode specifically so beta testers can't be
       charged real money, and separately asked for it to touch only
@@ -204,6 +216,79 @@ assuming nothing else is in flight.
 
 Everything below this line is the former `TODOS.md`, moved here verbatim
 (headings demoted one level) as part of the 2026-08-26 merge. Newest first.
+
+### STATUS 2026-09-02 through 2026-09-04: Comprehensive improvement-plan engagement — SHIPPED in stages, one item left open (see Claude checklist above)
+
+**Trigger:** CEO asked for a comprehensive improvement plan synthesized
+from `DEEPSEEK-REASONER.md` and `PLAN_COMPETITIVE.md` plus every other
+planning doc in the repo. Full plan (with per-track reasoning, the
+verification-against-live-code audit that found several "open" items
+already shipped, and later mid-flight updates) at
+`~/.claude/plans/read-deepseek-reasoner-md-plan-competiti-floating-toast.md`.
+
+**Shipped, in commit order:**
+1. **Doc sweep** (`ff68199`) — backfilled History entries for `5277b82`/
+   `0494ded`/`bc7e2e0` (which four docs still called unshipped), corrected
+   `PLAN_COMPETITIVE.md`'s stale Perplexity-routing claim.
+2. **Cookie consent banner** (`ad620c9`) — self-built, `partials/consent.html`
+   + `ConsentBanner.vue`, gates GA4 behind accept/decline. Verified
+   end-to-end via a real browser (`browse` skill against a built `dist/`
+   with a fake GA measurement ID) — found and fixed a real bug where the
+   raw-DOM and Vue banners both rendered on `app.html` (an `#app`-detection
+   check that ran before `<body>` existed on any page).
+3. **Portfolio search/filter** (`4f1a2b8`) — `CompaniesListView.vue` gained
+   `.includes()` brand/category search, a 4-bucket filter, "Needs
+   attention first" default sort. Live browser verification against real
+   signup data was blocked by this environment's dev-DB-proxy limitation
+   (a documented, pre-existing class of issue) — verified by type-check/
+   build/test and manual trace only.
+4. **Fact-drift fixes + blog nav** (`a9dca1c`) — GPT-5-mini had been
+   queried through Perplexity's gateway until the 2026-08-15 migration,
+   but `terms.html`/`privacy.html`/`how-it-works.html`/`index.html`/
+   `llms.txt` still said otherwise (including `privacy.html`'s data-
+   processor disclosure). Corrected throughout; added `/blog` to
+   `partials/nav.html` (footer already had it).
+5. **Password reset** (`84b2601`) — `requestPasswordReset`/`resetPassword`
+   in `auth.ts`, two new views, a route each. Confirmed Neon Auth already
+   had a shared email provider live via Neon MCP's `get_neon_auth_config`
+   rather than needing console access. **Verified genuinely end-to-end**
+   against the real Neon Auth backend: real request -> real token
+   retrieved via Neon MCP from `neon_auth.verification` -> reset succeeded
+   -> logged in with the new password -> replaying the same token
+   correctly 400s (single-use confirmed).
+6. **Top-up pack removal** (`c84ee06`) — cut from pricing back on
+   2026-08-28, never removed from code until now. Full removal across
+   `stripe-webhook.mts` (careful not to touch the same-word-different-
+   feature `metadata.mode === 'topup'` single-scan branch),
+   `_shared/plan.mts`, `scan.mts`, `scheduled-rescan.mts`,
+   `CompanyDetailView.vue`, marketing/legal copy. Resolved the stray live
+   `STRIPE_TOPUP_PRICE_ID` question without needing a decision: left it
+   untouched, since deleting its only reader makes it permanently inert.
+7. **Blog cross-links** (`d3034f9`) — Marc read all 4 posts, confirmed
+   go-ahead; added one "Next:" link per post in their natural reading
+   order, last post links back to the first.
+8. **Clarity check** — see the Claude checklist item above for what
+   shipped and what's still open (calibration + a live UI check). Replaces
+   the original "vertical prompt packs" ask: querying real
+   `companies.category` data (as the plan required before guessing
+   verticals) found no real clustering, mostly the founder's own test/dev
+   records — and reasoning through it further found that feeding a
+   business's own claimed differentiator into the *scan* prompts
+   themselves would have corrupted the measurement (turning an honest
+   unprompted-visibility test into a leading question). Built a homepage-
+   clarity signal instead, grounded in what `content/blog/*.md`'s own
+   essays already argue is the real lever.
+
+**Also confirmed, no code change needed:** `BETA_TESTERS.md` was already
+accurate (Marc's own parallel `0c1c3e9` doc-sweep had already fixed its one
+stale model-list mention) — checked, not edited. Stripe stays deliberately
+in test mode per Marc's explicit choice this round (not touched).
+
+**Not done this round, Marc's call:** every P2 backlog item except the
+clarity check (Slack alerts, CSV export, competitor-benchmarking view,
+full `company_members` team sharing, the embeddable badge, transparency
+marketing copy, `proof-script/OUTREACH.md`'s rebrand) — see the plan file
+for the full list.
 
 ### STATUS 2026-08-27: Scan-polling fix, retry/concurrency test coverage, ops failure-rate digest — SHIPPED (commit `bc7e2e0`)
 

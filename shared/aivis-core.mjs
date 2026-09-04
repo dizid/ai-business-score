@@ -1021,6 +1021,15 @@ export function buildDeepAdvicePrompt(scan) {
     .join('\n');
   const perPromptLines = summarizePerPromptRank(scan.perPromptRank);
   const excerptLines = selectDeepAdviceExcerpts(scan).join('\n');
+  // Clarity check (added 2026-09-04, see its own section above) — whether
+  // the business's own homepage states a specific, quotable claim. Purely
+  // extra context for THIS advisory prompt, never fed into the scan's own
+  // unprompted-visibility questions above.
+  const clarityLine = scan.clarityCheck
+    ? scan.clarityCheck.hasSpecificClaim
+      ? `\nHomepage clarity check: found a specific, quotable claim on the homepage ("${scan.clarityCheck.quote}") — build on this rather than suggesting the brand add specifics from scratch.\n`
+      : `\nHomepage clarity check: the homepage does NOT currently state a specific, quotable claim (no named service, credential, number, or differentiator found — likely only generic marketing language). This is very likely worth a step of its own.\n`
+    : '';
 
   return `You are a world-class SEO and AI-search-visibility strategist. A brand called "${scan.brand}" (${scan.website}, category: "${scan.category}") was just checked for how often it comes up when AI assistants (ChatGPT, Gemini) are asked about their category.
 
@@ -1030,7 +1039,7 @@ ${competitorLines || '(no named competitors)'}
 
 Breakdown by query type:
 ${perPromptLines || '(no per-query data)'}
-${excerptLines ? `\nActual excerpts where a competitor was cited and ${scan.brand} wasn't ranked first — use these to identify concrete content/topic gaps, not just aggregate counts:\n${excerptLines}\n` : ''}
+${excerptLines ? `\nActual excerpts where a competitor was cited and ${scan.brand} wasn't ranked first — use these to identify concrete content/topic gaps, not just aggregate counts:\n${excerptLines}\n` : ''}${clarityLine}
 Based on this, respond with ONLY a JSON object (no markdown fences, no commentary before or after) with this shape:
 {
   "steps": [
@@ -1123,6 +1132,66 @@ export function parseSentimentJudgeResponse(text) {
     const classification = SENTIMENT_CLASSIFICATIONS.has(parsed.classification) ? parsed.classification : 'neutral';
     const reasoning = typeof parsed.reasoning === 'string' ? parsed.reasoning.trim().slice(0, 300) : '';
     return { classification, reasoning };
+  } catch {
+    return empty;
+  }
+}
+
+// ---------- Clarity check (live LLM call) ----------
+// Added 2026-09-04, replacing a "vertical prompt packs" ask once querying
+// real companies.category data found no real vertical clustering to build
+// from (mostly test/dev records). The blog content itself (content/blog/)
+// argues the actual lever determining whether AI models mention a business
+// is whether the business states something specific and quotable on its
+// own site, versus generic filler ("quality service you can trust") — this
+// turns that claim into an actual checked signal instead of just an essay.
+// Deliberately does NOT feed anything back into the scan's own prompts
+// (shared/PROMPT_TEMPLATES above) — doing that would turn an honest
+// unprompted-visibility test into a leading question, which was the real
+// problem with the original "inject a differentiator into the scan
+// queries" idea this replaced. This only evaluates the business's own
+// homepage text (shared/harmonia.mjs already fetches it — see its
+// homepageText field), same "read what's already there" spirit as
+// buildDeepAdvicePrompt's excerpt selection above.
+//
+// Runs through the same callModel() every other call in this file uses —
+// there's no "ungrounded" (no web-search-tool) call path anywhere in this
+// codebase to reuse (every provider branch in callModel always attaches a
+// web-search tool), so this pays for that capability the same way the
+// sentiment judge above already does for its own classify-given-text task,
+// rather than building a new call shape for one feature.
+export function buildClarityCheckPrompt(brand, homepageText) {
+  return `You are evaluating whether a business's own homepage states something specific and quotable about what it does, versus only generic marketing filler. The business is "${brand}". Here is text extracted from their homepage:
+"""
+${homepageText}
+"""
+A "specific, quotable claim" is a concrete fact a person (or an AI model) could repeat: a named service, a credential or certification, years in business, a response-time commitment, a specific customer type, an award, a number — anything factual and distinct to this business. Generic filler ("quality service you can trust," "committed to excellence," "your one-stop shop") does NOT count, even if confidently worded.
+Respond with ONLY a JSON object (no markdown fences, no commentary before or after):
+{
+  "hasSpecificClaim": true | false,
+  "quote": "the exact specific sentence or phrase found, or null if none",
+  "reasoning": "one sentence explaining the classification"
+}
+If the homepage text is empty or clearly not real content (e.g. a loading placeholder), respond with "hasSpecificClaim": false and say so in "reasoning".`;
+}
+
+// Same lenient-extraction, always-safe-shape pattern as
+// parseSentimentJudgeResponse/parseDeepAdviceResponse — a malformed or
+// unparseable response degrades to "no specific claim found" rather than
+// throwing, since this is a secondary signal, not something the scan's
+// primary score depends on.
+export function parseClarityCheckResponse(text) {
+  const empty = { hasSpecificClaim: false, quote: null, reasoning: '' };
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return empty;
+  try {
+    const parsed = JSON.parse(match[0]);
+    const hasSpecificClaim = parsed.hasSpecificClaim === true;
+    const quote = hasSpecificClaim && typeof parsed.quote === 'string' && parsed.quote.trim()
+      ? parsed.quote.trim().slice(0, 300)
+      : null;
+    const reasoning = typeof parsed.reasoning === 'string' ? parsed.reasoning.trim().slice(0, 300) : '';
+    return { hasSpecificClaim, quote, reasoning };
   } catch {
     return empty;
   }

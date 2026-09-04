@@ -610,6 +610,24 @@ function copySchema(example: string, index: number) {
         <p v-else class="citations-intro">No Wikipedia page found for this brand — a real Wikipedia presence is a common off-site authority signal AI models draw on.</p>
       </CollapsibleSection>
 
+      <!-- clarity check (added 2026-09-04): does the business's own
+           homepage state something specific and quotable, versus only
+           generic filler? Distinct from Site Health/entity presence above
+           — this evaluates what the homepage SAYS, not its technical
+           structure or off-site presence. -->
+      <CollapsibleSection
+        v-if="payload.clarityCheck"
+        title="Homepage clarity"
+        :status-text="payload.clarityCheck.hasSpecificClaim ? 'Specific claim found' : 'No specific claim found'"
+      >
+        <p v-if="payload.clarityCheck.hasSpecificClaim" class="citations-intro">
+          Found a specific, quotable claim: "{{ payload.clarityCheck.quote }}"
+        </p>
+        <p v-else class="citations-intro">
+          This homepage doesn't clearly state a specific, quotable fact about what the business does or who it's for — generic phrasing ("quality service you can trust") gives an AI model nothing distinct to cite.
+        </p>
+      </CollapsibleSection>
+
       <!-- citation-URL attribution (Milestone F): the exact pages on the
            company's own site an AI model actually drew its answer from,
            instead of only generic "improve your content" advice above. -->

@@ -291,6 +291,35 @@ The single source of truth, imported by every consumer:
   tallies) rather than generic SEO advice; `parseDeepAdviceResponse`
   follows the same lenient-JSON-extraction, always-safe-shape pattern as
   `parseEnrichmentResponse` below.
+- **Clarity check** (`buildClarityCheckPrompt`, `parseClarityCheckResponse`)
+  — added 2026-09-04, replacing a "vertical prompt packs" ask once querying
+  real `companies.category` data found no real vertical clustering to build
+  from (mostly the founder's own test/dev records). Classifies whether the
+  scanned business's own homepage (text `shared/harmonia.mjs` already
+  fetches — see its `homepageText` field, exposed specifically for this)
+  states a specific, quotable claim versus generic filler — the thing
+  `content/blog/*.md`'s own essays argue is the actual lever for whether AI
+  models mention a business. Deliberately does **not** feed anything back
+  into the scan's own `PROMPT_TEMPLATES` above — the original idea (inject
+  a business's claimed differentiator into its own scan questions) would
+  have turned an honest unprompted-visibility test into a leading question,
+  found and rejected while designing this. Runs automatically in
+  `run-scan-background.mts` right after Harmonia resolves (needs its
+  `homepageText`), one call via the same `callModel(apiKeys, ...)` every
+  other call in this file uses — **there is no "ungrounded" (no
+  web-search-tool) call path anywhere in this codebase**, every provider
+  branch always attaches a search tool, so this pays for that capability
+  the same way the sentiment judge above already does for its own
+  classify-given-text task. Result stored in `scans.clarity_check jsonb`
+  (additive migration, applied 2026-09-04), surfaced in `ScanDetail.vue` as
+  a "Homepage clarity" section (see `src/shared/CLAUDE.md`), and spliced
+  into `buildDeepAdvicePrompt` as extra context so deep advice can build on
+  or address what the check found. **Not yet calibrated against real
+  homepages** the way the sentiment judge was (5 hand-labeled examples,
+  5/5 agreement, before shipping) — do that before fully trusting this
+  the way this codebase's own "verify live before trusting" discipline
+  expects; the code path itself is built, type-checked, and tested, but
+  no live LLM call has confirmed the prompt actually classifies well.
 - **Enrichment** (`buildEnrichPrompt`, `parseEnrichmentResponse`) — used by
   `netlify/functions/enrich.mts`. Asks a model to research a bare URL and
   return the rest of the prospect fields as JSON; always returns every

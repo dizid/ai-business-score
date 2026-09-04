@@ -85,6 +85,15 @@ were deliberately deferred (cost/latency per scan, and a real
 headless-Chrome dependency Netlify Functions can't run as-is) — logged as a
 follow-up phase in `~/.claude/plans/ping-spicy-oasis.md`, not built.
 
+**Clarity check (2026-09-04):** a small `CollapsibleSection` right after
+Entity presence in the Details tab — "Homepage clarity," status text
+"Specific claim found"/"No specific claim found," body either quotes the
+specific claim found or explains that the homepage only has generic
+filler. `payload.clarityCheck` is optional (`null` for pre-migration scans
+or an unreachable site), same lenient-optional pattern as `entityPresence`.
+See `shared/CLAUDE.md`'s "Clarity check" entry for the full design —
+notably not yet calibrated against real homepages.
+
 ### `scanDerived.ts` / `scanLabels.ts` / `scanReport.ts` / `Icon.vue`
 
 `scanDerived.ts` and `scanLabels.ts` were pulled out of `ScanDetail.vue`'s

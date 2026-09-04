@@ -36,6 +36,9 @@ export function toScanPayload(row: Record<string, any>) {
     // entity_presence is new (Wikipedia/Wikidata off-site authority check)
     // — same null default for pre-migration rows.
     entityPresence: row.entity_presence ?? null,
+    // clarity_check is new (2026-09-04, does the homepage state a specific
+    // quotable claim?) — same null default for pre-migration rows.
+    clarityCheck: row.clarity_check ?? null,
     // started_at is new (scan timing) — same null default for pre-migration
     // rows and any scan still `pending`/`running`.
     startedAt: row.started_at ?? null,
