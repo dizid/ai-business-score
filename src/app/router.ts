@@ -43,6 +43,16 @@ const routes = [
     props: true,
   },
   {
+    // Dedicated per-scan Report page (Markdown/CSV/PDF-via-print) — see
+    // ScanReportView.vue's own header comment. `?scan=<id>` optional,
+    // defaults to the latest completed scan.
+    path: '/app/companies/:id/report',
+    name: 'scan-report',
+    component: () => import('./views/ScanReportView.vue'),
+    meta: { requiresAuth: true, title: 'Foreground' }, // real title set dynamically, same pattern as 'company' above
+    props: true,
+  },
+  {
     path: '/app/billing/success',
     name: 'billing-success',
     component: () => import('./views/BillingSuccessView.vue'),

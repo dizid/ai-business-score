@@ -75,6 +75,13 @@ const props = withDefaults(
       sufficientData: boolean;
       minSampleSize: number;
     } | null;
+    // Link to the dedicated per-scan Report page (Markdown/CSV/PDF-via-
+    // print) for this scan — a plain href string, not a router-link,
+    // same reasoning as categoryBenchmark above: result.html has no
+    // vue-router instance at all, so this component must stay
+    // router-agnostic. CompanyDetailView.vue computes this from the
+    // currently-selected scan's id.
+    reportHref?: string | null;
   }>(),
   {
     allowDeepAdvice: false,
@@ -84,6 +91,7 @@ const props = withDefaults(
     sentimentJudgeLoadingKey: null,
     theme: 'legacy',
     categoryBenchmark: null,
+    reportHref: null,
   }
 );
 defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string] }>();
@@ -279,6 +287,7 @@ function copySchema(example: string, index: number) {
         Details<template v-if="totalChecksCount"> &middot; {{ totalChecksCount }} check{{ totalChecksCount === 1 ? '' : 's' }}</template>
       </button>
       <button type="button" class="download-report-button" @click="downloadReport">Download report</button>
+      <a v-if="reportHref" :href="reportHref" class="download-report-button full-report-link">Full report &rarr;</a>
     </div>
 
     <template v-if="viewMode === 'overview'">
@@ -1141,6 +1150,10 @@ h2:first-of-type { margin-top: 0; }
   transition: border-color 0.15s ease, color 0.15s ease !important;
 }
 .download-report-button:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+/* .download-report-button above is class-scoped so it already applies to
+   this <a> too — .tabbar button's element-selector reset doesn't, so this
+   fills the two anchor-specific gaps (link underline, inline-vs-block). */
+.full-report-link { display: inline-block; text-decoration: none; margin-left: 8px; }
 
 /* ---- status-band text/fill helpers (shared by score ring bands and
    Harmonia's pillar bars, so both read as the same color language) ---- */

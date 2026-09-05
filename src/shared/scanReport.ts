@@ -378,6 +378,37 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
   return lines.join('\n');
 }
 
+function csvEscape(value: string): string {
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+// CSV export (ScanReportView.vue's Report page): same check-by-check
+// granularity as the Markdown report's "Check-by-check" section above
+// (deriveCheckBreakdown), just tabular — for pivoting/filtering the raw
+// checks in a spreadsheet rather than reading them as prose. One row per
+// prompt×model check.
+export function buildCheckByCheckCsv(payload: ValidatedPayload): string {
+  const sentimentByKey = deriveSentimentByKey(payload);
+  const header = ['Prompt #', 'Prompt', 'Model', 'Rank', 'Sentiment', 'Citation Count', 'Citation URLs', 'Response'];
+  const rows: string[][] = [header];
+  for (const group of deriveCheckBreakdown(payload)) {
+    for (const c of group.checks) {
+      const judgment = sentimentByKey.get(sentimentKey(group.promptIndex, c.model));
+      rows.push([
+        String(group.promptIndex + 1),
+        group.label,
+        c.model,
+        CHECK_BADGE_LABEL[c.rank],
+        judgment ? SENTIMENT_LABEL[judgment.classification] : '',
+        String(c.citations.length),
+        c.citations.map((cit) => cit.url).join('; '),
+        c.text,
+      ]);
+    }
+  }
+  return rows.map((row) => row.map(csvEscape).join(',')).join('\r\n');
+}
+
 function slugify(s: string): string {
   const slug = s
     .toLowerCase()
@@ -393,6 +424,24 @@ export function downloadMarkdown(markdown: string, payload: ValidatedPayload) {
   const isoDate = payload.generatedAtDate.toISOString().slice(0, 10);
   const filename = `${slugify(payload.brand)}-ai-visibility-report-${isoDate}.md`;
   const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Same Blob+URL.createObjectURL+temporary-<a> pattern as downloadMarkdown
+// above, .csv/text/csv instead. A leading UTF-8 BOM is included so Excel
+// (which otherwise guesses the wrong encoding for non-ASCII brand/competitor
+// names on a double-click open) renders it correctly rather than mojibake.
+export function downloadCsv(csv: string, payload: ValidatedPayload) {
+  const isoDate = payload.generatedAtDate.toISOString().slice(0, 10);
+  const filename = `${slugify(payload.brand)}-ai-visibility-checks-${isoDate}.csv`;
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

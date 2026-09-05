@@ -161,3 +161,15 @@ body {
 }
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* Printing (currently only ScanReportView.vue's "Print / Save as PDF"
+   button) should never print a dark page background regardless of the
+   viewer's active theme — this is the one global source of body's
+   background/color, so the override belongs here rather than duplicated
+   per-component. App.vue has a matching rule hiding its own topbar/footer
+   chrome, and ScanReportView.vue overrides --card/--fg/etc. on its own root
+   for the same reason. Harmless no-op for every other page today (nothing
+   else calls window.print()). */
+@media print {
+  body { background: #ffffff; color: #111111; }
+}

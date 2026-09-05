@@ -351,6 +351,12 @@ const selectedPayload = computed(() =>
   selectedScan.value && selectedScanStatus.value === 'completed' ? validatePayload(selectedScan.value) : null
 );
 
+// Entry point for ScanReportView.vue's dedicated Report page, for the
+// scan currently being viewed.
+const reportHref = computed(() =>
+  selectedPayload.value ? `/app/companies/${route.params.id}/report?scan=${selectedPayload.value.id}` : null
+);
+
 // Deep advice is Pro-gated (Milestone 1 of the monetization plan) — locked
 // means "signed in, has a completed scan, but not entitled," distinct from
 // simply not being allowed at all (result.html's unauthenticated context).
@@ -556,6 +562,7 @@ watch(() => route.params.id, load);
               :allow-sentiment-judge="true"
               :sentiment-judge-loading-key="sentimentJudgeLoadingKey"
               :category-benchmark="categoryBenchmark"
+              :report-href="reportHref"
               @generate-deep-advice="runDeepAdvice"
               @judge-sentiment="runSentimentJudge"
             />

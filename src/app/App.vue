@@ -96,4 +96,13 @@ async function handleSignOut() {
   text-decoration: underline; text-underline-offset: 2px;
 }
 .cookie-settings-link:hover { color: var(--fg); }
+
+/* Printing a page (currently only ScanReportView.vue's "Print / Save as
+   PDF" button) should never include this shell's own topbar/footer chrome
+   — a component's own scoped styles can't reach this parent markup, so
+   this lives here instead. Harmless no-op for every other page today
+   (nothing else calls window.print()). */
+@media print {
+  .topbar, .app-footer { display: none !important; }
+}
 </style>
