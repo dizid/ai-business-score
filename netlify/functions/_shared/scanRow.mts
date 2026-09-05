@@ -5,6 +5,14 @@
 export function toScanPayload(row: Record<string, any>) {
   return {
     id: row.id,
+    // status/errorMessage: a scan row can be pending/running/failed, not
+    // just completed — raw_responses/generated_at (and therefore
+    // validatePayload()) are only ever populated on completion, so callers
+    // MUST branch on status before treating this as a renderable report.
+    // Added so a non-completed scan can show its real state/reason instead
+    // of a misleading generic "couldn't be rendered" message.
+    status: row.status,
+    errorMessage: row.error_message ?? null,
     brand: row.brand,
     website: row.website,
     category: row.category,

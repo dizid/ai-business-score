@@ -16,6 +16,17 @@ function normalizeCategory(category) {
   return category.split(/[,/]+/).map((s) => s.trim()).filter(Boolean).join(' / ');
 }
 
+// `competitors` can legitimately be empty — buildEnrichPrompt below tells the
+// auto-fill model to leave it empty rather than guess. Without this fallback,
+// competitor-comparison templates would substitute the literal string
+// "undefined" into a live prompt sent to the AI. Mirrors the templates' own
+// existing "reuse competitors[0] for the second slot" behavior when only one
+// competitor is known.
+const NO_COMPETITOR_FALLBACK = 'other well-known alternatives';
+function competitorAt(p, index) {
+  return p.competitors[index] || p.competitors[0] || NO_COMPETITOR_FALLBACK;
+}
+
 // ---------- Prompts (10, generic — brand/competitor substitution only) ----------
 // Vertical-adjusted templating explicitly deferred, see TODOS.md. Grew from
 // 8 to 10 on 2026-08-09 (added 8/9 below) after the hosted site's original
@@ -26,15 +37,15 @@ function normalizeCategory(category) {
 // run-scan-background.mts).
 export const PROMPT_TEMPLATES = [
   (p) => `What's the best ${normalizeCategory(p.category)} option for ${p.use_case}?`,
-  (p) => `Compare ${p.brand} vs ${p.competitors[0]} vs ${p.competitors[1] ?? p.competitors[0]}.`,
+  (p) => `Compare ${p.brand} vs ${competitorAt(p, 0)} vs ${competitorAt(p, 1)}.`,
   (p) => `I need a good ${normalizeCategory(p.category)} option — what do you recommend and why?`,
   (p) => `Top ${p.category} companies in ${p.region}?`,
   (p) => `Is ${p.brand} a good choice for ${p.use_case}? What are the alternatives?`,
-  (p) => `What are people saying about ${p.brand} vs ${p.competitors[0]}?`,
+  (p) => `What are people saying about ${p.brand} vs ${competitorAt(p, 0)}?`,
   (p) => `Best ${p.category} for ${p.customer_segment}?`,
   (p) => `Who are the leaders in ${p.category}?`,
   (p) => `What should I look for when choosing a ${normalizeCategory(p.category)}, and which brands do that well?`,
-  (p) => `I'm looking to switch away from ${p.competitors[0]} — what's a good ${normalizeCategory(p.category)} alternative?`,
+  (p) => `I'm looking to switch away from ${competitorAt(p, 0)} — what's a good ${normalizeCategory(p.category)} alternative?`,
 ];
 
 // Dutch translation of the same 10 templates, same parameterization, same
@@ -48,15 +59,15 @@ export const PROMPT_TEMPLATES = [
 // without that review.
 const PROMPT_TEMPLATES_NL = [
   (p) => `Wat is de beste optie op het gebied van ${normalizeCategory(p.category)} voor ${p.use_case}?`,
-  (p) => `Vergelijk ${p.brand} met ${p.competitors[0]} en ${p.competitors[1] ?? p.competitors[0]}.`,
+  (p) => `Vergelijk ${p.brand} met ${competitorAt(p, 0)} en ${competitorAt(p, 1)}.`,
   (p) => `Ik zoek een goede optie op het gebied van ${normalizeCategory(p.category)} — wat raad je aan en waarom?`,
   (p) => `Wat zijn toonaangevende ${p.category}-bedrijven in ${p.region}?`,
   (p) => `Is ${p.brand} een goede keuze voor ${p.use_case}? Wat zijn de alternatieven?`,
-  (p) => `Wat wordt er gezegd over ${p.brand} in vergelijking met ${p.competitors[0]}?`,
+  (p) => `Wat wordt er gezegd over ${p.brand} in vergelijking met ${competitorAt(p, 0)}?`,
   (p) => `Wat is de beste ${p.category} voor ${p.customer_segment}?`,
   (p) => `Wie zijn de marktleiders op het gebied van ${p.category}?`,
   (p) => `Waar moet ik op letten bij het kiezen van een ${normalizeCategory(p.category)}, en welke merken doen dat goed?`,
-  (p) => `Ik wil overstappen van ${p.competitors[0]} — wat is een goed alternatief op het gebied van ${normalizeCategory(p.category)}?`,
+  (p) => `Ik wil overstappen van ${competitorAt(p, 0)} — wat is een goed alternatief op het gebied van ${normalizeCategory(p.category)}?`,
 ];
 
 // Language support is deliberately a curated, reviewed set (not live/dynamic
@@ -465,7 +476,24 @@ export async function callModelWithRetry(apiKeys, model, prompt, timeoutMs, maxA
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await callModel(apiKeys, model, prompt, timeoutMs, externalSignal);
+      const result = await callModel(apiKeys, model, prompt, timeoutMs, externalSignal);
+      // A recognized-but-empty response (a token-limit cutoff mid web-search
+      // tool loop, a content/safety filter, or similar) is not the model
+      // genuinely looking and finding nothing — but callers treat any
+      // resolved call as a completed check and score it via
+      // findBrandMention('', ...), which silently reads as a clean
+      // "not-mentioned" and drags the score down for a reason that has
+      // nothing to do with real AI visibility. Throwing here routes it
+      // through the exact same "skip and count as a failure" path every
+      // other error already uses (excluded from completedCalls/
+      // perPromptRank, recorded in failures[] with an attributable reason)
+      // instead of silently completing. No retry for this, same as any
+      // other non-429 failure below — a token cutoff is a property of the
+      // prompt/response, not a transient blip an immediate retry would fix.
+      if (!result.text || !result.text.trim()) {
+        throw new Error(`Model returned an empty response for ${model} — likely a token-limit cutoff or a content/safety filter, not a genuine "not mentioned" result`);
+      }
+      return result;
     } catch (err) {
       lastErr = err;
       if (externalSignal?.aborted) break;

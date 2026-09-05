@@ -13,7 +13,7 @@ import {
   deriveCompetitorAppearances, deriveExecutiveSummary,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveVisibleAdvice,
   deriveHarmoniaPillars, deriveHarmoniaBand, cwvRating, formatSeconds, deriveScanDurationLabel,
-  confidenceLabel, deriveKeyMetrics,
+  confidenceLabel, deriveKeyMetrics, deriveExtraPsiScores, deriveAdditionalAuditRows,
   type ScoreboardRow,
 } from './scanDerived';
 import { buildScanReportMarkdown, downloadMarkdown } from './scanReport';
@@ -45,10 +45,13 @@ const props = withDefaults(
     payload: ValidatedPayload;
     allowDeepAdvice?: boolean;
     // True when the caller is signed in but not entitled (not Pro, no
-    // one-time purchase) — renders an upgrade CTA in place of the button
-    // instead of hiding the whole section. Distinct from allowDeepAdvice
-    // being merely false, which is what result.html's unauthenticated
-    // context looks like and should stay silent for.
+    // one-time purchase) — renders a locked-state message in place of the
+    // button instead of hiding the whole section. Distinct from
+    // allowDeepAdvice being merely false, which is what result.html's
+    // unauthenticated context looks like and should stay silent for.
+    // 2026-09-04: used to render an "Upgrade to Pro" CTA here; checkout is
+    // hard-disabled for now (free-only cost-control pass, see root
+    // CLAUDE.md's Deployment section), so this is plain unlockable-later text.
     deepAdviceLocked?: boolean;
     deepAdviceLoading?: boolean;
     allowSentimentJudge?: boolean;
@@ -67,7 +70,7 @@ const props = withDefaults(
     theme: 'legacy',
   }
 );
-defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string]; 'upgrade': [] }>();
+defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string] }>();
 
 // Sentiment/category/scoreboard/check-breakdown aggregation logic lives in
 // scanDerived.ts (imported above) — shared verbatim with scanReport.ts so
@@ -145,7 +148,9 @@ const rank1Count = computed(() => deriveRank1Count(props.payload));
 const beatenCount = computed(() => deriveBeatenCount(props.payload));
 const headlineKind = computed(() => deriveHeadlineKind(props.payload));
 const executiveSummary = computed(() => deriveExecutiveSummary(props.payload));
-const confidence = computed(() => confidenceLabel(props.payload.completedCalls));
+const confidence = computed(() =>
+  confidenceLabel(props.payload.completedCalls, props.payload.completedCalls + props.payload.failedCalls)
+);
 const keyMetrics = computed(() => deriveKeyMetrics(props.payload));
 
 const scoreboardRows = computed(() => deriveScoreboardRows(props.payload));
@@ -204,6 +209,18 @@ const detailsEmpty = computed(
 // status colors so this reads as the same system as the AI score ring.
 const harmoniaPillars = computed(() => deriveHarmoniaPillars(props.payload));
 const harmoniaBand = computed(() => deriveHarmoniaBand(props.payload));
+
+// Extra PSI Lighthouse data (2026-09-04): fetched in the same PSI call as
+// performanceScore above but never rendered until now — see
+// shared/harmonia.mjs's own comment on why these were requested but not
+// folded into any pillar's weighted score.
+const extraPsiScores = computed(() => deriveExtraPsiScores(props.payload));
+const additionalAuditRows = computed(() => deriveAdditionalAuditRows(props.payload));
+const additionalSeoSignals = computed(() => props.payload.harmonia?.additionalSeoSignals ?? null);
+const hreflangCodesLabel = computed(() => {
+  const codes = (additionalSeoSignals.value?.hreflangTags ?? []).map((t) => t.hreflang).filter((c): c is string => Boolean(c));
+  return codes.join(', ');
+});
 
 const scanDurationLabel = computed(() => deriveScanDurationLabel(props.payload));
 
@@ -429,10 +446,7 @@ function copySchema(example: string, index: number) {
           {{ deepAdviceLoading ? 'Generating…' : 'Generate deeper advice' }}
         </button>
         <div class="card deep-advice-locked" v-else-if="deepAdviceLocked">
-          <p>Unlock AI-generated action steps — specific, ranked fixes based on this scan's actual results.</p>
-          <button type="button" class="deep-advice-button" @click="$emit('upgrade')">
-            Upgrade to Pro
-          </button>
+          <p>Deeper advice isn't available on the free plan right now — check back soon.</p>
         </div>
       </template>
 
@@ -558,6 +572,58 @@ function copySchema(example: string, index: number) {
             <span class="cwv-metric" :class="`cwv-${cwvRating('clsScore', payload.harmonia.coreWebVitals.clsScore)}`">CLS {{ payload.harmonia.coreWebVitals.clsScore ?? '—' }}</span>
             <span class="cwv-metric" :class="`cwv-${cwvRating('inpMs', payload.harmonia.coreWebVitals.inpMs)}`">INP {{ payload.harmonia.coreWebVitals.inpMs !== null ? formatSeconds(payload.harmonia.coreWebVitals.inpMs) : 'no field data' }}</span>
           </div>
+        </div>
+
+        <!-- Extra PSI Lighthouse data (2026-09-04): SEO/Accessibility/Best
+             Practices category scores and 5 extra audits, fetched in the
+             same PSI call as performanceScore above but never rendered
+             until now — see shared/harmonia.mjs's additionalAudits/
+             extraPsiScores comment for why these aren't folded into any
+             pillar's weighted score. -->
+        <div class="harmonia-cwv" v-if="extraPsiScores.some((s) => s.score !== null) || additionalAuditRows.length">
+          <h3>Additional Lighthouse checks (mobile)</h3>
+          <div class="cwv-row" v-if="extraPsiScores.some((s) => s.score !== null)">
+            <span v-for="s in extraPsiScores" v-show="s.score !== null" :key="s.key" class="cwv-metric" :class="`band-${s.band}`">{{ s.label }} {{ s.score }}</span>
+          </div>
+          <ul class="harmonia-checklist" v-if="additionalAuditRows.length">
+            <li v-for="a in additionalAuditRows" :key="a.id" :class="a.passed ? 'passed' : 'failed'">
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="a.passed ? 'check' : 'x'" /><template v-else>{{ a.passed ? '✓' : '✗' }}</template></span> {{ a.label }}
+            </li>
+          </ul>
+        </div>
+
+        <!-- Additional SEO signals (2026-09-04): visible-but-unscored data
+             harmonia.mjs already collects alongside the four weighted
+             pillars — see that file's additionalSeoSignals comment. -->
+        <div class="harmonia-schema" v-if="additionalSeoSignals">
+          <h3>Additional SEO signals</h3>
+          <ul class="harmonia-checklist">
+            <li :class="additionalSeoSignals.htmlLang ? 'passed' : 'failed'">
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.htmlLang ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.htmlLang ? '✓' : '✗' }}</template></span>
+              HTML lang attribute {{ additionalSeoSignals.htmlLang ? `set (${additionalSeoSignals.htmlLang})` : 'not set' }}
+            </li>
+            <li :class="additionalSeoSignals.faviconPresent ? 'passed' : 'failed'">
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.faviconPresent ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.faviconPresent ? '✓' : '✗' }}</template></span>
+              Favicon present
+            </li>
+            <li :class="additionalSeoSignals.manifestPresent ? 'passed' : 'failed'">
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.manifestPresent ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.manifestPresent ? '✓' : '✗' }}</template></span>
+              Web app manifest present
+            </li>
+            <li :class="additionalSeoSignals.twitterCard.length ? 'passed' : 'failed'">
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.twitterCard.length ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.twitterCard.length ? '✓' : '✗' }}</template></span>
+              Twitter Card tags present
+            </li>
+            <li :class="additionalSeoSignals.hreflangTags.length ? 'passed' : 'failed'">
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.hreflangTags.length ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.hreflangTags.length ? '✓' : '✗' }}</template></span>
+              hreflang tags present{{ hreflangCodesLabel ? ` (${hreflangCodesLabel})` : '' }}
+            </li>
+            <li :class="additionalSeoSignals.sitemapUrlCount ? 'passed' : 'failed'">
+              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.sitemapUrlCount ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.sitemapUrlCount ? '✓' : '✗' }}</template></span>
+              <template v-if="additionalSeoSignals.sitemapUrlCount">Sitemap{{ additionalSeoSignals.sitemapIsIndex ? ' index' : '' }} lists {{ additionalSeoSignals.sitemapUrlCount }} URL{{ additionalSeoSignals.sitemapUrlCount === 1 ? '' : 's' }}</template>
+              <template v-else>No sitemap URLs found</template>
+            </li>
+          </ul>
         </div>
 
         <div class="harmonia-schema" v-if="payload.harmonia.schema.detected.length">
@@ -1090,6 +1156,15 @@ h2:first-of-type { margin-top: 0; }
 .cwv-metric.cwv-good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--success-text); }
 .cwv-metric.cwv-needs-improvement { background: color-mix(in srgb, var(--warning) 20%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
 .cwv-metric.cwv-poor { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+/* Same pill, keyed to scoreBand()'s 5-state band names instead of the
+   3-state good/needs-improvement/poor scale above — used for the extra PSI
+   category scores (SEO/Accessibility/Best Practices), which reuse the same
+   0-100 banding every other Harmonia pillar score already uses. */
+.cwv-metric.band-leading { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--success-text); }
+.cwv-metric.band-visible { background: color-mix(in srgb, var(--warning) 20%, transparent); color: color-mix(in srgb, var(--warning) 70%, var(--fg)); }
+.cwv-metric.band-weak { background: color-mix(in srgb, var(--serious) 18%, transparent); color: var(--serious); }
+.cwv-metric.band-invisible { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical); }
+.cwv-metric.band-unavailable { background: color-mix(in srgb, var(--faint) 16%, transparent); color: var(--muted); }
 
 .schema-list { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }
 .schema-list li { display: flex; align-items: baseline; gap: 6px; padding: 4px 0; color: var(--muted); }

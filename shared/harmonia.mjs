@@ -389,6 +389,18 @@ async function fetchRobotsTxt(origin) {
   const { signal, clear } = withTimeout(ROBOTS_TIMEOUT_MS);
   try {
     const res = await safeFetch(`${origin}/robots.txt`, { signal });
+    // A 404 means no robots.txt file exists at all — under the actual spec
+    // that's the maximally *permissive* state (nothing is disallowed), not
+    // a failure. Treating it the same as an unreachable/erroring site used
+    // to score an ordinary small-business site (no robots.txt published,
+    // which is common and harmless) identically to one whose robots.txt
+    // actively blocks every crawler — two opposite states collapsed into
+    // the same failing "robots.txt reachable and not blocking everything"
+    // check. Any other non-2xx status (5xx, 403, etc.) is a genuine
+    // problem and still falls through to reachable: false below.
+    if (res.status === 404) {
+      return { reachable: true, blanketDisallow: false, hasSitemapDirective: false, aiCrawlers: AI_CRAWLER_USER_AGENTS.map(({ bot, provider }) => ({ bot, provider, matched: false, blocked: false })), error: null };
+    }
     if (!res.ok) return { reachable: false, blanketDisallow: false, hasSitemapDirective: false, aiCrawlers: [], error: null };
     const text = await res.text();
     return {
@@ -493,18 +505,32 @@ export function extractPsiSignals(json) {
   };
 }
 
+// Returns { signals, error } rather than bare signals-or-null — every other
+// fetcher in this file (fetchHomepage/fetchRobotsTxt/fetchSitemapXml) already
+// surfaces a descriptive error string on failure; this one used to collapse
+// every failure mode (missing/invalid key, PSI rate-limited or erroring,
+// a timeout, a JSON-parse failure) into a bare null with zero detail, which
+// meant a broken/expired GOOGLE_PAGESPEED_API_KEY could silently degrade
+// every scan's uxSignals pillar indefinitely with no signal anywhere. A
+// missing apiKey is deliberately NOT treated as an error (analyzeHarmonia
+// callers may simply not have PSI configured) — only a real fetch/HTTP/parse
+// failure is.
 async function fetchCoreWebVitals(origin, apiKey) {
-  if (!apiKey) return null;
+  if (!apiKey) return { signals: null, error: null };
   const { signal, clear } = withTimeout(PSI_TIMEOUT_MS);
   try {
     const categories = 'category=performance&category=seo&category=accessibility&category=best-practices';
     const url = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(origin)}&strategy=mobile&${categories}&key=${apiKey}`;
     const res = await fetch(url, { signal });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.text()).slice(0, 200); } catch { /* body already consumed or unreadable — detail stays empty */ }
+      return { signals: null, error: `PageSpeed Insights check failed: HTTP ${res.status}${detail ? ` — ${detail}` : ''}` };
+    }
     const json = await res.json();
-    return extractPsiSignals(json);
-  } catch {
-    return null;
+    return { signals: extractPsiSignals(json), error: null };
+  } catch (err) {
+    return { signals: null, error: `PageSpeed Insights check failed: ${err.message}` };
   } finally {
     clear();
   }
@@ -566,13 +592,15 @@ export async function analyzeHarmonia(prospect, psiApiKey) {
   if (homepage.error) errors.push(homepage.error);
   const page = homepage.html ? parseHtml(homepage.html, origin) : null;
 
-  const [robots, sitemap, coreWebVitals] = await Promise.all([
+  const [robots, sitemap, coreWebVitalsResult] = await Promise.all([
     fetchRobotsTxt(origin),
     fetchSitemapXml(origin),
     fetchCoreWebVitals(origin, psiApiKey),
   ]);
   if (robots.error) errors.push(robots.error);
   if (sitemap.error) errors.push(sitemap.error);
+  if (coreWebVitalsResult.error) errors.push(coreWebVitalsResult.error);
+  const coreWebVitals = coreWebVitalsResult.signals;
 
   const jsonLdNodes = page ? validateJsonLdBlocks(page.jsonLdRaw) : [];
   const detectedTypes = jsonLdNodes.map((n) => n.type).filter(Boolean);

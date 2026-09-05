@@ -40,7 +40,6 @@ const selectedIndex = ref<number | null>(null);
 const scanning = ref(false);
 const scanStatus = ref('');
 const scanError = ref('');
-const scanUpgradeRequired = ref(false);
 const upgrading = ref(false);
 // singleScanBanner: read-only redirect-completion state (see onMounted's
 // ?singlescan= handling below) — kept even though the in-app CTA that used
@@ -66,6 +65,17 @@ function formatDate(generatedAt: unknown) {
   return typeof generatedAt === 'string' && generatedAt
     ? new Date(generatedAt).toLocaleString()
     : 'unknown date';
+}
+
+// Non-completed scans have no generatedAt yet (only ever set on completion),
+// so the history list would otherwise show "unknown date" for a scan that's
+// simply still running, queued, or failed — a real, current status reads
+// better than a falsely-implied missing timestamp.
+function scanListStatusLabel(status: string) {
+  if (status === 'running') return 'Running…';
+  if (status === 'pending') return 'Queued…';
+  if (status === 'failed') return 'Failed';
+  return 'unknown date';
 }
 
 async function load() {
@@ -115,14 +125,17 @@ const POLL_RETRY_BACKOFFS_MS = [2000, 4000, 8000];
 // now writes incrementally during a scan (run-scan-background.mts) into a
 // one-line status — replaces the old static "Running checks (~5-8 min)…"
 // that gave no signal of what was actually happening for the whole wait.
-// Falls back to the old static text if progress hasn't arrived yet (e.g.
-// the very first poll, or a scan finalized before the `progress` column
-// existed) rather than showing a broken "0/0" line. `currentModels` (was
+// Falls back to a generic "Running checks…" line if progress hasn't arrived
+// yet (e.g. the very first poll, or a scan finalized before the `progress`
+// column existed) rather than showing a broken "0/0" line — no minute
+// estimate here since that's tied to provider count/concurrency, which has
+// already gone stale once (see HOSTED_MODELS in run-scan-background.mts).
+// `currentModels` (was
 // `currentModel: string | null`) became an array once provider lanes
 // started running concurrently — more than one model can be in flight at
 // once now, not just one.
 function formatRunningStatus(progress: { completed: number; total: number; currentModels: string[] } | null) {
-  if (!progress || !progress.total) return 'Running checks (~5-8 min)…';
+  if (!progress || !progress.total) return 'Running checks…';
   const checking = progress.currentModels?.length ? ` — checking ${progress.currentModels.join(', ')}…` : '';
   return `Running checks: ${progress.completed}/${progress.total} done${checking}`;
 }
@@ -190,7 +203,6 @@ async function runNewScan() {
   if (!company.value) return;
   scanning.value = true;
   scanError.value = '';
-  scanUpgradeRequired.value = false;
   scanStatus.value = 'Starting scan…';
   try {
     const res = await authFetch('/scan', {
@@ -201,7 +213,6 @@ async function runNewScan() {
     const data = await res.json();
     if (!data.ok) {
       scanError.value = data.error || 'Failed to start scan.';
-      scanUpgradeRequired.value = !!data.upgradeRequired;
       scanning.value = false;
       return;
     }
@@ -215,6 +226,10 @@ async function runNewScan() {
 // Same shape as CompaniesListView's startCheckout — kept duplicated rather
 // than shared, matching this codebase's convention of copy-pasted per-file
 // auth/billing calls over a shared abstraction (see auth.mts's own comment).
+// 2026-09-04 — checkout is hard-disabled for now (free-only cost-control
+// pass, see root CLAUDE.md's Deployment section) and every call site below
+// was removed, so this function is currently unused. Left in place, body
+// unchanged, for a cheap revert later.
 async function startCheckout() {
   upgrading.value = true;
   try {
@@ -237,14 +252,15 @@ async function startCheckout() {
 const isProUser = computed(() => profile.value.plan_tier === 'pro');
 
 // Toggles companies.scan_frequency between 'off' and 'weekly'. A non-Pro
-// caller PATCHing 'weekly' gets a 402 upgradeRequired from company.mts —
-// route that into the same upgrade CTA the rest of this view already uses
-// rather than a bespoke error message.
+// caller PATCHing 'weekly' gets a 402 upgradeRequired from company.mts.
+// 2026-09-04 — used to route that into startCheckout(); checkout is
+// hard-disabled for now, so this just surfaces a plain message instead (see
+// root CLAUDE.md's Deployment section).
 async function toggleAutoScan() {
   if (!company.value || autoScanUpdating.value) return;
   const nextFrequency = company.value.scan_frequency === 'weekly' ? 'off' : 'weekly';
   if (nextFrequency === 'weekly' && !isProUser.value) {
-    startCheckout();
+    scanError.value = "Automatic weekly scans aren't available on the free plan right now.";
     return;
   }
   autoScanUpdating.value = true;
@@ -298,7 +314,18 @@ function selectScanById(id: string) {
 const selectedScan = computed(() =>
   selectedIndex.value === null ? null : scans.value[selectedIndex.value] ?? null
 );
-const selectedPayload = computed(() => (selectedScan.value ? validatePayload(selectedScan.value) : null));
+// raw_responses/generated_at (and therefore validatePayload()) are only
+// ever populated once a scan reaches status='completed' — calling
+// validatePayload on a pending/running/failed row always returns null, which
+// used to render as a misleading generic "couldn't be rendered" message
+// indistinguishable from a genuinely malformed record. Gate on status first,
+// same pattern PublicScanView.vue already uses for the public single-scan
+// page, so the real state (still running / actually failed, with its real
+// error_message) shows instead.
+const selectedScanStatus = computed(() => (selectedScan.value as any)?.status ?? 'completed');
+const selectedPayload = computed(() =>
+  selectedScan.value && selectedScanStatus.value === 'completed' ? validatePayload(selectedScan.value) : null
+);
 
 // Deep advice is Pro-gated (Milestone 1 of the monetization plan) — locked
 // means "signed in, has a completed scan, but not entitled," distinct from
@@ -437,7 +464,7 @@ watch(() => route.params.id, load);
             class="auto-scan-toggle"
             :class="{ active: company.scan_frequency === 'weekly' }"
             :disabled="autoScanUpdating"
-            :title="isProUser ? '' : 'Automatic weekly scans are a Pro feature'"
+            :title="isProUser ? '' : 'Automatic weekly scans aren\'t available on the free plan right now'"
             @click="toggleAutoScan"
           >
             Automatic weekly scans: {{ company.scan_frequency === 'weekly' ? 'On' : 'Off' }}
@@ -445,10 +472,7 @@ watch(() => route.params.id, load);
           <div class="scan-status" v-if="scanStatus">{{ scanStatus }}</div>
           <div class="scan-status error" v-if="scanError">
             {{ scanError }}
-            <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="upgrading" @click="startCheckout">
-              Upgrade to Pro
-            </button>
-            <button type="button" class="inline-upgrade" v-else-if="pendingScanId" @click="recheckPendingScan">
+            <button type="button" class="inline-upgrade" v-if="pendingScanId" @click="recheckPendingScan">
               Check again
             </button>
           </div>
@@ -475,7 +499,7 @@ watch(() => route.params.id, load);
           >
             <div class="scan-row">
               <div class="scan-meta">
-                {{ formatDate(scan.generatedAt) }}
+                {{ (scan as any).status === 'completed' || !(scan as any).status ? formatDate(scan.generatedAt) : scanListStatusLabel((scan as any).status) }}
                 <span v-if="index === 0" class="latest-tag">Latest</span>
               </div>
               <div class="scan-row-right">
@@ -504,8 +528,13 @@ watch(() => route.params.id, load);
               :sentiment-judge-loading-key="sentimentJudgeLoadingKey"
               @generate-deep-advice="runDeepAdvice"
               @judge-sentiment="runSentimentJudge"
-              @upgrade="startCheckout"
             />
+            <p class="empty" v-else-if="selectedScanStatus === 'failed'">
+              This scan didn't complete: {{ (selectedScan as any)?.errorMessage || 'Something went wrong running the checks.' }}
+            </p>
+            <p class="empty" v-else-if="selectedScanStatus === 'pending' || selectedScanStatus === 'running'">
+              This scan is still in progress — check back in a few minutes, or select it again once it finishes.
+            </p>
             <p class="empty" v-else>This record couldn't be rendered — its stored data doesn't match the expected format.</p>
           </template>
         </div>

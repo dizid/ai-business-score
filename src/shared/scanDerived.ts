@@ -101,15 +101,20 @@ export function deriveBeatenCount(payload: ValidatedPayload) {
 }
 
 // Qualitative read on completedCalls, next to the score card's existing raw
-// "X / Y successful checks" count. Thresholds are against the hosted site's
-// fixed 20-call scan size (5 prompt templates x 4 models — see
-// aivis-core.mjs's MODELS/PROMPT_TEMPLATES.slice(0,5)), not a percentage: a
-// handful of extra failed calls out of 20 matters more than the same
-// handful would out of a much larger set.
+// "X / Y successful checks" count. Percentage-based (of totalCalls actually
+// attempted) rather than a fixed completedCalls count, so this stays correct
+// regardless of how many prompts/models a scan attempts — a fixed threshold
+// tied to one specific scan size (e.g. the old 5-prompt x 4-model = 20 calls)
+// goes stale the moment that size changes, which is exactly what happened
+// when the hosted site's HOSTED_MODELS cut dropped the max to 5 x 2 = 10
+// (run-scan-background.mts) and made the old "High >= 16" threshold
+// permanently unreachable.
 export type ConfidenceLevel = 'High' | 'Medium' | 'Low';
-export function confidenceLabel(completedCalls: number): ConfidenceLevel {
-  if (completedCalls >= 16) return 'High';
-  if (completedCalls >= 10) return 'Medium';
+export function confidenceLabel(completedCalls: number, totalCalls: number): ConfidenceLevel {
+  if (totalCalls <= 0) return 'Low';
+  const ratio = completedCalls / totalCalls;
+  if (ratio >= 0.8) return 'High';
+  if (ratio >= 0.5) return 'Medium';
   return 'Low';
 }
 
@@ -325,6 +330,31 @@ export function deriveHarmoniaPillars(payload: ValidatedPayload): HarmoniaPillar
 }
 export function deriveHarmoniaBand(payload: ValidatedPayload) {
   return scoreBand(payload.harmonia?.harmoniaScore ?? null);
+}
+
+// The 3 extra PSI category scores requested alongside performance (same
+// Lighthouse run — see shared/harmonia.mjs). Colored via scoreBand(), the
+// same 0-100 banding every other Harmonia pillar score already uses, so
+// these read as the same color language rather than a differently
+// calibrated one.
+export interface ExtraPsiScoreView { key: 'seoScore' | 'accessibilityScore' | 'bestPracticesScore'; label: string; score: number | null; band: string; }
+const EXTRA_PSI_SCORE_LABELS: { key: ExtraPsiScoreView['key']; label: string }[] = [
+  { key: 'seoScore', label: 'SEO' },
+  { key: 'accessibilityScore', label: 'Accessibility' },
+  { key: 'bestPracticesScore', label: 'Best Practices' },
+];
+export function deriveExtraPsiScores(payload: ValidatedPayload): ExtraPsiScoreView[] {
+  const cwv = payload.harmonia?.coreWebVitals;
+  if (!cwv) return [];
+  return EXTRA_PSI_SCORE_LABELS.map(({ key, label }) => ({ key, label, score: cwv[key], band: scoreBand(cwv[key]) }));
+}
+
+// Audits where PSI genuinely returned no score (passed === null) are
+// excluded rather than shown as a third visual state — same "only render
+// what has data" discipline as harmonia.mjs's own uxChecks (only built
+// when coreWebVitals exists at all).
+export function deriveAdditionalAuditRows(payload: ValidatedPayload) {
+  return (payload.harmonia?.coreWebVitals?.additionalAudits ?? []).filter((a) => a.passed !== null);
 }
 
 export const CWV_THRESHOLDS = { lcpMs: [2500, 4000], clsScore: [0.1, 0.25], inpMs: [200, 500] } as const;

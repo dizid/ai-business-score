@@ -138,7 +138,7 @@ onUnmounted(() => {
     <template v-else-if="scanStatus === 'pending' || scanStatus === 'running'">
       <div class="card">
         <h1>Running your AI visibility scan…</h1>
-        <p class="sub">Five prompts, four AI models — usually 5-8 minutes. This page updates on its own; you can also close it and use the link in your email.</p>
+        <p class="sub">Five prompts, two AI models — usually a few minutes. This page updates on its own; you can also close it and use the link in your email.</p>
       </div>
     </template>
 

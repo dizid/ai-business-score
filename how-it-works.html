@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>How Foreground works — AI search visibility scoring explained</title>
-<meta name="description" content="How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<meta name="description" content="How Foreground checks whether your business shows up in Gemini and Claude answers: 5 prompts, 2 AI models, 10 checks, and how the 0-100 score is calculated." />
 <link rel="canonical" href="https://foreground.info/how-it-works" />
 <!--#include:llms-link-->
 <!--#include:favicon-->
@@ -12,12 +12,12 @@
 <meta name="theme-color" content="#0a0a0d" />
 <meta property="og:type" content="article" />
 <meta property="og:title" content="How Foreground works — AI search visibility scoring explained" />
-<meta property="og:description" content="How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<meta property="og:description" content="How Foreground checks whether your business shows up in Gemini and Claude answers: 5 prompts, 2 AI models, 10 checks, and how the 0-100 score is calculated." />
 <meta property="og:url" content="https://foreground.info/how-it-works" />
 <meta property="og:image" content="https://foreground.info/og-image.png" />
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="How Foreground works — AI search visibility scoring explained" />
-<meta name="twitter:description" content="How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated." />
+<meta name="twitter:description" content="How Foreground checks whether your business shows up in Gemini and Claude answers: 5 prompts, 2 AI models, 10 checks, and how the 0-100 score is calculated." />
 <meta property="twitter:image" content="https://foreground.info/og-image.png" />
 <!-- Self-contained @graph: this page is a separate HTTP document from
      index.html, so the WebPage node's isPartOf/publisher @id references
@@ -49,7 +49,7 @@
       "@id": "https://foreground.info/how-it-works#webpage",
       "url": "https://foreground.info/how-it-works",
       "name": "How Foreground works — AI search visibility scoring explained",
-      "description": "How Foreground checks whether your business shows up in ChatGPT and Gemini answers: 5 prompts, 4 AI models, 20 checks, and how the 0-100 score is calculated.",
+      "description": "How Foreground checks whether your business shows up in Gemini and Claude answers: 5 prompts, 2 AI models, 10 checks, and how the 0-100 score is calculated.",
       "isPartOf": { "@id": "https://foreground.info/#website" },
       "publisher": { "@id": "https://foreground.info/#organization" }
     },
@@ -57,26 +57,26 @@
       "@type": "HowTo",
       "@id": "https://foreground.info/how-it-works#howto",
       "name": "How a scan works",
-      "description": "Five prompts, four AI models, twenty checks, one score.",
+      "description": "Five prompts, two AI models, ten checks, one score.",
       "mainEntityOfPage": { "@id": "https://foreground.info/how-it-works#webpage" },
       "step": [
         {
           "@type": "HowToStep",
           "position": 1,
-          "name": "Foreground sends 5 prompts to 4 AI models",
-          "text": "When you run a scan, Foreground sends 5 different prompts — phrased the way a real customer would actually ask, not just \"tell me about {your brand}\" — to 4 AI models (OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6), for 20 checks total per scan. Some prompts ask for a recommendation directly (\"what's the best X for Y?\"), some ask for a comparison against your named competitors, some ask \"who are the leaders in X category?\" — covering the range of ways someone genuinely deciding between options might ask."
+          "name": "Foreground sends 5 prompts to 2 AI models",
+          "text": "When you run a scan, Foreground sends 5 different prompts — phrased the way a real customer would actually ask, not just \"tell me about {your brand}\" — to 2 AI models (Google's Gemini 3 Flash and Anthropic's Claude Haiku 4.5), for 10 checks total per scan. Some prompts ask for a recommendation directly (\"what's the best X for Y?\"), some ask for a comparison against your named competitors, some ask \"who are the leaders in X category?\" — covering the range of ways someone genuinely deciding between options might ask."
         },
         {
           "@type": "HowToStep",
           "position": 2,
           "name": "Each answer is grounded in live web search",
-          "text": "Every answer is grounded in a live web search rather than only the model's static training data — each model is queried directly against its own provider's API (OpenAI, Google, Anthropic, xAI), using that provider's own web-search tool. See \"Limitations, honestly stated\" below for a couple of real coverage gaps that are worth knowing about."
+          "text": "Every answer is grounded in a live web search rather than only the model's static training data — each model is queried directly against its own provider's API (Google, Anthropic), using that provider's own web-search tool. See \"Limitations, honestly stated\" below for a couple of real coverage gaps that are worth knowing about."
         },
         {
           "@type": "HowToStep",
           "position": 3,
           "name": "Foreground checks each response for brand mentions",
-          "text": "For each of the 20 responses, Foreground checks whether your brand name (or a domain-derived alias) is mentioned, whether it's the first business mentioned, and which competitors — if any — appear instead or alongside it. This is presence detection, and it's intentionally conservative — very short or common-word brand names are flagged as ambiguous rather than guessed at, since a naive text match on a name like \"Best\" would match almost every response regardless of whether your business was actually meant. On top of presence, every check where your brand is actually mentioned is also automatically classified by tone — recommended, neutral, negative, or comparison-only — so a mention isn't just counted, it's read for whether the model was actually vouching for you."
+          "text": "For each of the 10 responses, Foreground checks whether your brand name (or a domain-derived alias) is mentioned, whether it's the first business mentioned, and which competitors — if any — appear instead or alongside it. This is presence detection, and it's intentionally conservative — very short or common-word brand names are flagged as ambiguous rather than guessed at, since a naive text match on a name like \"Best\" would match almost every response regardless of whether your business was actually meant. On top of presence, every check where your brand is actually mentioned is also automatically classified by tone — recommended, neutral, negative, or comparison-only — so a mention isn't just counted, it's read for whether the model was actually vouching for you."
         }
       ]
     }
@@ -141,10 +141,9 @@
       <p>
         When you run a scan, Foreground sends <strong>5 different prompts</strong>
         — phrased the way a real customer would actually ask, not just "tell
-        me about {your brand}" — to <strong>4 AI models</strong>
-        (OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude
-        Haiku 4.5, and xAI's Grok 4.6), for
-        <strong>20 checks total</strong> per scan. Some prompts ask for a
+        me about {your brand}" — to <strong>2 AI models</strong>
+        (Google's Gemini 3 Flash and Anthropic's Claude Haiku 4.5), for
+        <strong>10 checks total</strong> per scan. Some prompts ask for a
         recommendation directly ("what's the best X for Y?"), some ask for a
         comparison against your named competitors, some ask "who are the
         leaders in X category?" — covering the range of ways someone
@@ -153,13 +152,13 @@
       <p>
         Every answer is grounded in a live web search rather than only the
         model's static training data — each model is queried
-        <strong>directly against its own provider's API</strong> (OpenAI,
-        Google, Anthropic, xAI), using that provider's own web-search tool.
+        <strong>directly against its own provider's API</strong> (Google,
+        Anthropic), using that provider's own web-search tool.
         See "Limitations, honestly stated" below for a couple of real
         coverage gaps that are worth knowing about.
       </p>
       <p>
-        For each of the 20 responses, Foreground checks whether your brand name
+        For each of the 10 responses, Foreground checks whether your brand name
         (or a domain-derived alias) is mentioned, whether it's the
         <em>first</em> business mentioned, and which competitors — if any —
         appear instead or alongside it. This is <strong>presence
@@ -176,7 +175,7 @@
         through a second pass: a <strong>sentiment judge</strong> that
         classifies the mention as recommended, neutral, negative, or
         comparison-only. This runs automatically on every scan, right after
-        the main 20-check pass completes, and shows up as a summary on the
+        the main 10-check pass completes, and shows up as a summary on the
         Overview tab plus a per-check badge in the detailed breakdown.
       </p>
     </section>
@@ -212,7 +211,7 @@
         If too few checks complete — a real outage, not a real result —
         Foreground shows no score at all rather than a misleading one computed
         from too little data. Your dashboard shows exactly how many of the
-        20 checks succeeded, so you can judge how much to trust a given
+        10 checks succeeded, so you can judge how much to trust a given
         score. A 0 always means "checked and genuinely not mentioned,"
         never "we couldn't check."
       </p>
@@ -263,22 +262,21 @@
         not the whole picture on its own.
       </p>
       <p>
-        <strong>On the "4 AI models" claim, specifically:</strong> all
-        four — GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 —
-        are called directly against OpenAI's, Google's, Anthropic's, and
-        xAI's own APIs, each grounded using that provider's own web-search
-        tool — so this measures each model in its own real product, not a
-        third party's approximation of it. There's one asterisk worth
-        naming: Gemini's citations come back as Google's own
-        grounding-redirect links rather than the original source URL, so
-        while Gemini's <em>answer text</em> is checked the same way as the
-        other three models, its citation links can't be matched against your
-        own site's domain the way OpenAI's, Anthropic's, and xAI's citations
-        can. Foreground also doesn't currently check Google's AI Overviews/AI
-        Mode or Microsoft Copilot, two AI-answer surfaces this scan doesn't
-        cover. We'd rather state all of this plainly than let "4 models"
-        imply more uniform or more direct coverage than what's actually
-        being measured.
+        <strong>On the "2 AI models" claim, specifically:</strong> both —
+        Gemini 3 Flash and Claude Haiku 4.5 — are called directly against
+        Google's and Anthropic's own APIs, each grounded using that
+        provider's own web-search tool — so this measures each model in its
+        own real product, not a third party's approximation of it. There's
+        one asterisk worth naming: Gemini's citations come back as Google's
+        own grounding-redirect links rather than the original source URL, so
+        while Gemini's <em>answer text</em> is checked the same way as
+        Claude's, its citation links can't be matched against your own
+        site's domain the way Claude's citations can. Foreground also
+        doesn't currently check OpenAI's ChatGPT, xAI's Grok, Google's AI
+        Overviews/AI Mode, or Microsoft Copilot — AI-answer surfaces this
+        scan doesn't cover. We'd rather state all of this plainly than let
+        "2 models" imply more or less coverage than what's actually being
+        measured.
       </p>
     </section>
   </main>

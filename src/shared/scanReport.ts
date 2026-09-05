@@ -17,7 +17,7 @@ import {
   deriveExecutiveSummary, confidenceLabel, deriveKeyMetrics,
   deriveSentimentSummaryRows, deriveSentimentAdvice, deriveVisibleAdvice, deriveHarmoniaPillars, deriveHarmoniaBand,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveScanDurationLabel, cwvRating,
-  formatSeconds, sentimentKey, deriveSentimentByKey,
+  formatSeconds, sentimentKey, deriveSentimentByKey, deriveExtraPsiScores, deriveAdditionalAuditRows,
 } from './scanDerived';
 import { scoreBand } from '../../shared/aivis-core.mjs';
 
@@ -126,7 +126,7 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
   push();
   push(BAND_EXPLAIN[band]);
   push();
-  push(`Confidence: ${confidenceLabel(payload.completedCalls)} — based on ${payload.completedCalls} / ${payload.completedCalls + payload.failedCalls} successful checks.`);
+  push(`Confidence: ${confidenceLabel(payload.completedCalls, payload.completedCalls + payload.failedCalls)} — based on ${payload.completedCalls} / ${payload.completedCalls + payload.failedCalls} successful checks.`);
   push();
   push(headlineMarkdown(payload));
   push();
@@ -263,6 +263,28 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
       push(`- LCP: ${formatSeconds(cwv.lcpMs)} (${rate('lcpMs', cwv.lcpMs)})`);
       push(`- CLS: ${cwv.clsScore ?? '—'} (${rate('clsScore', cwv.clsScore)})`);
       push(`- INP: ${cwv.inpMs !== null ? formatSeconds(cwv.inpMs) : 'no field data'} (${rate('inpMs', cwv.inpMs)})`);
+      push();
+    }
+    const extraPsiScores = deriveExtraPsiScores(payload).filter((s) => s.score !== null);
+    const additionalAuditRows = deriveAdditionalAuditRows(payload);
+    if (extraPsiScores.length || additionalAuditRows.length) {
+      push('### Additional Lighthouse checks (mobile)');
+      push();
+      for (const s of extraPsiScores) push(`- ${s.label}: ${s.score}/100 (${BAND_LABEL[s.band]})`);
+      for (const a of additionalAuditRows) push(checklistLine(Boolean(a.passed), a.label));
+      push();
+    }
+    if (h.additionalSeoSignals) {
+      const s = h.additionalSeoSignals;
+      push('### Additional SEO signals');
+      push();
+      push(checklistLine(Boolean(s.htmlLang), `HTML lang attribute ${s.htmlLang ? `set (${s.htmlLang})` : 'not set'}`));
+      push(checklistLine(s.faviconPresent, 'Favicon present'));
+      push(checklistLine(s.manifestPresent, 'Web app manifest present'));
+      push(checklistLine(s.twitterCard.length > 0, 'Twitter Card tags present'));
+      const hreflangCodes = s.hreflangTags.map((t) => t.hreflang).filter(Boolean).join(', ');
+      push(checklistLine(s.hreflangTags.length > 0, `hreflang tags present${hreflangCodes ? ` (${hreflangCodes})` : ''}`));
+      push(checklistLine(Boolean(s.sitemapUrlCount), s.sitemapUrlCount ? `Sitemap${s.sitemapIsIndex ? ' index' : ''} lists ${s.sitemapUrlCount} URL${s.sitemapUrlCount === 1 ? '' : 's'}` : 'No sitemap URLs found'));
       push();
     }
     if (h.schema.detected.length) {

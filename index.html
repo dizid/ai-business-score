@@ -50,8 +50,23 @@
      $29→$199 fix). FAQ answers here are
      kept string-identical to the visible <details> content below (Google's
      FAQPage guidelines require the two to match) — including the model
-     lineup, which was stale (said 2 models) until this pass corrected it
-     to the real 4-model / 5-prompt / 20-check scan, matching how-it-works.html. -->
+     lineup, corrected again on 2026-09-05 to the real 2-model / 5-prompt /
+     10-check scan (run-scan-background.mts's HOSTED_MODELS cut Google +
+     Anthropic only, dropped 2026-09-04 for cost — see root CLAUDE.md's
+     Deployment section), matching how-it-works.html. Previously said
+     4 models (stale from before that cut), and before that, briefly said
+     2 models for an unrelated reason — same number, different cause; don't
+     assume "2 models" here is inherited from that earlier state.
+
+     2026-09-04 — free-only cost-control pass (see root CLAUDE.md's
+     Deployment section): checkout is hard-disabled site-wide for now, so
+     the Pro-plan and Single-scan Offers below are marked OutOfStock rather
+     than removed (the price info stays accurate, only purchasability
+     changed), the "What does it cost?" answer was reworded to say so, and
+     the single-scan purchase form further down was removed. Revert: drop
+     the availability field from both Offers, restore the old "What does it
+     cost?" text, restore the form (git history, this commit). -->
+     ->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -76,7 +91,7 @@
       "name": "Foreground",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
-      "description": "Checks whether a business is mentioned when AI search engines like ChatGPT and Gemini are asked about its category, scores the result 0-100, and tracks it over time.",
+      "description": "Checks whether a business is mentioned when AI search engines like Gemini and Claude are asked about its category, scores the result 0-100, and tracks it over time.",
       "url": "https://foreground.info/",
       "publisher": { "@id": "https://foreground.info/#organization" },
       "offers": [
@@ -90,13 +105,15 @@
           "@type": "Offer",
           "name": "Pro plan",
           "price": "99",
-          "priceCurrency": "USD"
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/OutOfStock"
         },
         {
           "@type": "Offer",
           "name": "Single scan",
           "price": "19",
-          "priceCurrency": "USD"
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/OutOfStock"
         }
       ]
     },
@@ -126,7 +143,7 @@
           "name": "Which AI models does it check?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6 — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data."
+            "text": "Google's Gemini 3 Flash and Anthropic's Claude Haiku 4.5 — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data."
           }
         },
         {
@@ -134,7 +151,7 @@
           "name": "What does it cost?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Free to try — one company and three scans, no credit card required. Just need one check? A single scan is $19, one-time, no account required. Pro is $99/month for unlimited companies, 20 scans a month (fair use), and unlimited AI-generated deep advice."
+            "text": "Free to try — one company and three scans, no credit card required. Foreground is running as a free product for now while we dial in Pro and single-scan pricing — check back soon for paid options."
           }
         }
       ]
@@ -188,8 +205,8 @@
         <span class="hero-fact-label">your visibility score</span>
       </div>
       <div class="hero-fact">
-        <span class="hero-fact-num">4</span>
-        <span class="hero-fact-label">AI models checked — GPT-5&nbsp;mini, Gemini&nbsp;3&nbsp;Flash, Claude&nbsp;Haiku&nbsp;4.5, Grok&nbsp;4.6</span>
+        <span class="hero-fact-num">2</span>
+        <span class="hero-fact-label">AI models checked — Gemini&nbsp;3&nbsp;Flash, Claude&nbsp;Haiku&nbsp;4.5</span>
       </div>
       <div class="hero-fact">
         <span class="hero-fact-num">✓</span>
@@ -211,7 +228,7 @@
 
   <section>
     <h2>How a scan works</h2>
-    <p class="section-sub">Five prompts, four AI models, twenty checks, one score.</p>
+    <p class="section-sub">Five prompts, two AI models, ten checks, one score.</p>
     <div class="steps">
       <div class="step">
         <span class="num">01</span>
@@ -221,7 +238,7 @@
       <div class="step">
         <span class="num">02</span>
         <h3>We ask AI search</h3>
-        <p>The same questions real customers ask — across GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6, each grounded in live web results directly via that model's own provider.</p>
+        <p>The same questions real customers ask — across Gemini 3 Flash and Claude Haiku 4.5, each grounded in live web results directly via that model's own provider.</p>
       </div>
       <div class="step">
         <span class="num">03</span>
@@ -240,8 +257,8 @@
         <p>How often your business is the name AI actually says — not just whether you rank on page one somewhere nobody reads anymore.</p>
       </div>
       <div class="demo-card">
-        <h3>Four models, not one</h3>
-        <p>GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 — each grounded in live web results, so you see the real spread, not one model's opinion.</p>
+        <h3>Two models, not one</h3>
+        <p>Gemini 3 Flash and Claude Haiku 4.5 — each grounded in live web results, so you see the real spread, not one model's opinion.</p>
       </div>
       <div class="demo-card">
         <h3>See who's beating you</h3>
@@ -280,12 +297,7 @@
           <li>No account required to start</li>
           <li>Email link to view your results</li>
         </ul>
-        <form id="single-scan-form" class="single-scan-form">
-          <input type="email" name="email" placeholder="you@business.com" required autocomplete="email" />
-          <input type="text" name="website" placeholder="yourbusiness.com" required autocomplete="url" />
-          <button type="submit" class="btn-secondary">Get my scan — $19</button>
-          <div class="single-scan-status" aria-live="polite"></div>
-        </form>
+        <p class="hero-note">Not available right now — <a href="/app/signup">start free</a> instead.</p>
       </div>
       <div class="plan-card pro">
         <h3>Pro</h3>
@@ -295,49 +307,10 @@
           <li>20 scans/month (fair use)</li>
           <li>Unlimited AI-generated deep advice</li>
         </ul>
-        <a class="btn-secondary" href="/app/signup">Stay in the foreground</a>
+        <p class="hero-note">Not available right now — <a href="/app/signup">start free</a> instead.</p>
       </div>
     </div>
   </section>
-
-  <!-- Single-scan Checkout: the only interactive JS on this otherwise-static
-       page. POSTs directly to create-single-scan-checkout-session.mts
-       (public, no auth — see that function's own comment) and redirects to
-       the returned Stripe Checkout URL. Milestone 2 of the 2026-08-24
-       monetization plan. -->
-  <script>
-  (function () {
-    var form = document.getElementById('single-scan-form');
-    if (!form) return;
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var email = form.email.value.trim();
-      var website = form.website.value.trim();
-      var status = form.querySelector('.single-scan-status');
-      var button = form.querySelector('button[type=submit]');
-      button.disabled = true;
-      status.textContent = 'Starting checkout…';
-      fetch('/create-single-scan-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, website: website }),
-      })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-          if (!data.ok) {
-            status.textContent = data.error || 'Something went wrong — try again.';
-            button.disabled = false;
-            return;
-          }
-          window.location.href = data.url;
-        })
-        .catch(function () {
-          status.textContent = 'Something went wrong — try again.';
-          button.disabled = false;
-        });
-    });
-  })();
-  </script>
 
   <section>
     <h2>FAQ</h2>
@@ -352,11 +325,11 @@
       </details>
       <details>
         <summary>Which AI models does it check?</summary>
-        <p>OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6 — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data.</p>
+        <p>Google's Gemini 3 Flash and Anthropic's Claude Haiku 4.5 — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data.</p>
       </details>
       <details>
         <summary>What does it cost?</summary>
-        <p>Free to try — one company and three scans, no credit card required. Just need one check? A single scan is $19, one-time, no account required. Pro is $99/month for unlimited companies, 20 scans a month (fair use), and unlimited AI-generated deep advice.</p>
+        <p>Free to try — one company and three scans, no credit card required. Foreground is running as a free product for now while we dial in Pro and single-scan pricing — check back soon for paid options.</p>
       </details>
     </div>
   </section>
