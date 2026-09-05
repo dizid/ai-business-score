@@ -108,7 +108,9 @@ export default async (req: Request) => {
       if (count >= FREE_PLAN_COMPANY_LIMIT) {
         return new Response(
           JSON.stringify({
-            error: `Free plan is limited to ${FREE_PLAN_COMPANY_LIMIT} company. Upgrade to Pro for unlimited companies.`,
+            // 2026-09-04 — free-only cost-control pass, see scan.mts's matching
+            // comment / root CLAUDE.md's Deployment section.
+            error: `You've reached the free plan's limit of ${FREE_PLAN_COMPANY_LIMIT} company for now — more capacity is coming soon.`,
             upgradeRequired: true,
             limit: FREE_PLAN_COMPANY_LIMIT,
           }),

@@ -167,6 +167,40 @@ The single source of truth, imported by every consumer:
     behaves correctly across a real scan's mix of all 4 providers. Do that
     once, timed, before fully trusting this the way past model/concurrency
     changes in this file were each verified live before being trusted.
+    **Superseded 2026-09-04 for the hosted site specifically** — see the
+    `HOSTED_MODELS` entry immediately below; this "full 4-provider scan"
+    verification gap now only applies to `proof-script`.
+- **`HOSTED_MODELS` (2026-09-04, free-only cost-control pass)** —
+  `run-scan-background.mts` gained a local constant,
+  `MODELS.filter((m) => m.startsWith('google/') || m.startsWith('anthropic/'))`,
+  and its main loop now iterates that instead of the full `MODELS` above.
+  This does **not** touch `MODELS` itself — `proof-script/index.mjs` still
+  imports `MODELS` directly and keeps running all 4 providers unchanged,
+  same "shared source stays whole, this file takes a reduced view" pattern
+  `run-scan-background.mts` already uses for `PROMPT_TEMPLATES`
+  (`scanPrompts`, a 5-prompt slice of the full 10). Drops the hosted main
+  loop from 5 prompts × 4 models = 20 calls to 5 × 2 = 10. Kept
+  `google/gemini-3-flash-preview` + `anthropic/claude-haiku-4-5` over
+  `openai/gpt-5-mini` and `xai/grok-4.6` — a **latency-only decision**
+  (this file's own documented "single-digit-to-teens seconds" for
+  anthropic/google vs. openai's 30.5s reasoning-model overhead and xai's
+  30-50s+, the slowest of all four); **no per-call cost data exists
+  anywhere in this codebase for any provider**, so this is not a
+  cost-per-call-informed choice, just a latency-informed proxy for one.
+  **`OPENAI_API_KEY` stays required/in-use** despite `openai` being out of
+  `HOSTED_MODELS`: the clarity-check call and the automatic sentiment-judge
+  pass further down in `run-scan-background.mts` (see those two entries
+  below) are both hardcoded directly to `'openai/gpt-5-mini'`, independent
+  of `HOSTED_MODELS`/`MODELS`, and were deliberately left unchanged by this
+  pass — switching them to one of the two kept providers would have
+  invalidated the sentiment judge's existing 5-example calibration (see
+  that entry below). Don't remove `OPENAI_API_KEY` from Netlify thinking
+  it's dead config. `XAI_API_KEY` genuinely is unused by the hosted app
+  now (still read into `apiKeys.xai`, never dispatched to) but was left set
+  on Netlify anyway — out of scope for this pass, harmless. **Revert**:
+  change `run-scan-background.mts`'s main loop back to
+  `for (const model of MODELS)` (or delete the `HOSTED_MODELS` line) to
+  restore all 4 providers.
 - **Detection** (`findBrandMention`, `findMentions`) — whole-word,
   case-insensitive regex match on the brand name and a domain-derived alias.
   Presence-only, not sentiment-aware. Common-word brand names (from a

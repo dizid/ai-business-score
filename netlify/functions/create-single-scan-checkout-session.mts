@@ -14,7 +14,7 @@
 import type { Config } from '@netlify/functions';
 import { requireAuth, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
-import { stripe } from './_shared/stripe.mts';
+import { stripe, checkoutTemporarilyDisabled } from './_shared/stripe.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 import { normalizeUrl } from '../../shared/aivis-core.mjs';
 
@@ -32,6 +32,12 @@ export default async (req: Request) => {
       headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
     });
   }
+
+  // 2026-09-04 — checkout hard-disabled, free-only cost-control pass. See
+  // _shared/stripe.mts's checkoutTemporarilyDisabled() comment for why and
+  // how to revert. Placed before the priceId lookup and before the
+  // anonymous-vs-topup branch below, so one early return covers both paths.
+  return checkoutTemporarilyDisabled(corsHeaders(req));
 
   const priceId = Netlify.env.get('STRIPE_SINGLE_SCAN_PRICE_ID');
   if (!priceId) {
@@ -77,6 +83,9 @@ export default async (req: Request) => {
         headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
       });
     }
+    // @ts-expect-error — dead code below the temporary checkoutTemporarilyDisabled()
+    // early return above; TS loses body.company_id's narrowing in unreachable
+    // code. Left verbatim (not restructured) so re-enabling is a one-line revert.
     metadata = { type: 'single_scan_purchase', mode: 'topup', company_id: body.company_id };
     successUrl = `${origin}/app/companies/${body.company_id}?singlescan=success`;
     cancelUrl = `${origin}/app/companies/${body.company_id}?singlescan=cancelled`;

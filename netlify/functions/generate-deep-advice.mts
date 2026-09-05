@@ -57,7 +57,9 @@ export default async (req: Request, context: Context) => {
     `;
     if (purchases.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Deep advice is a Pro feature.', upgradeRequired: true }),
+        // 2026-09-04 — free-only cost-control pass, see scan.mts's matching
+        // comment / root CLAUDE.md's Deployment section.
+        JSON.stringify({ error: "Deeper advice isn't available on the free plan right now.", upgradeRequired: true }),
         { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
       );
     }

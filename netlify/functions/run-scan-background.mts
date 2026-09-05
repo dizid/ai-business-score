@@ -1,5 +1,10 @@
-// Does the actual scan (5 prompts x 4 models = 20 calls as of 2026-08-13 —
-// see aivis-core.mjs's PROMPT_TEMPLATES/MODELS comments for the full model
+// Does the actual scan (5 prompts x 4 models = 20 calls as of 2026-08-13,
+// corrected 2026-09-04: the main loop now uses HOSTED_MODELS, a 2-provider
+// subset of MODELS, for a free-only cost-control pass — see that constant's
+// own comment below and root CLAUDE.md's Deployment section — so the hosted
+// site's main loop is 5 prompts x 2 models = 10 calls; proof-script is
+// unaffected and still runs the full 4-model set — see
+// aivis-core.mjs's PROMPT_TEMPLATES/MODELS comments for the full model
 // history, and this file's CONCURRENCY_LIMIT comment below for why the
 // hosted site uses a 5-prompt SLICE of the 10-prompt PROMPT_TEMPLATES array
 // while proof-script always runs the full 10) after being triggered by
@@ -316,8 +321,21 @@ export default async (req: Request) => {
   // — last, so model-major queueing means a slow xai run can only eat into
   // xai's own remaining checks instead of starving faster providers that
   // would otherwise have completed fine.
+  // Hosted-scan-only reduced model list, 2026-09-04 cost-control pass — see
+  // root CLAUDE.md's Deployment section / shared/CLAUDE.md's MODELS entry
+  // for the full reasoning (latency-only, no per-call cost data exists
+  // anywhere in this codebase) and revert instructions. Does NOT touch
+  // aivis-core.mjs's own MODELS export — proof-script still imports that
+  // directly and keeps running all 4 providers, same "shared source stays
+  // whole, this file takes a reduced view of it" pattern scanPrompts above
+  // already uses for PROMPT_TEMPLATES. Filtered by provider prefix so a
+  // future model-id bump within either kept provider doesn't silently fall
+  // out of this list. openai/gpt-5-mini's clarity-check and sentiment-judge
+  // calls further down are unaffected by this — they're hardcoded to that
+  // model directly, not sourced from this list.
+  const HOSTED_MODELS = MODELS.filter((m) => m.startsWith('google/') || m.startsWith('anthropic/'));
   const tasks: { prompt: string; model: string; promptIndex: number }[] = [];
-  for (const model of MODELS) {
+  for (const model of HOSTED_MODELS) {
     for (const [promptIndex, template] of scanPrompts.entries()) {
       tasks.push({ prompt: template(prospect), model, promptIndex });
     }

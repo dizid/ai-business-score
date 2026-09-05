@@ -275,10 +275,18 @@ gap this update fixes rather than something built this session.
   (added 2026-09-02 as a safety gate while `STRIPE_SECRET_KEY` was
   live-mode) — **removed 2026-09-04** once its only caller
   (`create-topup-checkout-session.mts`) was deleted; its own comment said
-  "Remove this once that cleanup lands."
+  "Remove this once that cleanup lands." **Recreated the same day**, hours
+  later: Marc asked for the product to run free-only for now with real
+  cost control, so `checkoutTemporarilyDisabled()` is back (new message
+  text — this time it's a deliberate product decision, not an incident-
+  response safety gate) and wired into both remaining checkout functions
+  below. See root `CLAUDE.md`'s Deployment section for the full detail and
+  exact revert steps.
 - **`create-checkout-session.mts`** — POST, auth-gated. Creates a Stripe
   Checkout session, `mode: 'subscription'` (real recurring billing, not a
-  one-time charge), rejects if already Pro.
+  one-time charge), rejects if already Pro. **Hard-disabled again as of
+  2026-09-04** (returns `checkoutTemporarilyDisabled()`'s 503 before ever
+  reaching `requireAuth`) — see the `_shared/stripe.mts` bullet above.
 - **`stripe-webhook.mts`** — POST, deliberately *not* `requireAuth` (Stripe
   signs the raw body itself, verified via `STRIPE_WEBHOOK_SECRET`).
   `checkout.session.completed` sets `plan_tier='pro'` on `user_profiles`
@@ -294,16 +302,35 @@ gap this update fixes rather than something built this session.
   flip back to `'free'` if the subscription is no longer active/trialing.
 - **What Pro actually gates today**: `scan.mts` (3 scans lifetime on Free,
   20/calendar-month fair-use on Pro) and `companies.mts` (1 company on
-  Free), both returning a `402 {error, upgradeRequired, limit}` the
-  frontend renders as an inline "Upgrade to Pro" CTA
-  (`CompaniesListView.vue`/`CompanyDetailView.vue`). The Pro-cap 402 used
-  to additionally return `topupAvailable` (removed 2026-09-04 with the
-  top-up feature — see above). **Since 2026-08-24** (Milestone 1 of the
-  monetization plan): `generate-deep-advice.mts` also gates on
-  `isPro(planTier)`, returning `402 {error, upgradeRequired: true}` — the
-  frontend (`CompanyDetailView.vue`/`ScanDetail.vue`'s new
-  `deepAdviceLocked` prop) shows an "Upgrade to Pro" CTA in place of the
-  generate button for non-Pro users instead of hiding the section outright.
+  Free), both returning a `402 {error, upgradeRequired, limit}`. The
+  Pro-cap 402 used to additionally return `topupAvailable` (removed
+  2026-09-04 with the top-up feature — see above). **Since 2026-08-24**
+  (Milestone 1 of the monetization plan): `generate-deep-advice.mts` also
+  gates on `isPro(planTier)`, returning `402 {error, upgradeRequired:
+  true}`; `company.mts`'s weekly-rescan `PATCH` does the same for non-Pro
+  callers.
+  **2026-09-04 — free-only cost-control pass**: checkout is hard-disabled
+  (see the `_shared/stripe.mts` bullet above), so every "Upgrade to Pro"
+  CTA these 402s used to drive was removed, and the 402 message text
+  itself was reworded to not point at a dead checkout flow (the
+  `upgradeRequired`/`limit` JSON fields are unchanged — only the `error`
+  string): `scan.mts`'s free-cap message is now "You've used all 3 free
+  scans for now — more capacity is coming soon."; `companies.mts`'s is
+  "You've reached the free plan's limit of 1 company for now — more
+  capacity is coming soon."; `generate-deep-advice.mts`'s is "Deeper
+  advice isn't available on the free plan right now."; `company.mts`'s is
+  "Automatic weekly scans aren't available on the free plan right now."
+  Frontend CTAs removed to match: `CompaniesListView.vue`'s header
+  "Upgrade to Pro" button and its inline 402 CTA (the now-dead
+  `createUpgradeRequired` ref was also removed); `CompanyDetailView.vue`'s
+  inline 402 CTA (`scanUpgradeRequired` ref also removed) and
+  `toggleAutoScan()`'s checkout call (now just sets a plain `scanError`
+  message); `ScanDetail.vue`'s `deep-advice-locked` card's button and its
+  `upgrade` emit. Each view's `startCheckout()` function was left in place
+  (body unchanged, dated comment added) even though every call site is
+  gone — dead code kept for a cheap revert, not deleted. `1`/`3`/`20`
+  (`FREE_PLAN_COMPANY_LIMIT`/`FREE_PLAN_SCAN_LIMIT`/
+  `PRO_PLAN_MONTHLY_SCAN_LIMIT`) were **not** changed by this pass.
   The Pro subscription price was decided and shipped live on 2026-08-24 at
   **$199/month**, reflected in `index.html`'s pricing card, FAQ, and
   JSON-LD `Offer`, and `llms.txt`. **Confirmed 2026-08-24**: a direct
@@ -362,7 +389,15 @@ gap this update fixes rather than something built this session.
 - **`run-scan-background.mts`** — the actual 20-call scan (a 5-prompt slice
   × 4 models, updated 2026-08-13 — this bullet previously said "10 prompts
   × 2 models," stale since that date's model expansion) (`-background`
-  filename suffix required by Netlify's convention). Atomically claims the
+  filename suffix required by Netlify's convention).
+  **Corrected 2026-09-04**: the main loop's own call count above is stale
+  again — a free-only cost-control pass added a `HOSTED_MODELS` constant
+  (`MODELS` filtered to just `google/`/`anthropic/`) and the main loop now
+  iterates that instead of the full `MODELS`, so the hosted site's main
+  loop is actually 5 prompts × 2 models = **10 calls**, not 20. `MODELS`
+  itself is untouched and `proof-script` still runs all 4 providers — see
+  `shared/CLAUDE.md`'s `MODELS`/`HOSTED_MODELS` entry for the full
+  reasoning. Atomically claims the
   scan (`UPDATE ... WHERE status='pending'`) so a duplicate trigger is a
   cheap no-op instead of double-spending Perplexity calls, then updates the
   row to `completed`/`failed`. `CALL_TIMEOUT_MS` (60000) is shared by 3 of
@@ -514,7 +549,15 @@ gap this update fixes rather than something built this session.
   valid bearer + owned `company_id` in the body promotes the request to a
   logged-in top-up purchase; anything else falls back to the anonymous
   `{email, website}` path. See "Billing (Stripe)" above for the full
-  purchase-flow design.
+  purchase-flow design. **Hard-disabled again as of 2026-09-04** (returns
+  `checkoutTemporarilyDisabled(corsHeaders(req))`'s 503 before the
+  `priceId` lookup, covering both the anonymous and logged-in-topup paths
+  with one early return) — see the `_shared/stripe.mts` bullet above. The
+  one line of dead code this leaves behind (`metadata = {..., company_id:
+  body.company_id}` inside the now-unreachable topup branch) needs a
+  `@ts-expect-error` since TS loses `body.company_id`'s narrowing past the
+  early return — same fix the 2026-09-02 incident-driven disable already
+  needed here.
 - **`single-scan-status.mts`** — added 2026-08-24, GET
   `/single-scan-status?token=…` or `?session_id=…`, fully public (no auth
   at all — the token is the access control). Polled by

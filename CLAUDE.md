@@ -200,6 +200,39 @@ enterprise deal requiring a DPA).
   real Perplexity API credits even though the Stripe charge itself is fake,
   the same reasoning `netlify/functions/CLAUDE.md`'s Milestone 2 entry
   already used to justify not doing this without asking first.
+  **2026-09-04 — checkout hard-disabled again, this time deliberately, not
+  as an incident response.** Marc: "for now: i need free version with cost
+  control." Both remaining checkout-creating functions
+  (`create-checkout-session.mts`, `create-single-scan-checkout-session.mts`)
+  now hard-refuse with a 503 via a recreated `checkoutTemporarilyDisabled()`
+  in `_shared/stripe.mts` — same guard-function shape as the 2026-09-02
+  incident-driven disable above (`151be61`), but this one exists because the
+  product is running free-only for now, not because Stripe mode is unsafe
+  (it's already test mode, nobody could be charged real money either way).
+  It had briefly been deleted earlier the same day once
+  `create-topup-checkout-session.mts` (its only caller at the time) was
+  removed — see `netlify/functions/CLAUDE.md`'s Billing section for that
+  history. `stripe-webhook.mts` is untouched, same reasoning as before: no
+  new sessions can be created, so `checkout.session.completed` won't newly
+  fire, and any pre-existing test-mode subscription's
+  `customer.subscription.updated`/`.deleted` events should keep working.
+  Alongside this, the free-tier caps' 402 messaging
+  (`FREE_PLAN_COMPANY_LIMIT`/`FREE_PLAN_SCAN_LIMIT` themselves unchanged —
+  still 1 company / 3 lifetime scans) and every "Upgrade to Pro"/
+  single-scan-purchase UI element were removed, and the hosted scan's main
+  loop was cut from 4 AI providers to 2 for cost — see
+  `netlify/functions/CLAUDE.md`'s Billing section and
+  `shared/CLAUDE.md`'s `MODELS`/`HOSTED_MODELS` entry for the full detail,
+  and `TODO.md`'s 2026-09-04 "Free-only mode with cost control" entry for
+  the complete file list. **To revert**: remove the
+  `checkoutTemporarilyDisabled()` early-return line from both checkout
+  functions; restore the removed CTA markup in `CompaniesListView.vue`/
+  `CompanyDetailView.vue`/`ScanDetail.vue`/`index.html` from git history
+  (this change's commit); restore the original 402 message strings in
+  `scan.mts`/`companies.mts`/`generate-deep-advice.mts`/`company.mts` (the
+  `upgradeRequired`/`limit` JSON fields were never touched); and revert
+  `run-scan-background.mts`'s main loop from `HOSTED_MODELS` back to
+  `MODELS` to restore all 4 providers.
   **`VITE_GA4_MEASUREMENT_ID`** (new 2026-08-25, Google Analytics) — Marc
   created the GA4 property himself (Claude has no Analytics Admin API
   access or browser/OAuth session to do this) and provided the Measurement

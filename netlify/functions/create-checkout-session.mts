@@ -6,7 +6,7 @@
 import type { Config } from '@netlify/functions';
 import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
-import { stripe } from './_shared/stripe.mts';
+import { stripe, checkoutTemporarilyDisabled } from './_shared/stripe.mts';
 import { isPro } from './_shared/plan.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
@@ -18,6 +18,11 @@ export default async (req: Request) => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // 2026-09-04 — checkout hard-disabled, free-only cost-control pass. See
+  // _shared/stripe.mts's checkoutTemporarilyDisabled() comment for why and
+  // how to revert.
+  return checkoutTemporarilyDisabled();
 
   let userId: string;
   try {

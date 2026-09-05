@@ -67,7 +67,9 @@ export default async (req: Request, context: Context) => {
       const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
       if (!isPro(profiles[0]?.plan_tier)) {
         return new Response(
-          JSON.stringify({ error: 'Automatic weekly scans are a Pro feature.', upgradeRequired: true }),
+          // 2026-09-04 — free-only cost-control pass, see scan.mts's matching
+          // comment / root CLAUDE.md's Deployment section.
+          JSON.stringify({ error: "Automatic weekly scans aren't available on the free plan right now.", upgradeRequired: true }),
           { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
         );
       }

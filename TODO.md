@@ -217,6 +217,80 @@ assuming nothing else is in flight.
 Everything below this line is the former `TODOS.md`, moved here verbatim
 (headings demoted one level) as part of the 2026-08-26 merge. Newest first.
 
+### STATUS 2026-09-04: Free-only mode with cost control — SHIPPED
+
+**Trigger:** Marc, mid-beta: "for now: i need free version with cost
+control." Clarified via follow-up: checkout off entirely (hard-disabled on
+the backend, not just hidden UI), free-tier caps stay at their current
+numbers (only the messaging changes, since there's no upgrade path to
+point users at), and cheaper scans via fewer AI providers per scan. Marc
+also explicitly asked mid-task that this be documented so it can be
+changed or reverted later — this is a deliberate "for now" state, not a
+permanent product decision. Full plan at
+`~/.claude/plans/agile-hugging-frost.md`.
+
+**Shipped:**
+1. **Checkout hard-disabled again** — `checkoutTemporarilyDisabled()`
+   recreated in `_shared/stripe.mts` (deleted earlier the same day, see
+   item 6 in the entry below) and wired into `create-checkout-session.mts`
+   and `create-single-scan-checkout-session.mts`, same `checkoutTemporarilyDisabled()`
+   guard-function pattern as the 2026-09-02 incident-driven disable
+   (`151be61`), but this time a deliberate product decision, not an
+   incident response — new message text reflects that.
+   `stripe-webhook.mts` untouched (same reasoning both times: no new
+   sessions can be created, existing test-mode subscriptions' webhook
+   events should keep working).
+2. **Free-cap messaging reworded** — `FREE_PLAN_COMPANY_LIMIT`/
+   `FREE_PLAN_SCAN_LIMIT` (1/3, lifetime) are unchanged; only the 402
+   message text in `scan.mts`/`companies.mts`/`generate-deep-advice.mts`/
+   `company.mts` dropped "Upgrade to Pro" wording, since there's currently
+   nowhere for that CTA to lead. Every "Upgrade to Pro"/single-scan
+   purchase UI element removed: `CompaniesListView.vue`'s header button and
+   inline 402 CTA, `CompanyDetailView.vue`'s inline 402 CTA and
+   `toggleAutoScan()`'s checkout call, `ScanDetail.vue`'s
+   `deep-advice-locked` button and `upgrade` emit, `index.html`'s
+   single-scan purchase form/script (JSON-LD `Offer`s for Pro/single-scan
+   marked `OutOfStock` instead of removed, FAQ "What does it cost?"
+   reworded identically in both the JSON-LD and visible `<details>`). Each
+   `startCheckout()` function was left in place, body unchanged, with a
+   dated comment — dead code, kept for a cheap revert.
+3. **Hosted scans: 4 AI providers → 2** — `run-scan-background.mts` gained
+   a `HOSTED_MODELS` constant (`MODELS` filtered to `google/`/`anthropic/`
+   prefixes), and its main loop now iterates that instead of the shared
+   `MODELS` export — same "shared source stays whole, this file takes a
+   reduced view" pattern already used for `PROMPT_TEMPLATES`/`scanPrompts`.
+   Drops the main loop from 5 prompts × 4 models = 20 calls to 5 × 2 = 10.
+   `shared/aivis-core.mjs`'s own `MODELS` export is untouched — `proof-script`
+   still runs all 4 providers unchanged, since this is a hosted-SaaS-only
+   cost-control change. Kept `google/gemini-3-flash-preview` +
+   `anthropic/claude-haiku-4-5` (documented "single-digit-to-teens seconds"
+   latency) over `openai/gpt-5-mini` (documented 30.5s reasoning overhead)
+   and `xai/grok-4.6` (documented 30-50s+, the slowest of all four) — a
+   latency-only decision, since no per-call cost data exists anywhere in
+   this codebase for any provider. The clarity-check and sentiment-judge
+   calls elsewhere in that same file stayed hardcoded to
+   `openai/gpt-5-mini` unchanged (preserves the sentiment judge's existing
+   5-example calibration), so `OPENAI_API_KEY` stays required/in-use
+   despite `openai` being out of the main loop — flagged in
+   `shared/CLAUDE.md` so it isn't mistaken for dead config later.
+   `XAI_API_KEY` stays set on Netlify though now fully unused by the
+   hosted app — left alone, out of scope.
+
+**Verified:** `npm run type-check`, `npm run build`, `npm run test:run` all
+clean. Not yet verified: a live scan through the reduced 2-provider loop,
+or a manual browser pass confirming no dead checkout UI renders anywhere
+— do both before fully trusting this the way this codebase's own "verify
+live before trusting" discipline expects.
+
+**Revert path** (all three items independent): remove the
+`checkoutTemporarilyDisabled()` early-return line from both checkout
+functions; restore the removed CTA markup from git history in
+`CompaniesListView.vue`/`CompanyDetailView.vue`/`ScanDetail.vue`/
+`index.html`; restore the original 402 message strings (the
+`upgradeRequired`/`limit` JSON fields themselves were never touched); and
+change `run-scan-background.mts`'s loop back to `for (const model of MODELS)`
+to restore all 4 providers.
+
 ### STATUS 2026-09-02 through 2026-09-04: Comprehensive improvement-plan engagement — SHIPPED in stages, one item left open (see Claude checklist above)
 
 **Trigger:** CEO asked for a comprehensive improvement plan synthesized

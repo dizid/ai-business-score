@@ -36,12 +36,37 @@ export interface HarmoniaCheck { id: string; label: string; passed: boolean; }
 export interface HarmoniaPillar { score: number | null; checks: HarmoniaCheck[]; }
 export interface HarmoniaSchemaNode { valid: boolean; type: string | null; issues: string[]; }
 export interface HarmoniaSchemaOpportunity { type: string; reason: string; example: string; }
+// One of the 5 extra PSI Lighthouse audits requested alongside performance
+// (same call, same latency/cost budget — see shared/harmonia.mjs's
+// PSI_AUDIT_IDS). `passed` is null when PSI didn't return a score for this
+// audit id at all (rare, but the source `extractPsiSignals` allows it),
+// distinct from a real pass/fail.
+export interface HarmoniaAdditionalAudit { id: string; label: string; passed: boolean | null; }
 export interface HarmoniaCoreWebVitals {
   strategy: string;
   performanceScore: number | null;
+  seoScore: number | null;
+  accessibilityScore: number | null;
+  bestPracticesScore: number | null;
   lcpMs: number | null;
   clsScore: number | null;
   inpMs: number | null;
+  additionalAudits: HarmoniaAdditionalAudit[];
+}
+// Visible-but-unscored signals harmonia.mjs collects alongside the four
+// weighted pillars above — not folded into any pillar score (see that
+// file's own comment on additionalSeoSignals for why), just extra detail
+// worth showing rather than discarding.
+export interface HarmoniaHreflangTag { hreflang: string | null; href: string | null; }
+export interface HarmoniaTwitterTag { name: string | null; content: string; }
+export interface HarmoniaAdditionalSeoSignals {
+  htmlLang: string | null;
+  faviconPresent: boolean;
+  manifestPresent: boolean;
+  hreflangTags: HarmoniaHreflangTag[];
+  twitterCard: HarmoniaTwitterTag[];
+  sitemapUrlCount: number | null;
+  sitemapIsIndex: boolean;
 }
 export interface HarmoniaSecurityHeader { header: string; present: boolean; }
 // Per-bot robots.txt access for the AI crawlers a GEO tool cares about
@@ -65,6 +90,7 @@ export interface HarmoniaResult {
   coreWebVitals: HarmoniaCoreWebVitals | null;
   securityHeaders: HarmoniaSecurityHeader[];
   aiCrawlerAccess: HarmoniaAiCrawlerAccess;
+  additionalSeoSignals: HarmoniaAdditionalSeoSignals | null;
   errors: string[];
 }
 
@@ -142,6 +168,10 @@ const MAX_SCHEMA_EXAMPLE_LEN = 3000;
 const MAX_ISSUE_LEN = 200;
 const MAX_ISSUES_PER_NODE = 10;
 const MAX_AI_CRAWLER_BOTS = 20;
+const MAX_ADDITIONAL_AUDITS = 10;
+const MAX_HREFLANG_TAGS = 30;
+const MAX_TWITTER_TAGS = 10;
+const MAX_LANG_LEN = 20;
 
 // href-safety, same rule as the website link below: only http(s) survives,
 // anything else (javascript:, data:, etc.) is dropped rather than escaped.
@@ -215,6 +245,61 @@ function asHarmoniaChecks(raw: unknown): HarmoniaCheck[] {
   return checks;
 }
 
+function asAdditionalAudits(raw: unknown): HarmoniaAdditionalAudit[] {
+  if (!Array.isArray(raw)) return [];
+  const audits: HarmoniaAdditionalAudit[] = [];
+  for (const a of raw.slice(0, MAX_ADDITIONAL_AUDITS)) {
+    const id = asShortString(a && a.id);
+    const label = typeof (a && a.label) === 'string' ? a.label.slice(0, MAX_TEXT_LEN) : null;
+    if (id === null || label === null) continue;
+    const passed = typeof (a && a.passed) === 'boolean' ? a.passed : null;
+    audits.push({ id, label, passed });
+  }
+  return audits;
+}
+
+function asHreflangTags(raw: unknown): HarmoniaHreflangTag[] {
+  if (!Array.isArray(raw)) return [];
+  const tags: HarmoniaHreflangTag[] = [];
+  for (const t of raw.slice(0, MAX_HREFLANG_TAGS)) {
+    if (!t || typeof t !== 'object') continue;
+    const hreflang = typeof t.hreflang === 'string' ? t.hreflang.slice(0, MAX_LANG_LEN) : null;
+    const href = typeof t.href === 'string' ? t.href.slice(0, MAX_URL_LEN) : null;
+    tags.push({ hreflang, href });
+  }
+  return tags;
+}
+
+function asTwitterTags(raw: unknown): HarmoniaTwitterTag[] {
+  if (!Array.isArray(raw)) return [];
+  const tags: HarmoniaTwitterTag[] = [];
+  for (const t of raw.slice(0, MAX_TWITTER_TAGS)) {
+    if (!t || typeof t !== 'object') continue;
+    const name = typeof t.name === 'string' ? t.name.slice(0, MAX_NAME_LEN) : null;
+    const content = typeof t.content === 'string' ? t.content.slice(0, MAX_TEXT_LEN) : '';
+    tags.push({ name, content });
+  }
+  return tags;
+}
+
+// additionalSeoSignals is visible-but-unscored (see harmonia.mjs) — same
+// lenient degrade-to-null treatment as every other optional Harmonia
+// sub-section, since it's bonus detail, not something a pillar score
+// depends on.
+function asAdditionalSeoSignals(raw: unknown): HarmoniaAdditionalSeoSignals | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, any>;
+  return {
+    htmlLang: typeof r.htmlLang === 'string' ? r.htmlLang.slice(0, MAX_LANG_LEN) : null,
+    faviconPresent: r.faviconPresent === true,
+    manifestPresent: r.manifestPresent === true,
+    hreflangTags: asHreflangTags(r.hreflangTags),
+    twitterCard: asTwitterTags(r.twitterCard),
+    sitemapUrlCount: r.sitemapUrlCount !== undefined && r.sitemapUrlCount !== null ? asNonNegativeInt(r.sitemapUrlCount) : null,
+    sitemapIsIndex: r.sitemapIsIndex === true,
+  };
+}
+
 function asHarmoniaPillar(raw: unknown): HarmoniaPillar {
   if (!raw || typeof raw !== 'object') return { score: null, checks: [] };
   const r = raw as Record<string, unknown>;
@@ -271,9 +356,13 @@ function asHarmonia(raw: unknown): HarmoniaResult | null {
     coreWebVitals = {
       strategy: typeof cwv.strategy === 'string' ? cwv.strategy.slice(0, 20) : 'mobile',
       performanceScore: asHarmoniaScore(cwv.performanceScore),
+      seoScore: asHarmoniaScore(cwv.seoScore),
+      accessibilityScore: asHarmoniaScore(cwv.accessibilityScore),
+      bestPracticesScore: asHarmoniaScore(cwv.bestPracticesScore),
       lcpMs: typeof cwv.lcpMs === 'number' ? cwv.lcpMs : null,
       clsScore: typeof cwv.clsScore === 'number' ? cwv.clsScore : null,
       inpMs: typeof cwv.inpMs === 'number' ? cwv.inpMs : null,
+      additionalAudits: asAdditionalAudits(cwv.additionalAudits),
     };
   }
 
@@ -318,6 +407,7 @@ function asHarmonia(raw: unknown): HarmoniaResult | null {
     coreWebVitals,
     securityHeaders,
     aiCrawlerAccess,
+    additionalSeoSignals: asAdditionalSeoSignals(r.additionalSeoSignals),
     errors,
   };
 }
