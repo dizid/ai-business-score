@@ -60,6 +60,21 @@ const props = withDefaults(
     // since a user could plausibly have two checks expanded at once.
     sentimentJudgeLoadingKey?: string | null;
     theme?: 'dashboard' | 'legacy';
+    // Category benchmark ("you vs. businesses like yours") — a live
+    // server-side aggregate (GET /category-benchmark), not part of the
+    // persisted scan payload itself, so it's a separate optional prop
+    // rather than a scanPayload.ts field. Same deliberate exception to
+    // "purely presentational" as allowDeepAdvice/deepAdviceLocked above:
+    // result.html/PublicScanView.vue never pass this (no company_id/auth
+    // context there), so the card simply never renders on those surfaces.
+    // CompanyDetailView.vue owns the actual fetch.
+    categoryBenchmark?: {
+      companyCount: number;
+      avgScore: number | null;
+      medianScore: number | null;
+      sufficientData: boolean;
+      minSampleSize: number;
+    } | null;
   }>(),
   {
     allowDeepAdvice: false,
@@ -68,6 +83,7 @@ const props = withDefaults(
     allowSentimentJudge: false,
     sentimentJudgeLoadingKey: null,
     theme: 'legacy',
+    categoryBenchmark: null,
   }
 );
 defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string] }>();
@@ -291,6 +307,23 @@ function copySchema(example: string, index: number) {
           <a class="methodology-link" href="/how-it-works#methodology" target="_blank" rel="noopener">How this is measured &rarr;</a>
         </div>
       </div>
+
+      <!-- Category benchmark ("you vs. businesses like yours") — a live
+           server-side aggregate, not derived from this payload at all (see
+           the categoryBenchmark prop comment above). Gated on the backend's
+           own minimum-sample-size check; the "not enough data yet" state is
+           shown honestly rather than a misleading average from too few
+           companies. -->
+      <div class="card category-benchmark" v-if="categoryBenchmark && categoryBenchmark.sufficientData">
+        <div class="benchmark-row">
+          <span class="benchmark-label">Businesses like yours ({{ payload.category }})</span>
+          <span class="benchmark-value">avg {{ categoryBenchmark.avgScore }}/100 &middot; median {{ categoryBenchmark.medianScore }}/100</span>
+        </div>
+        <p class="benchmark-note">Based on {{ categoryBenchmark.companyCount }} other tracked businesses in this category, last 90 days.</p>
+      </div>
+      <p class="benchmark-empty" v-else-if="categoryBenchmark && !categoryBenchmark.sufficientData">
+        Not enough other businesses tracked in &ldquo;{{ payload.category }}&rdquo; yet for a category benchmark ({{ categoryBenchmark.companyCount }}/{{ categoryBenchmark.minSampleSize }} so far) — this fills in as more businesses get scanned.
+      </p>
 
       <div class="headline">
         <template v-if="headlineKind === 'none'">We couldn't complete any checks for <strong>{{ payload.brand }}</strong> this time — no data, not necessarily no visibility.</template>
@@ -826,6 +859,12 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
   text-decoration: none;
 }
 .methodology-link:hover { text-decoration: underline; }
+.category-benchmark { padding: 14px 20px; }
+.benchmark-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 0.88rem; }
+.benchmark-label { font-weight: 600; }
+.benchmark-value { color: var(--muted); font-variant-numeric: proportional-nums; }
+.benchmark-note { color: var(--faint); font-size: 0.78rem; margin: 6px 0 0; }
+.benchmark-empty { color: var(--muted); font-size: 0.82rem; margin: 0 0 16px; }
 .band-leading.score-card { background: color-mix(in srgb, var(--good) 6%, var(--card)); border-color: color-mix(in srgb, var(--good) 28%, var(--border)); }
 .band-leading .score-ring-fill { stroke: var(--good); }
 .band-leading .score-band-label { color: var(--success-text); }

@@ -37,6 +37,29 @@ const loading = ref(true);
 const loadError = ref('');
 const selectedIndex = ref<number | null>(null);
 
+interface CategoryBenchmark {
+  companyCount: number;
+  avgScore: number | null;
+  medianScore: number | null;
+  sufficientData: boolean;
+  minSampleSize: number;
+}
+// Fetched once per company load (category is a company-level field, not
+// per-scan) — best-effort, a failure here shouldn't block the rest of the
+// page from rendering, same "additive, never blocking" treatment as
+// everything else optional on this view.
+const categoryBenchmark = ref<CategoryBenchmark | null>(null);
+async function loadCategoryBenchmark(companyId: string) {
+  try {
+    const res = await authFetch(`/category-benchmark?company_id=${companyId}`);
+    const data = await res.json();
+    if (data.ok) categoryBenchmark.value = data;
+  } catch {
+    // best-effort — leave categoryBenchmark null, ScanDetail.vue's card
+    // simply doesn't render rather than showing a broken state.
+  }
+}
+
 const scanning = ref(false);
 const scanStatus = ref('');
 const scanError = ref('');
@@ -98,6 +121,7 @@ async function load() {
     selectedIndex.value = scans.value.length ? 0 : null;
     if (company.value) {
       document.title = `${company.value.brand} — Foreground`;
+      loadCategoryBenchmark(company.value.id);
     }
   } catch (err) {
     loadError.value = (err as Error).message;
@@ -459,6 +483,11 @@ watch(() => route.params.id, load);
           <button type="button" :disabled="scanning" @click="runNewScan">
             {{ scanning ? 'Scanning…' : 'Run new scan' }}
           </button>
+          <router-link
+            v-if="scans.length"
+            :to="`/app/companies/${company.id}/competitors`"
+            class="competitors-link"
+          >vs. Competitors &rarr;</router-link>
           <button
             type="button"
             class="auto-scan-toggle"
@@ -526,6 +555,7 @@ watch(() => route.params.id, load);
               :deep-advice-loading="deepAdviceLoading"
               :allow-sentiment-judge="true"
               :sentiment-judge-loading-key="sentimentJudgeLoadingKey"
+              :category-benchmark="categoryBenchmark"
               @generate-deep-advice="runDeepAdvice"
               @judge-sentiment="runSentimentJudge"
             />
@@ -567,6 +597,12 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
   border: 1px solid var(--border) !important; box-shadow: none !important;
 }
 .auto-scan-toggle.active { border-color: var(--accent) !important; color: var(--fg) !important; }
+.competitors-link {
+  display: inline-block; margin-top: 8px; margin-left: 8px;
+  padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg);
+}
+.competitors-link:hover { border-color: var(--accent); }
 .scan-status { margin-top: 8px; font-size: 0.82rem; color: var(--muted); max-width: 280px; }
 .scan-status.error { color: var(--critical); }
 .inline-upgrade {

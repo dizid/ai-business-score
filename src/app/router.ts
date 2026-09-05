@@ -33,6 +33,16 @@ const routes = [
     props: true,
   },
   {
+    // Dedicated "vs. Competitors" benchmark page — see
+    // CompetitorBenchmarkView.vue's own header comment for why this exists
+    // as a separate route instead of another section on the company page.
+    path: '/app/companies/:id/competitors',
+    name: 'company-competitors',
+    component: () => import('./views/CompetitorBenchmarkView.vue'),
+    meta: { requiresAuth: true, title: 'Foreground' }, // real title set dynamically, same pattern as 'company' above
+    props: true,
+  },
+  {
     path: '/app/billing/success',
     name: 'billing-success',
     component: () => import('./views/BillingSuccessView.vue'),
