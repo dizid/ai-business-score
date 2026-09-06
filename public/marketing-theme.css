@@ -38,7 +38,7 @@
   /* ---- Semantic aliases used throughout the rules below ---- */
   --bg: var(--stage-black);
   --card: var(--surface);
-  --faint: #86837a;
+  --faint: #938f86;
   --line: rgba(245, 244, 240, 0.10);
   --line-bright: rgba(245, 244, 240, 0.22);
 
@@ -92,7 +92,10 @@ nav.top {
   position: sticky; top: 0; z-index: 20;
   display: flex; justify-content: space-between; align-items: center;
   padding: 18px 22px;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  /* 82% -> 94%: still translucent/blurred (glassmorphism intact) but close
+     enough to opaque that whatever scrolls beneath this sticky nav can't
+     meaningfully drag the effective contrast of the nav text down. */
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid transparent;
 }

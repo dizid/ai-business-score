@@ -18,7 +18,7 @@
 <meta name="twitter:card" content="summary" />
 <meta name="twitter:title" content="Terms of Service — Foreground" />
 <meta name="twitter:description" content="Foreground's terms of service: plans and billing, acceptable use, and what a visibility score does and doesn't guarantee." />
-<meta property="twitter:image" content="https://foreground.info/og-image.png" />
+<meta name="twitter:image" content="https://foreground.info/og-image.png" />
 <!-- Self-contained @graph: this page is a separate HTTP document from
      index.html, so the WebPage node's isPartOf/publisher @id references
      below only resolve if the WebSite/Organization nodes they point at are
@@ -41,6 +41,14 @@
       "name": "Foreground",
       "url": "https://foreground.info/",
       "logo": "https://foreground.info/og-image.png"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://foreground.info/terms#breadcrumb",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://foreground.info/" },
+        { "@type": "ListItem", "position": 2, "name": "Terms of Service", "item": "https://foreground.info/terms" }
+      ]
     },
     {
       "@type": "WebPage",
