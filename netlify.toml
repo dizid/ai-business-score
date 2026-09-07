@@ -10,6 +10,18 @@
   command = "npm run dev"
   targetPort = 5173
 
+# Security headers — CSP deliberately excluded (highest risk of breaking
+# GA4/consent/Neon-Auth/fonts; not required to pass the self-scan's ≥3/5
+# checklist item). These 3 plus Netlify's platform-default
+# Strict-Transport-Security reach 4/5 with no functional risk (no iframe
+# usage anywhere in this repo, so X-Frame-Options: DENY is safe).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
 # "/" now serves the real static marketing landing page (dist/index.html,
 # built from the repo-root index.html entry in vite.config.ts) — no
 # redirect needed, Netlify serves it directly from the publish directory.

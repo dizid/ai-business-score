@@ -1,8 +1,8 @@
 # Foreground
 
 Foreground checks whether a business is mentioned when AI search engines
-(ChatGPT, Gemini, Claude, and Grok) are asked about its category, scores
-the result from 0-100, and tracks the score over time. The premise: an
+(Gemini and Claude) are asked about its category, scores the result from
+0-100, and tracks the score over time. The premise: an
 AI-generated answer has room for only a few names — Foreground checks
 whether a given business is one of them.
 
@@ -11,12 +11,11 @@ whether a given business is one of them.
 Foreground sends 5 category-relevant prompts (e.g. "who does emergency
 plumbing in Rotterdam") — phrased the way a real customer would ask,
 covering direct recommendations, competitor comparisons, and "who are the
-leaders in X" questions — to 4 AI models: OpenAI's GPT-5 mini, Google's
-Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6. That's
-20 checks per scan. Each model is queried directly against its own
-provider's API, using that provider's own web-search grounding tool — so
-answers reflect live web results rather than each model's static training
-data.
+leaders in X" questions — to 2 AI models: Google's Gemini 3 Flash and
+Anthropic's Claude Haiku 4.5. That's 10 checks per scan. Each model is
+queried directly against its own provider's API, using that provider's own
+web-search grounding tool — so answers reflect live web results rather
+than each model's static training data.
 
 For each completed check, Foreground records whether the business is
 mentioned, whether it's the first business mentioned, and how it ranks
@@ -41,8 +40,8 @@ the business scored zero.
 ## Pricing
 
 Free: 1 tracked company, 3 scans total, no credit card required.
-Single scan: $19 one-time, one full scan + AI deep advice, no account required to start.
-Paid ("Pro"): $99/month — unlimited companies, 20 scans/month (fair use), unlimited AI-generated deep advice.
+Foreground is running as a free product for now while we dial in Pro and
+single-scan pricing.
 
 ## Links
 

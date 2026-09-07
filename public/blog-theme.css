@@ -79,6 +79,25 @@
   margin: 40px 0 16px;
   text-align: left;
 }
+/* Comparison tables wrap cell text to fit the 68ch reading column instead
+   of forcing horizontal scroll — a table of short phrases reads better
+   wrapped than as a wide scrolling strip. Still scrolls as a fallback on
+   very narrow viewports where even wrapped columns don't fit. */
+.blog-body table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 22px;
+  font-size: 0.95rem;
+}
+.blog-body th,
+.blog-body td {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
 
 @media (max-width: 640px) {
   .blog-wrap { padding-top: 24px; padding-bottom: 40px; }
