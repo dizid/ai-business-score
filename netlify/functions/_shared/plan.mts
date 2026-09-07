@@ -8,13 +8,20 @@ export const FREE_PLAN_SCAN_LIMIT = 3;
 
 // Pro fair-use cap, added 2026-08-13 alongside MODELS growing from 2 to 4.
 // Monthly, not lifetime like FREE_PLAN_SCAN_LIMIT above — Pro is a real
-// working plan, not a one-time allotment. Sized off actual Perplexity cost:
-// a scan is 20 calls across 4 pricier-mixed models (was 2 cheaper ones),
-// roughly $0.30-0.80 in Perplexity spend per scan — 20 scans/month caps
-// worst-case per-Pro-user API exposure at roughly $6-16/month against a
-// fixed monthly subscription price, without meaningfully constraining any
-// real usage pattern observed so far.
-export const PRO_PLAN_MONTHLY_SCAN_LIMIT = 20;
+// working plan, not a one-time allotment. Originally sized off actual
+// Perplexity cost: a scan was 20 calls across 4 pricier-mixed models (was 2
+// cheaper ones), roughly $0.30-0.80 in Perplexity spend per scan — 20
+// scans/month capped worst-case per-Pro-user API exposure at roughly
+// $6-16/month against a fixed monthly subscription price.
+//
+// Raised 20 -> 50 on 2026-09-07. The hosted scan's main loop has since
+// dropped to HOSTED_MODELS (2 providers, 10 calls/scan, see the 2026-09-04
+// free-only cost-control pass in run-scan-background.mts) — roughly half
+// the per-scan cost this limit was originally sized against — so 50
+// scans/month lands in a similar or lower worst-case dollar range as the
+// original 20-scan cap did at 4 providers, while giving real Pro usage
+// meaningfully more headroom.
+export const PRO_PLAN_MONTHLY_SCAN_LIMIT = 50;
 
 // One-time single-scan purchase, added 2026-08-24 (Milestone 2 of the
 // monetization plan) — a full scan + deep advice for one company, no
