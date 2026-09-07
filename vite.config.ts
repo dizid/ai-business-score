@@ -62,6 +62,11 @@ function htmlIncludesPlugin() {
 export default defineConfig({
   plugins: [htmlIncludesPlugin(), vue(), tailwindcss(), netlifyPlugin()],
   build: {
+    // Needed so scripts/build-blog.mjs (a plain post-build Node step, not
+    // processed by Vite) can look up the hashed output path for
+    // src/marketing/authNav.ts and rewrite the nav partial's script src
+    // accordingly — see that file's resolveAuthNavAssetPath().
+    manifest: true,
     rollupOptions: {
       input: {
         result: 'result.html',

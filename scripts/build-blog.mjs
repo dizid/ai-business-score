@@ -30,6 +30,45 @@ const distDir = path.join(rootDir, 'dist');
 const partialsDir = path.join(rootDir, 'partials');
 const siteUrl = 'https://foreground.info';
 
+// partials/nav.html includes <script type="module" src="/src/marketing/
+// authNav.ts">, which the four Vite-built static pages (index.html etc.)
+// get bundled/hashed automatically by vite build's own HTML pipeline. This
+// script runs as plain post-build Node, so it has to resolve that same
+// script to its real hashed path itself, or it ships the dead source path
+// verbatim (dist has no /src/ directory). Looked up by the manifest
+// entry's `name` field ("authNav", derived from the source filename)
+// rather than by source path — confirmed by inspecting a real build's
+// dist/.vite/manifest.json that authNav.ts has no top-level source-path
+// key (it's pulled into a shared chunk since it's referenced identically
+// from 4 separate HTML entries), only a hash-suffixed chunk key whose
+// `name` field is the one stable thing to match on.
+function resolveAuthNavAssetPath() {
+  const manifestPath = path.join(distDir, '.vite', 'manifest.json');
+  if (!existsSync(manifestPath)) {
+    throw new Error(
+      `build-blog: expected Vite manifest at ${manifestPath} — did vite build run first, and is build.manifest enabled in vite.config.ts?`
+    );
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const matches = Object.values(manifest).filter((entry) => entry.name === 'authNav');
+  if (matches.length === 0) {
+    throw new Error(
+      'build-blog: no "authNav" entry found in the Vite manifest — src/marketing/authNav.ts may have been renamed or removed; update this lookup to match.'
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `build-blog: expected exactly one "authNav" manifest entry, found ${matches.length} — the lookup in resolveAuthNavAssetPath() is no longer unique enough.`
+    );
+  }
+  return `/${matches[0].file}`;
+}
+
+// Set once at the start of main(), read by every pageShell() call below —
+// simpler than threading it through buildPostPage()/buildIndexPage() as a
+// parameter, since it's a single build-wide constant, not per-page data.
+let authNavAssetPath;
+
 // --- frontmatter: plain `key: value` lines between `---` fences. Simple on
 // purpose — content/blog/*.md only ever needs title/description/date, no
 // arrays or nesting, so a hand-rolled parser avoids a dependency
@@ -124,6 +163,7 @@ __BODY_HTML__
 `;
   const gaId = process.env.VITE_GA4_MEASUREMENT_ID || '';
   return resolveIncludes(shell, partialsDir)
+    .replace('/src/marketing/authNav.ts', authNavAssetPath)
     .replaceAll('%VITE_GA4_MEASUREMENT_ID%', gaId)
     .replace('__EXTRA_HEAD__', () => extraHead)
     .replace('__BODY_HTML__', () => bodyHtml);
@@ -173,6 +213,9 @@ function buildPostPage(post) {
         name: 'Foreground',
         url: `${siteUrl}/`,
         logo: `${siteUrl}/og-image.png`,
+        founder: { '@type': 'Person', name: 'Marc de Ruijter' },
+        foundingDate: '2026-07-29',
+        slogan: 'Get in the foreground.',
       },
       {
         '@type': 'BlogPosting',
@@ -242,6 +285,9 @@ ${items}
         name: 'Foreground',
         url: `${siteUrl}/`,
         logo: `${siteUrl}/og-image.png`,
+        founder: { '@type': 'Person', name: 'Marc de Ruijter' },
+        foundingDate: '2026-07-29',
+        slogan: 'Get in the foreground.',
       },
       {
         '@type': 'CollectionPage',
@@ -331,6 +377,7 @@ function updateSitemap(posts) {
 }
 
 function main() {
+  authNavAssetPath = resolveAuthNavAssetPath();
   const posts = loadPosts();
 
   // Runs even with zero posts — the sitemap's 4 static-page <lastmod>
