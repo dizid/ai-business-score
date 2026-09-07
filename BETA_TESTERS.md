@@ -84,7 +84,7 @@ WHERE user_id = (SELECT id FROM neon_auth."user" WHERE email = 'TESTER_EMAIL');
 
 **Verify the grant worked**: have the tester (or you, logged in as them)
 refresh the app and confirm Pro-gated features unlock (deep advice button,
-20-scan/month cap instead of 3 lifetime) — don't just trust the `UPDATE`
+50-scan/month cap instead of 3 lifetime) — don't just trust the `UPDATE`
 ran without error.
 
 ## Tracker

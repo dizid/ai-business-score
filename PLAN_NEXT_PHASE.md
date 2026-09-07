@@ -69,7 +69,10 @@ loops, not feature-count — see Milestones F and G below.
   (`openai/gpt-5-mini`) asking the model to research the URL — no HTML
   fetch/parse of the site itself happens anywhere in the app today.
 - **Billing**: Stripe subscription is live — Free (1 company/3 scans total)
-  vs Pro (unlimited companies, 20 scans/calendar-month fair-use, **$199/month
+  vs Pro (unlimited companies, 20 scans/calendar-month fair-use **at the
+  time this section was written (2026-08-24) — raised to 50/month
+  2026-09-07 once the hosted scan's main loop dropped to 2 AI providers,
+  see `plan.mts`'s `PRO_PLAN_MONTHLY_SCAN_LIMIT` comment**, **$199/month
   at the time this section was written (2026-08-24) — dropped to $99/month
   2026-08-27, commit `0494ded`, which also removed the top-up-purchase CTA
   from the logged-in app; see `TODO.md`'s 2026-08-27 History entry**). A

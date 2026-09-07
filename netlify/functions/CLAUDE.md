@@ -263,9 +263,12 @@ Shipped in commit `5f47127` — not documented here until now, a pre-existing
 gap this update fixes rather than something built this session.
 
 - **`_shared/plan.mts`** — `FREE_PLAN_COMPANY_LIMIT = 1`,
-  `FREE_PLAN_SCAN_LIMIT = 3` (lifetime), `PRO_PLAN_MONTHLY_SCAN_LIMIT = 20`
-  (calendar-month fair-use cap, added 2026-08-13 — see `scan.mts`'s entry
-  below), `isPro(planTier)`. `SCAN_CREDIT_PACK_SIZE`/
+  `FREE_PLAN_SCAN_LIMIT = 3` (lifetime), `PRO_PLAN_MONTHLY_SCAN_LIMIT`
+  (calendar-month fair-use cap, added 2026-08-13 at `20` — see `scan.mts`'s
+  entry below; **raised to `50` on 2026-09-07**, now that the hosted scan's
+  main loop only calls `HOSTED_MODELS`/10 calls per scan rather than the
+  4-provider/20-call scan the original `20` was sized against — see the
+  constant's own comment in `plan.mts` for the cost math), `isPro(planTier)`. `SCAN_CREDIT_PACK_SIZE`/
   `SCAN_CREDIT_PACK_PRICE_USD`/`MAX_CREDIT_PACKS_PER_MONTH` (added
   2026-08-23 for the scan top-up feature) were **removed 2026-09-04** along
   with the whole feature — see the `scan_credit_purchases` schema entry
