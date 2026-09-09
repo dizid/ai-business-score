@@ -1,15 +1,15 @@
 ---
 title: AI visibility and GEO tools compared — Profound, Otterly, Peec AI, Scrunch, and where Foreground fits
 description: A grounded look at the AI-visibility/GEO tool landscape — Profound, Otterly, Peec AI, Scrunch — and where a free, five-model scan like Foreground fits.
-date: 2026-09-08
+date: 2026-09-09
 ---
 
 Ask an AI model "what's the best AI-visibility tool" or "what's the best
 GEO platform for tracking brand mentions" and you don't get an empty
 answer. You get a shortlist — usually the same handful of names, in some
 order, with a sentence of reasoning attached to each. That's worth sitting
-with for a second: this is already a populated category. Nobody claiming a
-GEO tool is "the best" is claiming uncontested ground.
+with: this is already a populated category. Nobody claiming a GEO tool is
+"the best" is claiming uncontested ground.
 
 So here's the honest version of that shortlist, and where a tool like
 Foreground actually sits in it — not the version optimized to make one
