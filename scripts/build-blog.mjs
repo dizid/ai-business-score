@@ -136,14 +136,9 @@ function pageShell({ title, description, canonicalPath, ogImagePath = '/og-image
 <link rel="stylesheet" href="/blog-theme.css" />
 __EXTRA_HEAD__
 
-<!-- Cookie consent — see partials/consent.html; must precede the ga4
-     include immediately below. -->
-<!--#include:consent-->
-
 <!-- Google Analytics (GA4) — see partials/ga4.html. Its measurement-ID
      token is substituted directly below via process.env, since this script
-     runs as plain Node after vite build, not through Vite's htmlEnvHook.
-     Also no-ops until cookie consent is granted. -->
+     runs as plain Node after vite build, not through Vite's htmlEnvHook. -->
 <!--#include:ga4-->
 </head>
 <body>

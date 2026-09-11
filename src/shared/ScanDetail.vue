@@ -294,8 +294,8 @@ function copySchema(example: string, index: number) {
     <template v-if="theme === 'dashboard'">
       <div class="tabbar">
         <ReportSectionNav v-model="section" />
-        <button type="button" class="download-report-button" @click="downloadReport">Download report</button>
-        <a v-if="reportHref" :href="reportHref" class="download-report-button full-report-link">Full report &rarr;</a>
+        <a v-if="reportHref" :href="reportHref" class="download-report-button">Download report</a>
+        <button v-else type="button" class="download-report-button" @click="downloadReport">Download report</button>
       </div>
 
       <ReportExecutiveSummary v-if="section === 'summary'" :payload="payload" :category-benchmark="categoryBenchmark" />
@@ -325,8 +325,8 @@ function copySchema(example: string, index: number) {
       <button type="button" role="tab" :aria-selected="viewMode === 'details'" :class="{ active: viewMode === 'details' }" @click="viewMode = 'details'">
         Details<template v-if="totalChecksCount"> &middot; {{ totalChecksCount }} check{{ totalChecksCount === 1 ? '' : 's' }}</template>
       </button>
-      <button type="button" class="download-report-button" @click="downloadReport">Download report</button>
-      <a v-if="reportHref" :href="reportHref" class="download-report-button full-report-link">Full report &rarr;</a>
+      <a v-if="reportHref" :href="reportHref" class="download-report-button">Download report</a>
+      <button v-else type="button" class="download-report-button" @click="downloadReport">Download report</button>
     </div>
 
     <template v-if="viewMode === 'overview'">
@@ -1184,9 +1184,9 @@ h2:first-of-type { margin-top: 0; }
 }
 .download-report-button:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
 /* .download-report-button above is class-scoped so it already applies to
-   this <a> too — .tabbar button's element-selector reset doesn't, so this
-   fills the two anchor-specific gaps (link underline, inline-vs-block). */
-.full-report-link { display: inline-block; text-decoration: none; margin-left: 8px; }
+   the <a> variant too — .tabbar button's element-selector reset doesn't,
+   so this fills the anchor-specific gap (link underline, inline-vs-block). */
+a.download-report-button { display: inline-block; text-decoration: none; }
 
 /* ---- status-band text/fill helpers (shared by score ring bands and
    Harmonia's pillar bars, so both read as the same color language) ---- */

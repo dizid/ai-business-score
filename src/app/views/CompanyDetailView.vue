@@ -663,5 +663,6 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
   .dashboard { display: grid; grid-template-columns: 360px 1fr; align-items: start; gap: 24px; }
   .list-pane { display: block !important; position: sticky; top: 24px; }
   .detail-pane { display: block; margin-top: 0; }
+  .back { display: none; }
 }
 </style>
