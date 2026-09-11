@@ -693,9 +693,17 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .has-selection .list-pane { display: none; }
 .has-selection .detail-pane { display: block; }
 
+/* Single scroll region only (2026-09-11 fix): previously both panes carried
+   their own `max-height: 80vh; overflow-y: auto`, while nothing above them
+   constrained the page — so the window scrollbar and .detail-pane's own
+   scrollbar were both active at once whenever a report exceeded 80vh
+   (almost always). .list-pane now just sticks to the viewport as the page
+   scrolls (position: sticky, no overflow/max-height of its own — it's short
+   enough to never need internal scrolling) and .detail-pane flows normally,
+   so the browser window is the only scrollable region. */
 @media (min-width: 900px) {
   .dashboard { display: grid; grid-template-columns: 360px 1fr; align-items: start; gap: 24px; }
-  .list-pane { display: block !important; max-height: 80vh; overflow-y: auto; }
-  .detail-pane { display: block; margin-top: 0; position: sticky; top: 24px; max-height: 80vh; overflow-y: auto; }
+  .list-pane { display: block !important; position: sticky; top: 24px; }
+  .detail-pane { display: block; margin-top: 0; }
 }
 </style>

@@ -6,7 +6,11 @@ import CollapsibleSection from './CollapsibleSection.vue';
 import {
   SENTIMENT_LABEL, BAND_LABEL, BAND_EXPLAIN, ADVICE_HEADING, CHECK_BADGE_LABEL, CATEGORY_EXPLAIN, CITATION_TIER_LABEL,
 } from './scanLabels';
-import Icon from './Icon.vue';
+import ReportSectionNav, { type ReportSection } from './report/ReportSectionNav.vue';
+import ReportExecutiveSummary from './report/ReportExecutiveSummary.vue';
+import ReportGeoSection from './report/ReportGeoSection.vue';
+import ReportSeoSection from './report/ReportSeoSection.vue';
+import ReportScanDetails from './report/ReportScanDetails.vue';
 import {
   sentimentKey, deriveSentimentByKey, deriveSentimentSummaryRows, deriveCategoryBreakdown, deriveSentimentAdvice,
   deriveRank1Count, deriveBeatenCount, deriveHeadlineKind, deriveScoreboardRows, scoreboardRowPct, shareOfVoicePct,
@@ -44,14 +48,11 @@ const props = withDefaults(
   defineProps<{
     payload: ValidatedPayload;
     allowDeepAdvice?: boolean;
-    // True when the caller is signed in but not entitled (not Pro, no
-    // one-time purchase) — renders a locked-state message in place of the
-    // button instead of hiding the whole section. Distinct from
-    // allowDeepAdvice being merely false, which is what result.html's
-    // unauthenticated context looks like and should stay silent for.
-    // 2026-09-04: used to render an "Upgrade to Pro" CTA here; checkout is
-    // hard-disabled for now (free-only cost-control pass, see root
-    // CLAUDE.md's Deployment section), so this is plain unlockable-later text.
+    // True when the caller is signed in but not entitled (not Pro) —
+    // renders an upgrade CTA in place of the button instead of hiding the
+    // whole section. Distinct from allowDeepAdvice being merely false,
+    // which is what result.html's unauthenticated context looks like and
+    // should stay silent for.
     deepAdviceLocked?: boolean;
     deepAdviceLoading?: boolean;
     allowSentimentJudge?: boolean;
@@ -65,9 +66,9 @@ const props = withDefaults(
     // persisted scan payload itself, so it's a separate optional prop
     // rather than a scanPayload.ts field. Same deliberate exception to
     // "purely presentational" as allowDeepAdvice/deepAdviceLocked above:
-    // result.html/PublicScanView.vue never pass this (no company_id/auth
-    // context there), so the card simply never renders on those surfaces.
-    // CompanyDetailView.vue owns the actual fetch.
+    // result.html never passes this (no company_id/auth context there), so
+    // the card simply never renders on that surface. CompanyDetailView.vue
+    // owns the actual fetch.
     categoryBenchmark?: {
       companyCount: number;
       avgScore: number | null;
@@ -94,7 +95,7 @@ const props = withDefaults(
     reportHref: null,
   }
 );
-defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string] }>();
+defineEmits<{ 'generate-deep-advice': []; 'judge-sentiment': [promptIndex: number, model: string]; 'upgrade': [] }>();
 
 // Sentiment/category/scoreboard/check-breakdown aggregation logic lives in
 // scanDerived.ts (imported above) — shared verbatim with scanReport.ts so
@@ -211,7 +212,13 @@ const ownSiteCitationRows = computed(() => deriveOwnSiteCitationRows(props.paylo
 
 const visibleAdvice = computed(() => deriveVisibleAdvice(props.payload));
 
-// ---- Overview/Details tab split (REPORTPLAN.md) ----
+// ---- Dashboard-theme section switcher (2026-09-11 dashboard redesign) ----
+// Separate state from the legacy viewMode below — dashboard and legacy now
+// render entirely different template branches (see the top-level
+// v-if="theme === 'dashboard'" in the template). See ReportSectionNav.vue.
+const section = ref<ReportSection>('summary');
+
+// ---- Overview/Details tab split (REPORTPLAN.md) — legacy theme only ----
 const viewMode = ref<'overview' | 'details'>('overview');
 const tablistRef = ref<HTMLElement | null>(null);
 // Switching tabs re-renders a differently-sized panel below the tab bar —
@@ -280,6 +287,38 @@ function copySchema(example: string, index: number) {
       <template v-if="scanDurationLabel">&middot; completed in {{ scanDurationLabel }}</template>
     </div>
 
+    <!-- Dashboard theme (2026-09-11 redesign): Executive Summary / GEO / SEO
+         / Details master-detail dashboard. Legacy theme (old shareable
+         links, result.html) renders a completely separate branch below,
+         byte-for-byte unchanged — see the theme prop comment above. -->
+    <template v-if="theme === 'dashboard'">
+      <div class="tabbar">
+        <ReportSectionNav v-model="section" />
+        <button type="button" class="download-report-button" @click="downloadReport">Download report</button>
+        <a v-if="reportHref" :href="reportHref" class="download-report-button full-report-link">Full report &rarr;</a>
+      </div>
+
+      <ReportExecutiveSummary v-if="section === 'summary'" :payload="payload" :category-benchmark="categoryBenchmark" />
+      <ReportGeoSection
+        v-else-if="section === 'geo'"
+        :payload="payload"
+        :allow-sentiment-judge="allowSentimentJudge"
+        :sentiment-judge-loading-key="sentimentJudgeLoadingKey"
+        @judge-sentiment="(promptIndex, model) => $emit('judge-sentiment', promptIndex, model)"
+      />
+      <ReportSeoSection v-else-if="section === 'seo'" :payload="payload" />
+      <ReportScanDetails
+        v-else
+        :payload="payload"
+        :allow-deep-advice="allowDeepAdvice"
+        :deep-advice-locked="deepAdviceLocked"
+        :deep-advice-loading="deepAdviceLoading"
+        @generate-deep-advice="$emit('generate-deep-advice')"
+        @upgrade="$emit('upgrade')"
+      />
+    </template>
+
+    <template v-else>
     <!-- Overview/Details tabs (REPORTPLAN.md) -->
     <div class="tabbar" role="tablist" ref="tablistRef">
       <button type="button" role="tab" :aria-selected="viewMode === 'overview'" :class="{ active: viewMode === 'overview' }" @click="viewMode = 'overview'">Overview</button>
@@ -459,9 +498,9 @@ function copySchema(example: string, index: number) {
       </template>
 
       <!-- deep advice: on-demand LLM-generated steps, Milestone 6. Gated
-           behind Pro (or a one-time purchase) since Milestone 1 of the
-           monetization plan — deepAdviceLocked renders an upgrade CTA
-           instead of hiding the section outright. -->
+           behind Pro since Milestone 1 of the monetization plan —
+           deepAdviceLocked renders an upgrade CTA instead of hiding the
+           section outright. -->
       <template v-if="allowDeepAdvice || payload.deepAdvice || deepAdviceLocked">
         <h2>Deeper advice</h2>
         <div class="card deep-advice-card" v-if="payload.deepAdvice">
@@ -488,7 +527,10 @@ function copySchema(example: string, index: number) {
           {{ deepAdviceLoading ? 'Generating…' : 'Generate deeper advice' }}
         </button>
         <div class="card deep-advice-locked" v-else-if="deepAdviceLocked">
-          <p>Deeper advice isn't available on the free plan right now — check back soon.</p>
+          <p>Unlock AI-generated action steps — specific, ranked fixes based on this scan's actual results.</p>
+          <button type="button" class="deep-advice-button" @click="$emit('upgrade')">
+            Upgrade to Pro
+          </button>
         </div>
       </template>
 
@@ -535,23 +577,13 @@ function copySchema(example: string, index: number) {
                the two data shapes get two different chart forms). Legacy
                theme (old shareable links) keeps the original flat bars,
                byte-for-byte unchanged. -->
-          <div class="harmonia-gauge-grid" v-if="theme === 'dashboard'">
-            <div class="harmonia-gauge" v-for="p in harmoniaPillars" :key="p.key">
-              <div class="harmonia-gauge-ring" :class="`band-fill-${p.band}`" :style="{ '--pct': p.score ?? 0 }">
-                <span class="harmonia-gauge-score">{{ p.score ?? '—' }}</span>
-              </div>
-              <span class="harmonia-gauge-label">{{ p.label }}</span>
+          <div class="harmonia-bar-row" v-for="p in harmoniaPillars" :key="p.key">
+            <div class="harmonia-bar-label">
+              <span>{{ p.label }}</span>
+              <span class="board-count">{{ p.score ?? '—' }}</span>
             </div>
+            <div class="board-track"><div class="board-fill" :class="`band-fill-${p.band}`" :style="{ width: (p.score ?? 0) + '%' }"></div></div>
           </div>
-          <template v-else>
-            <div class="harmonia-bar-row" v-for="p in harmoniaPillars" :key="p.key">
-              <div class="harmonia-bar-label">
-                <span>{{ p.label }}</span>
-                <span class="board-count">{{ p.score ?? '—' }}</span>
-              </div>
-              <div class="board-track"><div class="board-fill" :class="`band-fill-${p.band}`" :style="{ width: (p.score ?? 0) + '%' }"></div></div>
-            </div>
-          </template>
           <button type="button" class="harmonia-details-link" @click="viewMode = 'details'">See full breakdown &rarr;</button>
         </div>
       </template>
@@ -574,7 +606,7 @@ function copySchema(example: string, index: number) {
           <div class="board-track" v-if="p.score !== null"><div class="board-fill" :class="`band-fill-${p.band}`" :style="{ width: p.score + '%' }"></div></div>
           <ul class="harmonia-checklist" v-if="p.checks.length">
             <li v-for="c in p.checks" :key="c.id" :class="c.passed ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="c.passed ? 'check' : 'x'" /><template v-else>{{ c.passed ? '✓' : '✗' }}</template></span> {{ c.label }}
+              <span class="check-icon">{{ c.passed ? '✓' : '✗' }}</span> {{ c.label }}
             </li>
           </ul>
           <p class="harmonia-pillar-empty" v-else>Not available for this scan.</p>
@@ -588,7 +620,7 @@ function copySchema(example: string, index: number) {
           <h3>Security headers</h3>
           <ul class="harmonia-checklist">
             <li v-for="h in payload.harmonia.securityHeaders" :key="h.header" :class="h.present ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="h.present ? 'check' : 'x'" /><template v-else>{{ h.present ? '✓' : '✗' }}</template></span> {{ h.header }}
+              <span class="check-icon">{{ h.present ? '✓' : '✗' }}</span> {{ h.header }}
             </li>
           </ul>
         </div>
@@ -602,7 +634,7 @@ function copySchema(example: string, index: number) {
           <h3>AI crawler access (robots.txt)</h3>
           <ul class="harmonia-checklist">
             <li v-for="b in payload.harmonia.aiCrawlerAccess.bots" :key="b.bot" :class="b.blocked ? 'failed' : 'passed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="b.blocked ? 'x' : 'check'" /><template v-else>{{ b.blocked ? '✗' : '✓' }}</template></span> {{ b.bot }} ({{ b.provider }}) — {{ b.blocked ? 'blocked' : b.matched ? 'allowed' : 'no rule (allowed by default)' }}
+              <span class="check-icon">{{ b.blocked ? '✗' : '✓' }}</span> {{ b.bot }} ({{ b.provider }}) — {{ b.blocked ? 'blocked' : b.matched ? 'allowed' : 'no rule (allowed by default)' }}
             </li>
           </ul>
         </div>
@@ -629,7 +661,7 @@ function copySchema(example: string, index: number) {
           </div>
           <ul class="harmonia-checklist" v-if="additionalAuditRows.length">
             <li v-for="a in additionalAuditRows" :key="a.id" :class="a.passed ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="a.passed ? 'check' : 'x'" /><template v-else>{{ a.passed ? '✓' : '✗' }}</template></span> {{ a.label }}
+              <span class="check-icon">{{ a.passed ? '✓' : '✗' }}</span> {{ a.label }}
             </li>
           </ul>
         </div>
@@ -641,27 +673,27 @@ function copySchema(example: string, index: number) {
           <h3>Additional SEO signals</h3>
           <ul class="harmonia-checklist">
             <li :class="additionalSeoSignals.htmlLang ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.htmlLang ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.htmlLang ? '✓' : '✗' }}</template></span>
+              <span class="check-icon">{{ additionalSeoSignals.htmlLang ? '✓' : '✗' }}</span>
               HTML lang attribute {{ additionalSeoSignals.htmlLang ? `set (${additionalSeoSignals.htmlLang})` : 'not set' }}
             </li>
             <li :class="additionalSeoSignals.faviconPresent ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.faviconPresent ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.faviconPresent ? '✓' : '✗' }}</template></span>
+              <span class="check-icon">{{ additionalSeoSignals.faviconPresent ? '✓' : '✗' }}</span>
               Favicon present
             </li>
             <li :class="additionalSeoSignals.manifestPresent ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.manifestPresent ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.manifestPresent ? '✓' : '✗' }}</template></span>
+              <span class="check-icon">{{ additionalSeoSignals.manifestPresent ? '✓' : '✗' }}</span>
               Web app manifest present
             </li>
             <li :class="additionalSeoSignals.twitterCard.length ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.twitterCard.length ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.twitterCard.length ? '✓' : '✗' }}</template></span>
+              <span class="check-icon">{{ additionalSeoSignals.twitterCard.length ? '✓' : '✗' }}</span>
               Twitter Card tags present
             </li>
             <li :class="additionalSeoSignals.hreflangTags.length ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.hreflangTags.length ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.hreflangTags.length ? '✓' : '✗' }}</template></span>
+              <span class="check-icon">{{ additionalSeoSignals.hreflangTags.length ? '✓' : '✗' }}</span>
               hreflang tags present{{ hreflangCodesLabel ? ` (${hreflangCodesLabel})` : '' }}
             </li>
             <li :class="additionalSeoSignals.sitemapUrlCount ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="additionalSeoSignals.sitemapUrlCount ? 'check' : 'x'" /><template v-else>{{ additionalSeoSignals.sitemapUrlCount ? '✓' : '✗' }}</template></span>
+              <span class="check-icon">{{ additionalSeoSignals.sitemapUrlCount ? '✓' : '✗' }}</span>
               <template v-if="additionalSeoSignals.sitemapUrlCount">Sitemap{{ additionalSeoSignals.sitemapIsIndex ? ' index' : '' }} lists {{ additionalSeoSignals.sitemapUrlCount }} URL{{ additionalSeoSignals.sitemapUrlCount === 1 ? '' : 's' }}</template>
               <template v-else>No sitemap URLs found</template>
             </li>
@@ -672,7 +704,7 @@ function copySchema(example: string, index: number) {
           <h3>Schema.org detected</h3>
           <ul class="schema-list">
             <li v-for="(n, i) in payload.harmonia.schema.detected" :key="i" :class="n.valid ? 'passed' : 'failed'">
-              <span class="check-icon"><Icon v-if="theme === 'dashboard'" :name="n.valid ? 'check' : 'x'" /><template v-else>{{ n.valid ? '✓' : '✗' }}</template></span> {{ n.type || 'Unrecognized type' }}
+              <span class="check-icon">{{ n.valid ? '✓' : '✗' }}</span> {{ n.type || 'Unrecognized type' }}
               <span class="schema-issues" v-if="n.issues.length">— {{ n.issues.join('; ') }}</span>
             </li>
           </ul>
@@ -812,6 +844,7 @@ function copySchema(example: string, index: number) {
       </CollapsibleSection>
 
       <p class="details-empty" v-if="detailsEmpty">No check details available for this scan.</p>
+    </template>
     </template>
 
     <footer>Detection is presence-only, not sentiment-aware — a negative or comparative mention still counts as "cited." The score above is a heuristic weighting of that same presence-only detection, not an independently verified rank. This is a single point-in-time check, not a monitored score. Results are fixed at generation time; this link will always show the same result.</footer>
