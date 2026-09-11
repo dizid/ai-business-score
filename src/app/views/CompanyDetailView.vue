@@ -63,13 +63,8 @@ async function loadCategoryBenchmark(companyId: string) {
 const scanning = ref(false);
 const scanStatus = ref('');
 const scanError = ref('');
+const scanUpgradeRequired = ref(false);
 const upgrading = ref(false);
-// singleScanBanner: read-only redirect-completion state (see onMounted's
-// ?singlescan= handling below) — kept even though the in-app CTA that used
-// to *initiate* this purchase was removed (S3 pricing simplification), so
-// anyone who already had a Checkout tab open still gets a graceful
-// confirmation banner on return.
-const singleScanBanner = ref<'success' | 'cancelled' | ''>('');
 const autoScanUpdating = ref(false);
 let pollHandle: ReturnType<typeof setTimeout> | null = null;
 // Tracked outside pollScan's own recursive param so the terminal-error
@@ -227,6 +222,7 @@ async function runNewScan() {
   if (!company.value) return;
   scanning.value = true;
   scanError.value = '';
+  scanUpgradeRequired.value = false;
   scanStatus.value = 'Starting scan…';
   try {
     const res = await authFetch('/scan', {
@@ -237,6 +233,7 @@ async function runNewScan() {
     const data = await res.json();
     if (!data.ok) {
       scanError.value = data.error || 'Failed to start scan.';
+      scanUpgradeRequired.value = !!data.upgradeRequired;
       scanning.value = false;
       return;
     }
@@ -250,10 +247,6 @@ async function runNewScan() {
 // Same shape as CompaniesListView's startCheckout — kept duplicated rather
 // than shared, matching this codebase's convention of copy-pasted per-file
 // auth/billing calls over a shared abstraction (see auth.mts's own comment).
-// 2026-09-04 — checkout is hard-disabled for now (free-only cost-control
-// pass, see root CLAUDE.md's Deployment section) and every call site below
-// was removed, so this function is currently unused. Left in place, body
-// unchanged, for a cheap revert later.
 async function startCheckout() {
   upgrading.value = true;
   try {
@@ -276,15 +269,13 @@ async function startCheckout() {
 const isProUser = computed(() => profile.value.plan_tier === 'pro');
 
 // Toggles companies.scan_frequency between 'off' and 'weekly'. A non-Pro
-// caller PATCHing 'weekly' gets a 402 upgradeRequired from company.mts.
-// 2026-09-04 — used to route that into startCheckout(); checkout is
-// hard-disabled for now, so this just surfaces a plain message instead (see
-// root CLAUDE.md's Deployment section).
+// caller PATCHing 'weekly' gets a 402 upgradeRequired from company.mts, so
+// route straight into checkout instead of round-tripping the PATCH first.
 async function toggleAutoScan() {
   if (!company.value || autoScanUpdating.value) return;
   const nextFrequency = company.value.scan_frequency === 'weekly' ? 'off' : 'weekly';
   if (nextFrequency === 'weekly' && !isProUser.value) {
-    scanError.value = "Automatic weekly scans aren't available on the free plan right now.";
+    startCheckout();
     return;
   }
   autoScanUpdating.value = true;
@@ -342,9 +333,8 @@ const selectedScan = computed(() =>
 // ever populated once a scan reaches status='completed' — calling
 // validatePayload on a pending/running/failed row always returns null, which
 // used to render as a misleading generic "couldn't be rendered" message
-// indistinguishable from a genuinely malformed record. Gate on status first,
-// same pattern PublicScanView.vue already uses for the public single-scan
-// page, so the real state (still running / actually failed, with its real
+// indistinguishable from a genuinely malformed record. Gate on status first
+// so the real state (still running / actually failed, with its real
 // error_message) shows instead.
 const selectedScanStatus = computed(() => (selectedScan.value as any)?.status ?? 'completed');
 const selectedPayload = computed(() =>
@@ -430,29 +420,6 @@ onMounted(async () => {
     delete cleanedQuery.autoscan;
     router.replace({ query: cleanedQuery });
   }
-  // Landed back here from a $19 single-scan Checkout redirect
-  // (?singlescan=success or ?singlescan=cancelled) — same strip-after-read
-  // pattern as ?autoscan above. A success here means the webhook creates a
-  // real new scan — retry load() a few times so it appears without a
-  // manual refresh, since the webhook runs asynchronously relative to this
-  // redirect. Deliberately not routed through BillingSuccessView.vue: its
-  // poll-until plan_tier==='pro' logic would resolve instantly for an
-  // already-Pro user regardless of whether the webhook actually landed, so
-  // it's the wrong tool for confirming this purchase.
-  if (route.query.singlescan === 'success' || route.query.singlescan === 'cancelled') {
-    singleScanBanner.value = route.query.singlescan;
-    const cleanedQuery = { ...route.query };
-    delete cleanedQuery.singlescan;
-    router.replace({ query: cleanedQuery });
-    if (singleScanBanner.value === 'success') {
-      const baselineCount = scans.value.length;
-      for (let i = 0; i < 5; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        await load();
-        if (scans.value.length > baselineCount) break;
-      }
-    }
-  }
 });
 onUnmounted(stopPolling);
 watch(() => route.params.id, load);
@@ -478,14 +445,6 @@ watch(() => route.params.id, load);
           <p class="sub">{{ company.category }} · {{ company.website }}</p>
         </div>
         <div class="scan-trigger">
-          <div class="scan-status purchase-success-banner" v-if="singleScanBanner === 'success'">
-            Purchase received — your scan is starting.
-            <button type="button" class="dismiss" @click="singleScanBanner = ''">Dismiss</button>
-          </div>
-          <div class="scan-status" v-else-if="singleScanBanner === 'cancelled'">
-            Checkout cancelled — no charge was made.
-            <button type="button" class="dismiss" @click="singleScanBanner = ''">Dismiss</button>
-          </div>
           <button type="button" :disabled="scanning" @click="runNewScan">
             {{ scanning ? 'Scanning…' : 'Run new scan' }}
           </button>
@@ -509,6 +468,9 @@ watch(() => route.params.id, load);
             {{ scanError }}
             <button type="button" class="inline-upgrade" v-if="pendingScanId" @click="recheckPendingScan">
               Check again
+            </button>
+            <button type="button" class="inline-upgrade" v-if="scanUpgradeRequired" :disabled="upgrading" @click="startCheckout">
+              Upgrade to Pro
             </button>
           </div>
         </div>
@@ -565,6 +527,7 @@ watch(() => route.params.id, load);
               :report-href="reportHref"
               @generate-deep-advice="runDeepAdvice"
               @judge-sentiment="runSentimentJudge"
+              @upgrade="startCheckout"
             />
             <p class="empty" v-else-if="selectedScanStatus === 'failed'">
               This scan didn't complete: {{ (selectedScan as any)?.errorMessage || 'Something went wrong running the checks.' }}
@@ -617,11 +580,6 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
   border: 1px solid var(--critical); border-radius: 999px; background: transparent; color: var(--critical); cursor: pointer;
 }
 .inline-upgrade:disabled { opacity: 0.6; cursor: wait; }
-.purchase-success-banner { color: var(--success-text); }
-.dismiss {
-  display: inline; margin-left: 6px; padding: 0; border: none; background: none;
-  color: inherit; text-decoration: underline; font-size: inherit; cursor: pointer;
-}
 
 .status.error { font-size: 0.9rem; color: var(--critical); }
 .empty { color: var(--muted); font-size: 0.9rem; }

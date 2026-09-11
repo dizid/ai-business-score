@@ -40,8 +40,8 @@ the business scored zero.
 ## Pricing
 
 Free: 1 tracked company, 3 scans total, no credit card required.
-Foreground is running as a free product for now while we dial in Pro and
-single-scan pricing.
+Pro: $99/month for unlimited companies, 50 scans a month, and unlimited
+AI-generated deep advice.
 
 ## Links
 

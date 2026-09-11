@@ -64,6 +64,7 @@ const showExample = ref(false);
 const showCreate = ref(false);
 const creating = ref(false);
 const createError = ref('');
+const createUpgradeRequired = ref(false);
 const detailsRevealed = ref(false);
 const editingDetails = ref(false);
 const enriching = ref(false);
@@ -202,11 +203,6 @@ async function loadCompanies() {
   }
 }
 
-// 2026-09-04 — checkout is hard-disabled for now (free-only cost-control
-// pass, see root CLAUDE.md's Deployment section) and both call sites below
-// were removed, so this function is currently unused. Left in place, body
-// unchanged, so re-enabling checkout later is just re-adding the button/CTA
-// call sites rather than rebuilding this.
 async function startCheckout() {
   upgrading.value = true;
   upgradeError.value = '';
@@ -231,6 +227,7 @@ function resetForm() {
   editingDetails.value = false;
   enrichError.value = '';
   createError.value = '';
+  createUpgradeRequired.value = false;
 }
 
 // Enrichment succeeded and the user hasn't asked to edit: show a compact
@@ -305,6 +302,7 @@ function onSubmit() {
 async function onCreate() {
   creating.value = true;
   createError.value = '';
+  createUpgradeRequired.value = false;
   try {
     const res = await authFetch('/companies', {
       method: 'POST',
@@ -314,6 +312,7 @@ async function onCreate() {
     const data = await res.json();
     if (!data.ok) {
       createError.value = data.error || 'Failed to create company.';
+      createUpgradeRequired.value = !!data.upgradeRequired;
       return;
     }
     showCreate.value = false;
@@ -344,6 +343,9 @@ onMounted(loadCompanies);
         <span class="plan-badge" :class="{ pro: profile.plan_tier === 'pro' }">
           {{ profile.plan_tier === 'pro' ? 'Pro' : 'Free plan' }}
         </span>
+        <button type="button" class="upgrade-btn" v-if="profile.plan_tier !== 'pro'" :disabled="upgrading" @click="startCheckout">
+          {{ upgrading ? 'Redirecting…' : 'Upgrade to Pro' }}
+        </button>
         <button type="button" @click="toggleCreate">{{ showCreate ? 'Cancel' : '+ New company' }}</button>
       </div>
     </div>
@@ -453,7 +455,12 @@ onMounted(loadCompanies);
         <button type="submit" :disabled="creating">{{ creating ? 'Creating…' : 'GO' }}</button>
       </template>
 
-      <div class="status error" v-if="createError">{{ createError }}</div>
+      <div class="status error" v-if="createError">
+        {{ createError }}
+        <button type="button" class="inline-upgrade" v-if="createUpgradeRequired" :disabled="upgrading" @click="startCheckout">
+          Upgrade to Pro
+        </button>
+      </div>
     </form>
 
     <p class="status error" v-if="loadError">{{ loadError }}</p>

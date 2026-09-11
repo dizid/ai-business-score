@@ -9,3 +9,7 @@ dist/
 
 # Local Netlify folder
 .netlify
+docs/courses/
+
+# Local-only backups (e.g. artifact exports) - never tracked
+backups/

@@ -224,15 +224,70 @@ enterprise deal requiring a DPA).
   `netlify/functions/CLAUDE.md`'s Billing section and
   `shared/CLAUDE.md`'s `MODELS`/`HOSTED_MODELS` entry for the full detail,
   and `TODO.md`'s 2026-09-04 "Free-only mode with cost control" entry for
-  the complete file list. **To revert**: remove the
-  `checkoutTemporarilyDisabled()` early-return line from both checkout
-  functions; restore the removed CTA markup in `CompaniesListView.vue`/
-  `CompanyDetailView.vue`/`ScanDetail.vue`/`index.html` from git history
-  (this change's commit); restore the original 402 message strings in
-  `scan.mts`/`companies.mts`/`generate-deep-advice.mts`/`company.mts` (the
-  `upgradeRequired`/`limit` JSON fields were never touched); and revert
-  `run-scan-background.mts`'s main loop from `HOSTED_MODELS` back to
-  `MODELS` to restore all 4 providers.
+  the complete file list. **Reverted 2026-09-11** — see the pricing-restore
+  entry below; the "to revert" recipe that used to sit here was executed,
+  not just documented. `run-scan-background.mts`'s `HOSTED_MODELS` cut (2
+  providers instead of 4) was deliberately left as-is — pricing and provider
+  count are independent decisions, and reverting the cost cut wasn't part of
+  what was asked.
+  **2026-09-11 — live two-tier Pro billing restored, $19 single-scan SKU
+  removed for good (not just re-disabled).** Marc: keep it simple — 3 free
+  scans (unchanged), then $99/month Pro, nothing in between. Checkout is
+  live again: `checkoutTemporarilyDisabled()` and its call sites were
+  deleted outright (not just bypassed) from `_shared/stripe.mts` and
+  `create-checkout-session.mts`; "Upgrade to Pro" CTAs were restored in
+  `CompaniesListView.vue`, `CompanyDetailView.vue` (including routing the
+  weekly-auto-scan gate back into checkout instead of a dead-end message),
+  and `ScanDetail.vue` (a restored `upgrade` emit, wired to `startCheckout`
+  from `CompanyDetailView.vue`); the four 402 messages went back to
+  "Upgrade to Pro" wording. The $19 single-scan SKU — both its "anonymous"
+  and logged-in "topup" sub-modes — was fully deleted rather than
+  re-enabled: `create-single-scan-checkout-session.mts`,
+  `claim-single-scan.mts`, `single-scan-status.mts`, and
+  `src/app/views/PublicScanView.vue` are gone; `stripe-webhook.mts`'s
+  `single_scan_purchase` branch and `generate-deep-advice.mts`'s
+  purchase-based entitlement fallback were removed (Pro-only now);
+  `SignupView.vue`'s post-signup `?claim=` step and `/app/scan`'s route
+  were removed; `sendSingleScanReceiptEmail` (`_shared/email.mts`) and
+  `SINGLE_SCAN_PRICE_USD` (`_shared/plan.mts`) were deleted as unused.
+  Verified safe before deleting: a live query confirmed
+  `single_scan_purchases` had **zero rows, ever** — the feature was live for
+  weeks but never actually purchased — so both that table and the older,
+  already-code-dead `scan_credit_purchases` (1 stray test row, the removed
+  top-up-pack feature) were dropped from the database outright, not left as
+  dormant-but-present the way `is_public`/`company_urls` are elsewhere in
+  this schema (see `netlify/functions/CLAUDE.md`'s Database schema
+  section). `STRIPE_SINGLE_SCAN_PRICE_ID` and the stray `STRIPE_TOPUP_PRICE_ID`
+  (the 2026-08-28 concurrent-session leftover this section used to flag)
+  were both removed from Netlify's env vars, same reasoning. Marketing/legal
+  copy updated to match (two-tier pricing, no more single-scan mentions):
+  `index.html`'s JSON-LD offers + pricing cards + FAQ, `terms.html`
+  (dropped the single-scan billing clause), `privacy.html` (dropped
+  single-scan data-collection bullets), `how-it-works.html`, and
+  `public/llms.txt`. **Stripe mode**: Marc explicitly chose to go straight
+  to live mode rather than a test-mode dry run first. Marc created a new
+  live-mode restricted API key himself in the Stripe dashboard (same
+  minimal Write-only-on-Checkout-Sessions/Products/Prices/Webhook-Endpoints
+  scoping as the existing test key — Claude has no dashboard/OAuth access
+  to create this step itself) and handed it over **2026-09-11**. A live
+  $99/mo Price (`price_1UEQwp8gBja0qkMxMPD8sfNe`, product "Foreground Pro",
+  confirmed `livemode: true` via the Stripe API before trusting it — same
+  verify-before-wiring discipline as every other key/Price change in this
+  file) and a live webhook endpoint (`we_1UEQwt8gBja0qkMxb1F494PY`, pointed
+  at `https://foreground.info/stripe-webhook`, same 3 event types as the
+  test one) were created via the Stripe API, and `STRIPE_SECRET_KEY`/
+  `STRIPE_PRICE_ID`/`STRIPE_WEBHOOK_SECRET` were swapped to these live
+  values across dev/branch-deploy/deploy-preview/production (`dev-server`
+  left as its stale empty value for `STRIPE_PRICE_ID`, same pre-existing
+  gap noted earlier in this file — that context can't be reached via this
+  API). **The code changes that re-enable checkout were not yet committed
+  or pushed as of this key swap** — env vars alone don't do anything until
+  the `create-checkout-session.mts` guard removal (and everything else in
+  this entry) actually deploys; see git status / ask Marc before pushing.
+  A real end-to-end live Checkout test (create → pay with a real card →
+  webhook fires → `plan_tier='pro'`) still hasn't been run, same reasoning
+  as every prior "don't automate spending real money" note in this file —
+  that's Marc's step once this is deployed.
   **`VITE_GA4_MEASUREMENT_ID`** (new 2026-08-25, Google Analytics) — Marc
   created the GA4 property himself (Claude has no Analytics Admin API
   access or browser/OAuth session to do this) and provided the Measurement

@@ -78,12 +78,27 @@ export default async (req: Request) => {
     // dashboard's "Alerts" section — surfaces what sendScoreRegressionEmail
     // already computes, since the email alone is invisible until someone
     // checks their inbox. Last 30 days, most recent first, capped at 10 —
-    // no read/dismissed state (out of scope for this pass).
+    // still no read/dismissed state, but `a.scan_id = latest_scan.id` keeps
+    // an alert from outliving its own relevance: score_alerts is an
+    // append-only log written once when a regression is detected, so
+    // without this filter an old regression keeps showing even after a
+    // company's score has since recovered on a later scan (found 2026-09-07
+    // dogfooding — the list card's live latest/prev delta and this alert
+    // disagreed because the alert was stale, not because the two used
+    // different scan-ordering logic).
     const alerts = await db`
       SELECT a.id, a.company_id, c.brand, a.prior_score, a.new_score, a.delta, a.created_at
       FROM public.score_alerts a
       JOIN public.companies c ON c.id = a.company_id
-      WHERE c.owner_user_id = ${userId} AND a.created_at >= now() - interval '30 days'
+      JOIN LATERAL (
+        SELECT s.id FROM public.scans s
+        WHERE s.company_id = a.company_id AND s.status = 'completed'
+        ORDER BY s.generated_at DESC
+        LIMIT 1
+      ) latest_scan ON true
+      WHERE c.owner_user_id = ${userId}
+        AND a.created_at >= now() - interval '30 days'
+        AND a.scan_id = latest_scan.id
       ORDER BY a.created_at DESC
       LIMIT 10
     `;
@@ -108,9 +123,7 @@ export default async (req: Request) => {
       if (count >= FREE_PLAN_COMPANY_LIMIT) {
         return new Response(
           JSON.stringify({
-            // 2026-09-04 — free-only cost-control pass, see scan.mts's matching
-            // comment / root CLAUDE.md's Deployment section.
-            error: `You've reached the free plan's limit of ${FREE_PLAN_COMPANY_LIMIT} company for now — more capacity is coming soon.`,
+            error: `Free plan is limited to ${FREE_PLAN_COMPANY_LIMIT} company. Upgrade to Pro to track more.`,
             upgradeRequired: true,
             limit: FREE_PLAN_COMPANY_LIMIT,
           }),

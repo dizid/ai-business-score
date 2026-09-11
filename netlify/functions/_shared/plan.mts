@@ -23,14 +23,6 @@ export const FREE_PLAN_SCAN_LIMIT = 3;
 // meaningfully more headroom.
 export const PRO_PLAN_MONTHLY_SCAN_LIMIT = 50;
 
-// One-time single-scan purchase, added 2026-08-24 (Milestone 2 of the
-// monetization plan) — a full scan + deep advice for one company, no
-// subscription required, for anonymous lead-gen visitors and logged-in
-// free-tier users who don't want to subscribe. (The Pro-only bulk top-up
-// pack this comment used to distinguish itself from was removed
-// 2026-09-04 — see TODO.md.)
-export const SINGLE_SCAN_PRICE_USD = 19;
-
 // Score-regression alert threshold, added 2026-08-26 alongside scheduled
 // weekly re-scans (scheduled-rescan.mts). A drop of this many points or
 // more from a company's prior completed scan fires a distinct alert email

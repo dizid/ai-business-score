@@ -47,22 +47,12 @@ export default async (req: Request, context: Context) => {
   }
   const scanRow = rows[0];
 
-  // Entitled via Pro, or via a $19 one-time single-scan purchase covering
-  // this exact scan (Milestone 2 of the 2026-08-24 monetization plan) —
-  // that SKU bundles deep advice for the one scan it paid for.
   const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
   if (!isPro(profiles[0]?.plan_tier)) {
-    const purchases = await db`
-      SELECT id FROM public.single_scan_purchases WHERE scan_id = ${scanId}
-    `;
-    if (purchases.length === 0) {
-      return new Response(
-        // 2026-09-04 — free-only cost-control pass, see scan.mts's matching
-        // comment / root CLAUDE.md's Deployment section.
-        JSON.stringify({ error: "Deeper advice isn't available on the free plan right now.", upgradeRequired: true }),
-        { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
-      );
-    }
+    return new Response(
+      JSON.stringify({ error: 'Deep advice is a Pro feature. Upgrade to Pro to unlock it.', upgradeRequired: true }),
+      { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+    );
   }
 
   if (scanRow.status !== 'completed') {

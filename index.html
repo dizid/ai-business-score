@@ -58,14 +58,10 @@
      2 models for an unrelated reason — same number, different cause; don't
      assume "2 models" here is inherited from that earlier state.
 
-     2026-09-04 — free-only cost-control pass (see root CLAUDE.md's
-     Deployment section): checkout is hard-disabled site-wide for now, so
-     the Pro-plan and Single-scan Offers below are marked OutOfStock rather
-     than removed (the price info stays accurate, only purchasability
-     changed), the "What does it cost?" answer was reworded to say so, and
-     the single-scan purchase form further down was removed. Revert: drop
-     the availability field from both Offers, restore the old "What does it
-     cost?" text, restore the form (git history, this commit). -->
+     2026-09-11 — live two-tier Pro billing restored (see root CLAUDE.md's
+     Deployment section): checkout is live again and the $19 single-scan
+     SKU was removed for good (not just marked unavailable) as part of a
+     KISS pricing simplification to Free + Pro only. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -114,15 +110,7 @@
           "@type": "Offer",
           "name": "Pro plan",
           "price": "99",
-          "priceCurrency": "USD",
-          "availability": "https://schema.org/OutOfStock"
-        },
-        {
-          "@type": "Offer",
-          "name": "Single scan",
-          "price": "19",
-          "priceCurrency": "USD",
-          "availability": "https://schema.org/OutOfStock"
+          "priceCurrency": "USD"
         }
       ]
     },
@@ -160,7 +148,7 @@
           "name": "What does it cost?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Free to try — one company and three scans, no credit card required. Foreground is running as a free product for now while we dial in Pro and single-scan pricing — check back soon for paid options."
+            "text": "Free to try — one company and three scans, no credit card required. Upgrade to Pro for $99/month for unlimited companies, 50 scans a month, and unlimited AI-generated deep advice."
           }
         }
       ]
@@ -298,25 +286,15 @@
         </ul>
         <a class="btn-secondary" href="/app/signup">Start free</a>
       </div>
-      <div class="plan-card">
-        <h3>Single scan</h3>
-        <div class="price">$19<span> one-time</span></div>
-        <ul>
-          <li>One full scan + AI deep advice</li>
-          <li>No account required to start</li>
-          <li>Email link to view your results</li>
-        </ul>
-        <p class="hero-note">Not available right now — <a href="/app/signup">start free</a> instead.</p>
-      </div>
       <div class="plan-card pro">
         <h3>Pro</h3>
         <div class="price">$99<span> /month</span></div>
         <ul>
           <li>Unlimited companies</li>
-          <li>20 scans/month (fair use)</li>
+          <li>50 scans/month (fair use)</li>
           <li>Unlimited AI-generated deep advice</li>
         </ul>
-        <p class="hero-note">Not available right now — <a href="/app/signup">start free</a> instead.</p>
+        <a class="btn-secondary" href="/app/signup">Start free, upgrade anytime</a>
       </div>
     </div>
   </section>
@@ -338,7 +316,7 @@
       </details>
       <details>
         <summary>What does it cost?</summary>
-        <p>Free to try — one company and three scans, no credit card required. Foreground is running as a free product for now while we dial in Pro and single-scan pricing — check back soon for paid options.</p>
+        <p>Free to try — one company and three scans, no credit card required. Upgrade to Pro for $99/month for unlimited companies, 50 scans a month, and unlimited AI-generated deep advice.</p>
       </details>
     </div>
   </section>

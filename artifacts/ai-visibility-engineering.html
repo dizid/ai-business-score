@@ -1,0 +1,1286 @@
+<!doctype html><html><head><!-- frame-runtime --><script>window.__FRAME_PREAMBLE={"v":1,"capabilities":{"artifact":"artifact.B_zN8nKT.js","assets":"assets.8Gk803W0.js","comments":"comments.hEoja5zd.js","db":"db.DoKNwgX8.js","downloads":"downloads.th1YuAIk.js","embed":"embed.eqL6deQM.js","endpoints":"endpoints.CooJFPzL.js","mcp":"mcp.Ch3NPscy.js","network":"network.B5UA9Su4.js","permissions":"permissions.BNySkLV5.js","room":"room.Dc3WDo3b.js","sample":"sample.C2869FGz.js","self":"artifact.B_zN8nKT.js","user":"user.BpKav-Rf.js"},"transforms":"_transforms.Cil6ankx.js","comments":"_comments.e5-ml_Nr.js","translate":"_translate.5HCW4BJh.js","ldx":"_ldx.DycbNc-Q.js"}</script><script>(function(){"use strict";var fe=["light","dark","system"],de=/^[A-Za-z0-9_-]{1,64}$/,te=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,pe=new Set(["class","hidden","value","checked","style","title","alt","placeholder","lang","dir","role","tabindex","disabled","readonly","contenteditable","open","colspan","rowspan"]);function me(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||pe.has(t)}var $e="http://www.w3.org/1999/xhtml",he="http://www.w3.org/2000/svg",_e=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),ve=new Set(["script","style"]);function ye(e){const t=e.localName.toLowerCase();return e.namespaceURI==="http://www.w3.org/1999/xhtml"?!_e.has(t):e.namespaceURI===he?!ve.has(t):!1}function x(e,t){return e===t||(e===160||e===32)&&(t===160||t===32)}function we(e,t){const r=e.length,n=t.length;let a=0;for(;a<r&&a<n&&x(e.charCodeAt(a),t.charCodeAt(a));)a++;let o=0;for(;o<r-a&&o<n-a&&x(e.charCodeAt(r-1-o),t.charCodeAt(n-1-o));)o++;return{p:a,s:o}}function Ee(e,t){const r=e.firstChild;if(e.childNodes.length!==1||r===null||r.nodeType!==Node.TEXT_NODE){e.textContent=t;return}const n=r.data,a=n.length,o=t.length,{p:c,s:i}=we(n,t);c===a&&i===0&&a===o||r.replaceData(c,a-c-i,t.slice(c,o-i));const m=r.data,f=e.ownerDocument.getSelection?.()??null,y=f!==null&&f.rangeCount>0&&(f.anchorNode===r||f.focusNode===r)?{anchor:f.anchorNode,anchorOffset:f.anchorOffset,focus:f.focusNode,focusOffset:f.focusOffset}:null;let d=-1,E=-1;for(let v=0;v<m.length&&v<t.length;v++){const A=m.charCodeAt(v),k=t.charCodeAt(v);A!==k&&x(A,k)&&(d<0&&(d=v),E=v)}const b=d>=0;if(b&&r.replaceData(d,E-d+1,t.slice(d,E+1)),b&&y!==null&&y.anchor!==null&&y.focus!==null)try{f.setBaseAndExtent(y.anchor,y.anchorOffset,y.focus,y.focusOffset)}catch{}}var be=new Set(["html","head","body","frameset"]);function ge(e){return e.namespaceURI==="http://www.w3.org/1999/xhtml"&&be.has(e.localName)}function Ae(e){if(e===null||typeof e!="object")return!1;const t=e;if(typeof t.target!="string"||!de.test(t.target)||t.text!==void 0&&typeof t.text!="string")return!1;if(t.attrsSet!==void 0){if(t.attrsSet===null||typeof t.attrsSet!="object")return!1;for(const[r,n]of Object.entries(t.attrsSet))if(!te.test(r)||typeof n!="string")return!1}if(t.attrsRemoved!==void 0){if(!Array.isArray(t.attrsRemoved))return!1;for(const r of t.attrsRemoved)if(typeof r!="string"||!te.test(r))return!1}return!0}function Le(e,t){if(e===null||typeof e!="object")return!1;const{seq:r,elements:n}=e;if(typeof r!="number"||!Number.isSafeInteger(r)||!Array.isArray(n)||n.length===0||n.length>64)return!1;for(let a=0;a<n.length;a++)if(!t(n[a]))return!1;return!0}function Te(e){return e===null||typeof e!="object"?!1:Le(e.__frame_patch,Ae)}function Se(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function Re(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function ke(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const r=t.theme;return typeof r=="string"&&fe.includes(r)}var O=/^[\w.-]+\.js$/;function Pe(e,t,r){return r?"inert":typeof t=="string"&&O.test(t)?e?[t]:"inert":e?"inert":"framed"}var Ye="frame_ldx_runtime",Oe="frame_ldx_build",Ge="script#an-form";function Ce(){return{post(e,t){parent.postMessage(e,t)},on(e){const t=r=>{r.source===parent&&e(r.data,r.origin,r.isTrusted)};return addEventListener("message",t),()=>removeEventListener("message",t)}}}function Me(){return{post:()=>{},on:()=>()=>{}}}var F="__frame_scroll",je=150,Ne=310,De=160,Be=3e4;function Ie(){let e=0,t=!1,r=!1,n=!1,a=0,o=null;const c=u=>{try{sessionStorage.setItem(F,JSON.stringify({y:u}))}catch{}},i=()=>{if(clearTimeout(e),o===null)return;const u=o;o=null,c(u)},m=()=>{if(t){t=!1;return}r=!0,o=scrollY,clearTimeout(e),e=setTimeout(i,je)};try{addEventListener("scroll",m,{passive:!0}),addEventListener("pagehide",i)}catch{}const f=()=>{let u;try{u=sessionStorage.getItem(F)}catch{return null}if(u===null)return null;let g;try{g=JSON.parse(u)}catch{g=null}const w=g?.y;if(!(typeof w=="number"&&Number.isFinite(w)&&w>=0)){try{sessionStorage.removeItem(F)}catch{}return null}return w};let y=!1;const d=u=>{try{const g=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),a=u,n=!0,clearTimeout(e),o=null,c(u);const w=scrollY;w!==g&&(t=!0),w!==u&&!y&&(y=!0,addEventListener("load",()=>{try{if(scrollY===w){const M=f();d(M!==null?M:a)}}catch{}},{once:!0}))}catch{}},E=()=>{try{return!!location.hash}catch{return!0}};let b=!1;const v=()=>{try{if(b||innerWidth>Ne||innerHeight>De)return;b=!0;const u=Date.now(),g=()=>{try{removeEventListener("resize",g)}catch{}if(Date.now()-u>Be||r||E())return;const w=f();d(w!==null?w:a)};addEventListener("resize",g)}catch{}};let A=!1,k=!1;return{restore(){if(A||(A=!0,E()))return;const u=f();u!==null&&(d(u),v())},promoted(){if(k||(k=!0,E()))return;const u=f();u!==null?(d(u),v()):n&&d(a)}}}function Ue(e,t,r,n){let a=null;try{a=window.trustedTypes?.createPolicy("frame-runtime",{createScriptURL:m=>m})??null}catch{}const o=window.Worker,c=o?.prototype,i=Object.freeze({Worker:o,workerOn:c?.addEventListener,workerPost:c?.postMessage,workerTerminate:c?.terminate,fetch:window.fetch.bind(window),preventDefault:Event.prototype.preventDefault,policy:a,origins:t});r(e).then(m=>m?.bootTopLevel?m.bootTopLevel(i,n):n.settle()).catch(()=>n.settle())}var Ve="modulepreload",Ze=function(e){return"/"+e},Je={},xe=function(t,r,n){let a=Promise.resolve();function o(c){const i=new Event("vite:preloadError",{cancelable:!0});if(i.payload=c,window.dispatchEvent(i),!i.defaultPrevented)throw c}return a.then(c=>{for(const i of c||[])i.status==="rejected"&&o(i.reason);return t().catch(o)})},Fe=window===top,re=Object.getOwnPropertyDescriptor(window,"claude"),j=Pe(Fe,window.__FRAME_PREAMBLE?.topLevel,re?.writable===!1),H=typeof j=="object"&&j[0],_=H?Me():Ce();(function(){const e=Object.defineProperty,t=globalThis,r=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let n=0;for(let a=0;a<r.length;a++){const o=r[a];try{e(t,o,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[o]}catch{}try{e(t,o,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[o]=="function"&&n++}if(n&&j==="framed")try{_.post({__frame_rtc_lockdown_failed:n},"*")}catch{}})();var He=1e4,ze=2e3,We=2e3,ne=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function oe(e){for(const t of ne)if(t.endsWith(":*"))try{const r=new URL(e);if(`${r.protocol}//${r.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var N=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),z=window.__FRAME_PREAMBLE?.transforms,W=window.__FRAME_PREAMBLE?.comments,q=window.__FRAME_PREAMBLE?.translate,K=window.__FRAME_PREAMBLE?.ldx;function C(e){return xe(()=>import("/_runtime/"+e),void 0)}function se(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:Y,hooks:B,pipe:()=>({wrap:(r,n)=>(...a)=>{try{return n(...a)}catch(o){return Promise.reject(o)}}})}}var D=null,S=null;function ae(e,t,r){try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:r,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var X=!1,B={editBefore:null,edit:null};function qe(e,t,r=!1){const n=[];let a;if(r)try{B.editBefore?.(e)}catch{}for(const o of e.elements){const c=document.querySelector(`[data-id="${o.target}"]`);if(!c){a=o.target;break}if([...Object.keys(o.attrsSet??{}),...o.attrsRemoved??[]].some(i=>!me(i))){a=o.target;break}if(o.text!==void 0&&(!ye(c)||ge(c))){a=o.target;break}for(const[i,m]of Object.entries(o.attrsSet??{}))if(!ce(c,i)){try{c.setAttribute(i,m)}catch{}ie(c,i,m)}for(const i of o.attrsRemoved??[])ce(c,i)||(c.removeAttribute(i),ie(c,i,null));typeof o.text=="string"&&Ee(c,o.text),n.push(o.target)}if(r)try{B.edit?.(e.seq,n,a)}catch{}if(a!==void 0){_.post({__frame_patch_miss:{seq:e.seq}},t);return}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function ie(e,t,r){if(!(e instanceof HTMLInputElement))return;const n=t.toLowerCase();n==="checked"?e.checked=r!==null:n==="value"&&e.type!=="file"&&(e.value=r??"")}function ce(e,t){const r=t.toLowerCase(),n=e;return r==="data-id"||(r==="value"||r==="checked")&&(n.__artifactSecret===!0||/^(password|hidden|file)$/.test(n.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${n.autocomplete??""}`))}function le(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,X=!0):X&&(delete t.dataset.theme,t.style.colorScheme="",X=!1)}var I=new Map;function Ke(){let e;const t={u:new Promise(r=>{e=r}),r:r=>{t.done=!0,e(r)},done:!1,nulled:!1};return t}function $(){for(const e of I.values())e.done||(e.nulled=!0,e.r(null))}var Xe=Object.freeze(Object.assign(Object.create(null),{call:Function.prototype.call,apply:Function.prototype.apply,bind:Function.prototype.bind})),Y=(e,t)=>{const r=I.get(e);if(!r||r.done){r?.nulled&&S&&_.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:e}},S);return}const n=typeof t=="function"?Object.setPrototypeOf(t,Xe):Object.assign(Object.create(null),t);typeof n.then=="function"&&delete n.then,r.r(Object.freeze(n))};function ue(){const e=re?.value??{};ae(window,"claude",e);for(const t of Object.keys(N)){if(e[t]!==void 0){ae(e,t,e[t]);continue}I.set(t,Ke())}if(e.use===void 0){const t=r=>{if(typeof r!="string"||!Object.hasOwn(N,r))return Promise.resolve(null);const n=I.get(r);return n?n.u:Promise.resolve(e[r]??null)};try{Object.defineProperty(e,"use",{value:t,writable:!0,configurable:!0,enumerable:!1})}catch{}}}if(j==="framed"){const e=z&&O.test(z)?C(z).catch(()=>{}):Promise.resolve(void 0),t=s=>{if(s.type==="auxclick"&&s.button!==1)return;const h=s.target,p=h&&h.closest?h.closest("a[href],area[href]"):null;if(!p)return;const P=p.getAttribute("href");if(!P)return;let L;try{L=new URL(P,document.baseURI)}catch{return}if((L.protocol==="http:"||L.protocol==="https:")&&L.origin!==location.origin){s.preventDefault();const R=(p.getAttribute("target")??"").toLowerCase(),T=s.type==="auxclick"||s.metaKey||s.ctrlKey||s.shiftKey||s.altKey||!["","_self","_top","_parent"].includes(R);_.post({__frame_nav:!0,url:L.href,newTab:T},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const r={},n=s=>{s.isTrusted&&(r.pointer=!0)},a=s=>{s.isTrusted&&(r.click=!0)};addEventListener("pointermove",n,{capture:!0,passive:!0}),addEventListener("click",a,{capture:!0,passive:!0});const o={cb:null};addEventListener("keydown",s=>o.cb?.(s),!0),e.then(s=>s?.installEscapeForward?.(o,h=>{S&&_.post(h,S)})),e.then(s=>{s?.wireNav&&(s.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",n,!0),removeEventListener("click",a,!0),s.wireEngagement?.(r))});let c=null;try{c=Ie()}catch{}ue();let i=null,m=null,f=0;const y=_.on((s,h)=>{oe(h)&&Se(s)&&(i=s.__frame_init,S=h,y(),clearTimeout(f),m?.())});_.post({__frame_connect:!0},"*");const d=setTimeout,E=clearTimeout;let b=0;const v=()=>{try{_.post({__frame_alive:!0},"*")}catch{}b=d(v,ze)},A=()=>E(b);v(),addEventListener("load",A,{once:!0});const k=new Promise(s=>{m=s,f=setTimeout(()=>{y(),s()},He)}),u=document.readyState==="loading"?new Promise(s=>document.addEventListener("DOMContentLoaded",()=>s(),{once:!0})):Promise.resolve(),g=new WeakSet;addEventListener("error",s=>{s.target&&g.add(s.target)},!0);const w=()=>{let s=[];try{s=[...document.querySelectorAll("link[rel~=stylesheet]:not([rel~=alternate])")].filter(p=>!p.sheet&&!p.disabled&&!g.has(p)&&p.getAttribute("href")&&URL.canParse(p.href)&&(!p.media||matchMedia(p.media).matches))}catch{}let h=s.length;return h===0?Promise.resolve():new Promise(p=>{try{const P=d(p,We),L=()=>{--h===0&&(E(P),p())};for(const R of s)R.addEventListener("load",L,{once:!0}),R.addEventListener("error",L,{once:!0})}catch{p()}})};u.then(()=>{try{c?.restore()}catch{}});const M={cb:null};_.on((s,h)=>{if(oe(h)&&Re(s)){try{c?.promoted()}catch{}M.cb?.()}}),k.then(async()=>{if(!i||!S){$();return}le(i.theme);const s=S;let h=!1,p=!1;_.on((l,Z,U)=>{if(Z!==s)return;ke(l)&&le(l.__frame_theme.theme),Te(l)&&qe(l.__frame_patch,s,U);const J=l?.__fc_mode;J&&typeof J=="object"&&!h&&W&&O.test(W)&&(h=!0,C(W).then(ee=>ee.install?.(s,J.on===!0)).catch(()=>{}));const Q=l?.__ft_cmd;Q&&typeof Q=="object"&&!p&&q&&O.test(q)&&(p=!0,C(q).then(ee=>ee.install?.(s,Q)).catch(()=>{}))});const P=Object.keys(i.capabilities??{}).filter(l=>Object.hasOwn(N,l)).map(l=>[l,N[l]]).filter(l=>typeof l[1]=="string"&&O.test(l[1])),L=await Promise.allSettled(P.map(([,l])=>C(l))),R=await e,T=S;if(R?.buildBoot||_.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},T),R?.buildBoot)try{D=R.buildBoot(i,R.TRANSFORMS??{},{shellOrigin:T,mount:Y,hooks:B},l=>_.post({__frame_cap_telemetry:l},T))}catch{_.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},T),D=se(i,T)}else D=se(i,T);const G=l=>_.post({__frame_cap_telemetry:{kind:"cap-load-error",cap:l}},T),V=D;L.forEach((l,Z)=>{const U=P[Z][0];if(l.status!=="fulfilled"){G(U);return}try{l.value?.install?.(V)}catch{G(U)}}),$(),await u,await w(),A(),_.post({__frame_ready:!0},S),e.then(l=>l?.installSizeReporter?.(T,M)),V.flags.has("frame_ldx_runtime")&&K&&O.test(K)&&document.querySelector("script#an-form")&&C(K).then(l=>l?.boot?.({shellOrigin:s,build:V.flags.has(Oe)})).catch(()=>!1).then(l=>{l!==!0&&G("_ldx")})})}else H&&(ue(),Ue(H,ne,C,{settle:$,mount:Y}))})();</script><!-- /frame-runtime --><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>AI Visibility Engineering</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ---------------------------------------------------------------
+     TOKENS
+     Light = base. Dark overrides via prefers-color-scheme (unstamped
+     root) and again via [data-theme="dark"] (explicit toggle wins).
+  ----------------------------------------------------------------*/
+  :root{
+    --color-bg: #E7E8EA;
+    --color-surface: #F5F5F3;
+    --color-surface-2: #FFFFFF;
+    --color-text: #14171F;
+    --color-text-muted: #4B5061;
+    --color-text-faint: #767c8c;
+    --color-accent: #96601F;
+    --color-accent-contrast: #FBF4E8;
+    --color-accent-2: #2E5E58;
+    --color-line: rgba(20,23,31,0.14);
+    --color-code-bg: #14171F;
+    --color-code-text: #E7E8EA;
+    --color-code-accent: #E3B15C;
+    --color-code-accent-2: #7FC1B5;
+    --shadow-card: 0 1px 2px rgba(20,23,31,0.05), 0 8px 24px -12px rgba(20,23,31,0.18);
+
+    --font-display: 'Zilla Slab', Georgia, 'Times New Roman', serif;
+    --font-body: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --color-bg: #14171F;
+      --color-surface: #1B1F2A;
+      --color-surface-2: #212636;
+      --color-text: #EAEBE6;
+      --color-text-muted: #AEB3C2;
+      --color-text-faint: #7B8093;
+      --color-accent: #E3B15C;
+      --color-accent-contrast: #1B1300;
+      --color-accent-2: #7FC1B5;
+      --color-line: rgba(234,235,230,0.14);
+      --color-code-bg: #0E1017;
+      --color-code-text: #E7E8EA;
+      --color-code-accent: #E3B15C;
+      --color-code-accent-2: #7FC1B5;
+      --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --color-bg: #14171F;
+    --color-surface: #1B1F2A;
+    --color-surface-2: #212636;
+    --color-text: #EAEBE6;
+    --color-text-muted: #AEB3C2;
+    --color-text-faint: #7B8093;
+    --color-accent: #E3B15C;
+    --color-accent-contrast: #1B1300;
+    --color-accent-2: #7FC1B5;
+    --color-line: rgba(234,235,230,0.14);
+    --color-code-bg: #0E1017;
+    --color-code-text: #E7E8EA;
+    --color-code-accent: #E3B15C;
+    --color-code-accent-2: #7FC1B5;
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.6);
+  }
+
+  *{ box-sizing: border-box; }
+  html{ -webkit-text-size-adjust: 100%; }
+  @media (prefers-reduced-motion: no-preference){
+    html{ scroll-behavior: smooth; }
+  }
+  body{
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a{ color: var(--color-accent); }
+  a:focus-visible, button:focus-visible, summary:focus-visible{
+    outline: 2px solid var(--color-accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  h1,h2,h3,h4{
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0;
+  }
+  p{ margin: 0 0 1em; }
+  ul,ol{ margin: 0 0 1em; padding-left: 1.3em; }
+  li{ margin-bottom: .4em; }
+  table{ border-collapse: collapse; width: 100%; font-size: .96rem; }
+  .prose{ max-width: 66ch; }
+  .prose p, .prose ul, .prose ol{ max-width: 66ch; }
+
+  /* ---------------- layout shell ---------------- */
+  .shell{
+    display: grid;
+    grid-template-columns: 272px minmax(0,1fr);
+    gap: 0;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px){
+    .shell{ grid-template-columns: 1fr; }
+  }
+
+  /* ---------------- sidebar / TOC ---------------- */
+  .toc{
+    padding: 2.2rem 1.4rem 2.5rem 1.6rem;
+    border-right: 1px solid var(--color-line);
+  }
+  @media (min-width: 901px){
+    .toc{ position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; }
+  }
+  .toc-brand{
+    display: block;
+    font-family: var(--font-mono);
+    font-size: .74rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+    text-decoration: none;
+    margin-bottom: 1.5rem;
+  }
+  .toc-brand strong{ color: var(--color-text); display:block; font-size: .82rem; margin-top:.15rem;}
+  .toc-source{
+    display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+    font-family: var(--font-mono); font-size:.72rem; letter-spacing:.02em;
+    color: var(--color-text-faint); text-decoration:none; margin: -.9rem 0 1.6rem;
+  }
+  .toc-source a{
+    color: var(--color-text-faint); text-decoration:none; border-bottom:1px solid transparent;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .toc-source a:hover{ color: var(--color-accent); border-color: var(--color-accent); }
+  .toc-source .sep{ opacity:.5; }
+  details.toc-mobile summary{
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    color: var(--color-text);
+    padding: .3rem 0;
+    list-style: none;
+  }
+  details.toc-mobile summary::-webkit-details-marker{ display:none; }
+  details.toc-mobile summary::after{ content: "▾ toggle"; float:right; color: var(--color-text-faint); font-size:.7rem; }
+  @media (min-width: 901px){
+    details.toc-mobile summary::after{ display:none; cursor:default; }
+    details.toc-mobile summary{ pointer-events:none; }
+  }
+  .toc-part-label{
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    margin: 1.4rem 0 .5rem;
+  }
+  .toc-part-label:first-of-type{ margin-top: .6rem; }
+  .toc nav ul{ list-style:none; margin:0; padding:0; }
+  .toc nav a{
+    display: flex;
+    gap: .55rem;
+    align-items: baseline;
+    text-decoration: none;
+    color: var(--color-text-muted);
+    font-size: .88rem;
+    padding: .3rem 0;
+    border-left: 2px solid transparent;
+    padding-left: .6rem;
+    margin-left: -.6rem;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .toc nav a .n{ font-family: var(--font-mono); font-size: .74rem; color: var(--color-text-faint); flex-shrink:0; width:1.4em; }
+  .toc nav a:hover{ color: var(--color-text); }
+  .toc nav a.is-active{ color: var(--color-text); border-left-color: var(--color-accent); font-weight: 600; }
+  .toc nav a.is-active .n{ color: var(--color-accent); }
+
+  /* ---------------- main column ---------------- */
+  main{ padding: 0 0 6rem; min-width:0; }
+
+  .cover{
+    padding: 4.5rem 2.4rem 3rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+  @media (max-width: 640px){ .cover{ padding: 3rem 1.3rem 2.2rem; } }
+  .cover .eyebrow{
+    font-family: var(--font-mono);
+    font-size: .78rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    display:block;
+    margin-bottom: 1.1rem;
+  }
+  .cover h1{
+    font-size: clamp(2.3rem, 3.6vw + 1rem, 3.6rem);
+    max-width: 16ch;
+    margin-bottom: 1rem;
+  }
+  .cover .dek{
+    font-size: 1.18rem;
+    color: var(--color-text-muted);
+    max-width: 58ch;
+    margin-bottom: 2rem;
+  }
+  .cover .thesis{
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.22rem;
+    max-width: 52ch;
+    border-left: 3px solid var(--color-accent);
+    padding-left: 1.1rem;
+    color: var(--color-text);
+    margin-bottom: 2.2rem;
+  }
+  .audience-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+    gap: 1.6rem;
+    margin-top: 1rem;
+  }
+  .audience-grid h4{ font-family: var(--font-mono); font-size:.76rem; letter-spacing:.08em; text-transform:uppercase; color:var(--color-text-faint); margin-bottom:.7rem; font-weight:500; }
+  .audience-grid ul{ list-style:none; padding:0; margin:0; font-size:.95rem; color:var(--color-text-muted); }
+  .audience-grid li{ margin-bottom:.35rem; }
+
+  .callout{
+    margin: 0 2.4rem 3rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 4px;
+    padding: 1.5rem 1.7rem;
+    box-shadow: var(--shadow-card);
+  }
+  @media (max-width: 640px){ .callout{ margin: 0 1.3rem 2.2rem; } }
+  .callout .label{ font-family: var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color: var(--color-accent); display:block; margin-bottom:.6rem; }
+  .callout ol{ margin:0; padding-left: 1.2em; }
+  .callout li{ margin-bottom:.5em; }
+  .callout li:last-child{ margin-bottom:0; }
+
+  /* ---------------- parts & modules ---------------- */
+  .part-header{
+    padding: 3.4rem 2.4rem .6rem;
+    display:flex; align-items:baseline; gap:1rem; flex-wrap:wrap;
+  }
+  @media (max-width: 640px){ .part-header{ padding: 2.4rem 1.3rem .4rem; } }
+  .part-header .roman{ font-family: var(--font-mono); color: var(--color-accent); font-size: 1rem; letter-spacing:.06em; }
+  .part-header h2{ font-size: clamp(1.5rem, 1.6vw + 1rem, 2rem); }
+  .part-dek{ padding: 0 2.4rem 1.4rem; color: var(--color-text-muted); max-width: 62ch; font-size: 1rem; }
+  @media (max-width: 640px){ .part-dek{ padding: 0 1.3rem 1.4rem; } }
+
+  .module{
+    padding: 2.6rem 2.4rem;
+    border-top: 1px solid var(--color-line);
+    scroll-margin-top: 1.5rem;
+  }
+  @media (max-width: 640px){ .module{ padding: 2rem 1.3rem; } }
+  .module-head{ margin-bottom: 1.4rem; }
+  .module-kicker{
+    display:flex; align-items:center; gap:.7rem; flex-wrap:wrap;
+    font-family: var(--font-mono); font-size:.78rem; color: var(--color-text-faint);
+    margin-bottom: .7rem;
+  }
+  .module-kicker .mnum{ color: var(--color-accent); font-weight:600; }
+  .module h3{ font-size: clamp(1.35rem, 1.3vw + 1rem, 1.7rem); max-width: 34ch; margin-bottom: .55rem; }
+  .module .thesis-line{ color: var(--color-text-muted); max-width: 58ch; font-size: 1.02rem; }
+
+  .chip{
+    font-family: var(--font-mono); font-size:.68rem; letter-spacing:.06em; text-transform:uppercase;
+    padding: .22em .6em; border-radius: 3px; border: 1px solid var(--color-line);
+    color: var(--color-text-muted); white-space:nowrap;
+  }
+  .chip--weights{ border-color: color-mix(in srgb, var(--color-accent-2) 55%, transparent); color: var(--color-accent-2); }
+  .chip--retrieval{ border-color: color-mix(in srgb, var(--color-accent) 55%, transparent); color: var(--color-accent); }
+  .chip--entity{ border-color: var(--color-text); color: var(--color-text); }
+  .chip--measurement{ border-style: dashed; }
+  .chip--system{ background: var(--color-text); color: var(--color-bg); border-color: var(--color-text); }
+
+  .section-label{
+    font-family: var(--font-mono); font-size:.72rem; letter-spacing:.09em; text-transform:uppercase;
+    color: var(--color-text-faint); margin: 1.7rem 0 .7rem;
+  }
+  .section-label:first-child{ margin-top:0; }
+
+  /* cards */
+  .card-grid{ display:grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap:1rem; margin: 0 0 1.2rem; }
+  .card{
+    background: var(--color-surface); border:1px solid var(--color-line); border-radius:4px;
+    padding: 1.15rem 1.3rem; box-shadow: var(--shadow-card);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  .card:hover{
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line));
+    box-shadow: 0 4px 10px rgba(20,23,31,0.08), 0 16px 32px -16px rgba(20,23,31,0.22);
+  }
+  .card h4{ font-family: var(--font-mono); font-size:.82rem; letter-spacing:.03em; color: var(--color-accent); margin-bottom:.5rem; font-weight:600; }
+  .card p{ font-size:.94rem; color: var(--color-text-muted); margin:0; }
+
+  /* tables */
+  .table-wrap{ overflow-x:auto; margin: 0 0 1.2rem; border:1px solid var(--color-line); border-radius:4px; }
+  table.ledger{ min-width: 560px; }
+  table.ledger thead th{
+    background: var(--color-text); color: var(--color-bg);
+    font-family: var(--font-mono); font-size:.72rem; letter-spacing:.05em; text-transform:uppercase;
+    text-align:left; padding:.7rem .85rem; font-weight:500;
+  }
+  table.ledger td{ padding:.7rem .85rem; border-top:1px solid var(--color-line); font-size:.92rem; vertical-align:top; }
+  table.ledger tbody tr:nth-child(odd){ background: var(--color-surface); }
+  table.ledger td strong{ color: var(--color-text); }
+  table.ledger td.num{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  table.worksheet td{ color: var(--color-text-faint); }
+
+  /* code / terminal */
+  .term{
+    background: var(--color-code-bg); color: var(--color-code-text);
+    border-radius: 5px; padding: 1.1rem 1.3rem; font-family: var(--font-mono);
+    font-size: .86rem; line-height:1.7; overflow-x:auto; margin: 0 0 1.2rem;
+  }
+  .term .c1{ color: var(--color-code-accent); }
+  .term .c2{ color: var(--color-code-accent-2); }
+  .term .muted{ color: var(--color-text-faint); }
+
+  /* principle: bad vs good */
+  .compare{ display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 0 0 1.2rem; }
+  @media (max-width: 620px){ .compare{ grid-template-columns: 1fr; } }
+  .compare .bad, .compare .good{ border-radius:4px; padding: 1.1rem 1.25rem; font-size:.94rem; }
+  .compare .bad{ background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface)); border: 1px dashed var(--color-line); color: var(--color-text-muted); }
+  .compare .good{ background: var(--color-surface-2); border: 1px solid var(--color-line); box-shadow: var(--shadow-card); }
+  .compare .tag{ font-family: var(--font-mono); font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; display:block; margin-bottom:.5rem; }
+  .compare .bad .tag{ color: var(--color-text-faint); }
+  .compare .good .tag{ color: var(--color-accent); }
+
+  /* formula */
+  .formula{
+    font-family: var(--font-display); font-style: italic; font-size: 1.15rem;
+    background: var(--color-surface); border:1px solid var(--color-line); border-radius:4px;
+    padding: 1.2rem 1.4rem; margin: 0 0 1.2rem; overflow-x:auto;
+  }
+  .formula .op{ color: var(--color-accent); font-style: normal; padding: 0 .3em; }
+
+  /* pull quote / principle callout */
+  .principle{
+    border-left: 3px solid var(--color-accent);
+    padding: .2rem 0 .2rem 1.1rem;
+    margin: 0 0 1.2rem;
+    font-family: var(--font-display); font-size: 1.08rem; font-style: italic;
+    max-width: 58ch;
+  }
+
+  /* checklist */
+  .checklist{ list-style:none; padding:0; margin:0 0 1.2rem; display:grid; gap:.5rem; }
+  .checklist li{ display:flex; gap:.7rem; align-items:flex-start; font-size:.95rem; margin:0; }
+  .checklist li::before{
+    content:""; flex-shrink:0; width:.95em; height:.95em; margin-top:.28em;
+    border:1.5px solid var(--color-text-faint); border-radius:2px;
+  }
+
+  /* loop diagram */
+  .loop{ list-style:none; margin:0 0 1.2rem; padding:0; max-width: 46ch; }
+  .loop li{
+    position:relative; padding: 0 0 1.6rem 2.4rem; font-size:.95rem; margin:0;
+  }
+  .loop li::before{
+    content: attr(data-i);
+    position:absolute; left:0; top:-.1rem; width:1.7rem; height:1.7rem;
+    border-radius:50%; background: var(--color-surface); border:1px solid var(--color-line);
+    display:flex; align-items:center; justify-content:center;
+    font-family: var(--font-mono); font-size:.7rem; color: var(--color-accent);
+  }
+  .loop li::after{
+    content:""; position:absolute; left: .85rem; top: 1.7rem; bottom:-.1rem; width:1px;
+    background: var(--color-line);
+  }
+  .loop li:last-child::after{ display:none; }
+  .loop li strong{ display:block; color: var(--color-text); margin-bottom:.15em; }
+  .loop .repeat{ color: var(--color-accent); font-family: var(--font-mono); font-size:.8rem; }
+
+  /* anti-pattern list */
+  .antipatterns{ list-style:none; margin:0 0 1.2rem; padding:0; display:grid; gap:.75rem; }
+  .antipatterns li{
+    display:grid; grid-template-columns: auto 1fr; gap: .8rem; align-items:baseline;
+    background: var(--color-surface); border:1px solid var(--color-line); border-radius:4px;
+    padding: .85rem 1.1rem; margin:0; font-size:.94rem;
+  }
+  .antipatterns .x{ font-family: var(--font-mono); color: var(--color-accent); font-weight:600; }
+
+  /* 90-day timeline */
+  .timeline{ display:grid; gap:.9rem; margin:0 0 1.2rem; }
+  .tblock{
+    display:grid; grid-template-columns: 130px 1fr; gap:1.1rem;
+    border-top:1px solid var(--color-line); padding-top:.9rem;
+  }
+  .tblock:first-child{ border-top:none; padding-top:0; }
+  @media (max-width:560px){ .tblock{ grid-template-columns: 1fr; } }
+  .tblock .days{ font-family: var(--font-mono); font-size:.82rem; color: var(--color-accent); }
+  .tblock ul{ margin:0; padding-left:1.1em; font-size:.94rem; }
+
+  /* final project */
+  .deliverables{ display:grid; gap:.7rem; margin: 0 0 1.2rem; counter-reset: d; }
+  .deliverables li{
+    list-style:none; counter-increment: d;
+    display:grid; grid-template-columns: 2.1rem 1fr; gap:.9rem;
+    padding: .8rem 0; border-top:1px solid var(--color-line); margin:0;
+  }
+  .deliverables li:first-child{ border-top:none; }
+  .deliverables li::before{
+    content: counter(d, decimal-leading-zero);
+    font-family: var(--font-mono); color: var(--color-accent); font-size:.85rem; padding-top:.1em;
+  }
+  .deliverables strong{ display:block; color:var(--color-text); }
+  .deliverables span{ font-size:.92rem; color: var(--color-text-muted); }
+
+  .mindset-split{ display:grid; grid-template-columns:1fr auto 1fr; gap:1.4rem; align-items:center; margin: 1rem 0 1.4rem; }
+  @media (max-width:620px){ .mindset-split{ grid-template-columns:1fr; } .mindset-split .arrow{ display:none; } }
+  .mindset-split .q{ font-family: var(--font-display); font-style:italic; font-size:1.1rem; padding:1.1rem 1.3rem; border-radius:4px; }
+  .mindset-split .old{ background: var(--color-surface); color: var(--color-text-muted); border:1px dashed var(--color-line); }
+  .mindset-split .new{ background: var(--color-surface-2); border:1px solid var(--color-line); box-shadow: var(--shadow-card); }
+  .mindset-split .arrow{ font-family: var(--font-mono); color: var(--color-accent); font-size:1.3rem; text-align:center; }
+
+  .service-grid{ display:grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap:1rem; margin:0 0 1.2rem; }
+  .service-grid .card .k{ font-family: var(--font-mono); font-size:.72rem; color: var(--color-text-faint); }
+
+  footer.colophon{
+    padding: 2.4rem 2.4rem 4rem; color: var(--color-text-faint); font-size:.85rem; border-top:1px solid var(--color-line);
+  }
+  @media (max-width:640px){ footer.colophon{ padding: 2rem 1.3rem 3rem; } }
+
+  @media print{
+    .toc{ display:none; }
+    .shell{ grid-template-columns: 1fr; }
+    .module{ break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  .fade-in{ animation: fadeIn .7s ease both; }
+  @keyframes fadeIn{ from{ opacity:0; transform: translateY(6px);} to{ opacity:1; transform:none; } }
+</style>
+
+<div class="shell">
+  <aside class="toc">
+    <a class="toc-brand" href="#top">Field Manual<strong>AI Visibility Engineering</strong></a>
+    <p class="toc-source">
+      <a href="https://foreground.info" target="_blank" rel="noopener">foreground.info</a>
+      <span class="sep">·</span>
+      <a href="https://x.com/foreground_info" target="_blank" rel="noopener">@foreground_info</a>
+    </p>
+    <details class="toc-mobile" open>
+      <summary>Contents</summary>
+      <div class="toc-body">
+        <nav>
+          <p class="toc-part-label">Part I — The Model</p>
+          <ul>
+            <li><a href="#m01"><span class="n">01</span>The New Search Model</a></li>
+            <li><a href="#m02"><span class="n">02</span>How AI Decides What to Say</a></li>
+            <li><a href="#m03"><span class="n">03</span>Entity Engineering</a></li>
+          </ul>
+          <p class="toc-part-label">Part II — Engineering the Signals</p>
+          <ul>
+            <li><a href="#m04"><span class="n">04</span>The Question Map</a></li>
+            <li><a href="#m05"><span class="n">05</span>Prompt Mining</a></li>
+            <li><a href="#m06"><span class="n">06</span>Citation Engineering</a></li>
+            <li><a href="#m07"><span class="n">07</span>Authority Off Your Site</a></li>
+            <li><a href="#m08"><span class="n">08</span>Digital PR for AI</a></li>
+            <li><a href="#m09"><span class="n">09</span>Content Architecture</a></li>
+            <li><a href="#m10"><span class="n">10</span>Structured Data</a></li>
+            <li><a href="#m11"><span class="n">11</span>Technical Accessibility</a></li>
+          </ul>
+          <p class="toc-part-label">Part III — Winning the Answer</p>
+          <ul>
+            <li><a href="#m12"><span class="n">12</span>Recommendation Engineering</a></li>
+            <li><a href="#m13"><span class="n">13</span>Competitor Displacement</a></li>
+            <li><a href="#m14"><span class="n">14</span>The Visibility Audit</a></li>
+            <li><a href="#m15"><span class="n">15</span>The Visibility Score</a></li>
+            <li><a href="#m16"><span class="n">16</span>Citation Share</a></li>
+            <li><a href="#m17"><span class="n">17</span>Experimentation</a></li>
+            <li><a href="#m18"><span class="n">18</span>The Visibility Loop</a></li>
+            <li><a href="#m19"><span class="n">19</span>What Not to Do</a></li>
+            <li><a href="#m20"><span class="n">20</span>The 90-Day Program</a></li>
+          </ul>
+          <p class="toc-part-label">Part IV — Prove It</p>
+          <ul>
+            <li><a href="#final-project"><span class="n">—</span>Final Project</a></li>
+            <li><a href="#mindset"><span class="n">—</span>The Expert Mindset</a></li>
+            <li><a href="#commercial"><span class="n">—</span>Commercial Opportunity</a></li>
+          </ul>
+          <p class="toc-part-label">Appendices</p>
+          <ul>
+            <li><a href="#app-a"><span class="n">A</span>Prompt-Set Template</a></li>
+            <li><a href="#app-b"><span class="n">B</span>Technical Checklist</a></li>
+            <li><a href="#app-c"><span class="n">C</span>Schema Map</a></li>
+            <li><a href="#app-d"><span class="n">D</span>Tooling Map</a></li>
+            <li><a href="#app-e"><span class="n">E</span>Weekly Cadence</a></li>
+          </ul>
+        </nav>
+      </div>
+    </details>
+  </aside>
+
+  <main id="top">
+    <section class="cover fade-in">
+      <span class="eyebrow">Practitioner Course · Advanced / Expert</span>
+      <h1>AI Visibility Engineering</h1>
+      <p class="dek">How to get a brand, product, or company mentioned, cited, and recommended by ChatGPT, Google AI Overviews, Perplexity, Claude, and Grok — treated as an engineering discipline, not a content-marketing trend.</p>
+      <p class="thesis">Be extractable on your own pages, corroborable on other people's pages, and the named answer to a named constraint.</p>
+
+      <div class="audience-grid">
+        <div>
+          <h4>Built for</h4>
+          <ul>
+            <li>Founders &amp; SaaS teams</li>
+            <li>SEO professionals moving into GEO</li>
+            <li>Growth marketers</li>
+            <li>Developers &amp; content strategists</li>
+            <li>Agencies building an AI-visibility service line</li>
+          </ul>
+        </div>
+        <div>
+          <h4>By the end, you can</h4>
+          <ul>
+            <li>Measure how visible a company is inside AI answers</li>
+            <li>Diagnose why competitors get mentioned instead</li>
+            <li>Engineer content and off-site signals AI can cite</li>
+            <li>Build entity authority around a brand, product, or person</li>
+            <li>Move from citation to <em>recommendation</em></li>
+            <li>Run experiments and prove what actually worked</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="callout">
+      <span class="label">How to use this course</span>
+      <ol>
+        <li>Read Modules 01–03 once. That's the model — the rest of the course is just applying it.</li>
+        <li>Skip straight to Module 20 and run the 90-day system in order. Baseline before you change anything.</li>
+        <li>Do <strong>not</strong> start by rewriting blog posts. Rewriting content before you've measured a baseline and mapped the entity graph is the single most common wasted effort in this field.</li>
+        <li>Every intervention in Parts II and III is tagged with the layer it targets — <span class="chip chip--weights">Weights</span> <span class="chip chip--retrieval">Retrieval</span> <span class="chip chip--entity">Entity Graph</span> <span class="chip chip--measurement">Measurement</span> — so you always know what you're actually trying to move.</li>
+      </ol>
+    </div>
+
+    <!-- ============================================================ PART I ============================================================ -->
+    <div class="part-header"><span class="roman">Part I</span><h2>The Model</h2></div>
+    <p class="part-dek">Three modules, read once. Everything downstream is an application of the ideas here — the shift from ranking pages to being the entity an AI system trusts enough to name.</p>
+
+    <!-- MODULE 01 -->
+    <section class="module" id="m01">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 01</span><span class="chip">Framework</span></div>
+        <h3>The New Search Model</h3>
+        <p class="thesis-line">Ranking #1 on Google no longer guarantees a mention. The optimization target itself has changed.</p>
+      </div>
+
+      <p class="section-label">Two different pipelines</p>
+      <div class="card-grid">
+        <div class="card">
+          <h4>Traditional search</h4>
+          <p>Query → ranking → click → website. The user does the synthesis. Your job is to win the click.</p>
+        </div>
+        <div class="card">
+          <h4>AI search</h4>
+          <p>Question → retrieval → candidate sources → interpretation → synthesis → answer → citations / recommendations. The model does the synthesis. Your job is to be trustworthy material for <em>it</em> to synthesize with.</p>
+        </div>
+      </div>
+      <p>A page can rank #1 and contribute almost nothing to an AI answer. A small site can dominate an AI answer if its information is specific, easy to extract, authoritative, independently corroborated, current, and precisely relevant to the question asked. The SEO fundamentals — crawlability, indexing, clarity, authority — still support AI grounding and citation. They're necessary. They're no longer sufficient.</p>
+
+      <p class="section-label">Three outcomes — don't conflate them</p>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Level</th><th>What it looks like</th><th>What it means</th></tr></thead>
+          <tbody>
+            <tr><td><strong>1 · Mention</strong></td><td>"Another option is Brand X."</td><td>The entity is known and recalled.</td></tr>
+            <tr><td><strong>2 · Citation</strong></td><td>"According to Brand X…"</td><td>Your own page was used as evidence.</td></tr>
+            <tr><td><strong>3 · Recommendation</strong></td><td>"For your situation, I'd recommend Brand X."</td><td>The model is confident enough to stake an answer on you.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="principle">Target order: Recommendation &gt; Mention &gt; Citation. Recommendation is the most commercially valuable and requires the strongest entity-level evidence — a citation alone doesn't buy it.</p>
+
+      <p class="section-label">Engine-by-engine retrieval logic</p>
+      <p>Every engine solves retrieval differently. Success in one does not transfer to another — audit and optimize each separately.</p>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Engine</th><th>Primary retrieval mechanics</th><th>Core optimization strategy</th></tr></thead>
+          <tbody>
+            <tr><td><strong>ChatGPT Search</strong></td><td>Bing index + OpenAI crawler partnerships + synthesis over retrieved passages.</td><td>Clean server-rendered HTML, high-authority reviews, verified Wikidata entity, OAI-SearchBot allowed.</td></tr>
+            <tr><td><strong>Perplexity</strong></td><td>Multi-index live web crawl, academic feeds, heavy forum prioritization.</td><td>Reddit / community consensus, YouTube transcript indexing, visibly recent timestamps.</td></tr>
+            <tr><td><strong>Google AI Overviews / AI Mode</strong></td><td>Google index + Knowledge Graph + Gemini RAG + passage retrieval.</td><td>Strict, accurate JSON-LD; top-of-SERP traditional ranking; entity authority in the Knowledge Graph.</td></tr>
+            <tr><td><strong>Claude</strong></td><td>Broad pre-training plus deep, tool-based retrieval on demand.</td><td>Unlinked brand co-occurrence in whitepapers, patents, and technical documentation the model was trained or tool-retrieves on.</td></tr>
+            <tr><td><strong>Grok</strong></td><td>X/Twitter's real-time firehose plus xAI's own web index.</td><td>Active, sustained presence and discussion on X — posts and threads are indexed close to real time.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="section-label">Directional signal-weight matrix</p>
+      <p style="font-size:.9rem;color:var(--color-text-faint);margin-top:-.4rem;">A practitioner heuristic, not a measured constant — recalibrate it against your own baseline data every cycle.</p>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Signal</th><th>ChatGPT Search</th><th>Perplexity</th><th>AI Overviews</th><th>Claude</th><th>Grok</th></tr></thead>
+          <tbody>
+            <tr><td>Bing index presence</td><td class="num">High</td><td class="num">Med</td><td class="num">Low</td><td class="num">Low</td><td class="num">Low</td></tr>
+            <tr><td>Google index / Knowledge Graph</td><td class="num">Med</td><td class="num">Med</td><td class="num">High</td><td class="num">Low</td><td class="num">Low</td></tr>
+            <tr><td>Reddit / community consensus</td><td class="num">Med</td><td class="num">High</td><td class="num">Med</td><td class="num">Low</td><td class="num">Med</td></tr>
+            <tr><td>Freshness / recent timestamps</td><td class="num">Med</td><td class="num">High</td><td class="num">Med</td><td class="num">Low</td><td class="num">High</td></tr>
+            <tr><td>Structured data / entity graph</td><td class="num">High</td><td class="num">Med</td><td class="num">High</td><td class="num">Med</td><td class="num">Low</td></tr>
+            <tr><td>X / Twitter activity</td><td class="num">Low</td><td class="num">Low</td><td class="num">Low</td><td class="num">Low</td><td class="num">High</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MODULE 02 -->
+    <section class="module" id="m02">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 02</span><span class="chip chip--weights">Weights</span><span class="chip chip--retrieval">Retrieval</span><span class="chip chip--entity">Entity Graph</span></div>
+        <h3>How AI Decides What to Say</h3>
+        <p class="thesis-line">AI systems aren't ranking your website. They're solving discovery, understanding, relevance, trust, evidence, selection, and recommendation — in that order, for every query.</p>
+      </div>
+
+      <p class="section-label">The two engines behind every answer</p>
+      <div class="card-grid">
+        <div class="card">
+          <h4>Parametric memory</h4>
+          <p>Stored neural-network weights, learned from a multi-terabyte training corpus (Common Crawl, Wikipedia, academic datasets). This is what dictates a brand's intrinsic, default authority and whether the model recognizes the entity at all. Updates every 6–18 months, on a training cycle.</p>
+        </div>
+        <div class="card">
+          <h4>Non-parametric RAG</h4>
+          <p>Real-time vector search over live indices. Chunks, re-ranks, and summarizes current documents to answer specific, time-sensitive, or granular queries. Updates continuously, on the crawl cycle.</p>
+        </div>
+      </div>
+
+      <p class="section-label">The 3-stage RAG execution pipeline</p>
+      <ol>
+        <li><strong>Chunking &amp; vector embedding</strong> — target pages are parsed into discrete text chunks, typically 200–450 tokens, and mapped into a high-dimensional embedding space. Chunk coherence determines match accuracy.</li>
+        <li><strong>Cross-encoder re-ranking</strong> — candidate chunks are filtered through a secondary model evaluating information density, factual specificity, context clarity, and domain authority.</li>
+        <li><strong>Citation allocation &amp; synthesis</strong> — the generator selects the passages that resolve the prompt with minimal ambiguity, and cites the URLs that provide the most unassailable factual consensus.</li>
+      </ol>
+
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Dimension</th><th>Parametric foundation</th><th>RAG engine</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Update frequency</strong></td><td>6–18 month training intervals</td><td>Continuous, real-time crawl cycles</td></tr>
+            <tr><td><strong>Core sources</strong></td><td>Wikipedia, Wikidata, books, ArXiv, Common Crawl</td><td>Web indices, community forums, live news, technical docs</td></tr>
+            <tr><td><strong>Optimization objective</strong></td><td>Entity co-occurrence density across knowledge bases</td><td>Passage extractability, structured schemas, fresh verification</td></tr>
+            <tr><td><strong>Primary lever</strong></td><td>High-authority digital PR, Wikipedia / Wikidata presence</td><td>Answer-block layout, structured comparison tables, live feeds</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="section-label">The AI Visibility Equation</p>
+      <div class="formula">Visibility <span class="op">=</span> Discoverability <span class="op">×</span> Extractability <span class="op">×</span> Relevance <span class="op">×</span> Authority <span class="op">×</span> Evidence <span class="op">×</span> Entity&nbsp;Clarity <span class="op">×</span> Freshness</div>
+      <p>It's multiplicative, not additive. If any factor approaches zero, visibility collapses — an excellent company with excellent content and a blocked crawler is practically invisible to that engine, full stop. No amount of reputation compensates for a factor at zero.</p>
+
+      <p class="section-label">The three layers</p>
+      <p>Every tactic in this course targets one of three layers. Name the layer before you ship the tactic — it's how you avoid busywork that feels productive but moves nothing:</p>
+      <div class="card-grid">
+        <div class="card"><h4><span class="chip chip--weights">Weights</span></h4><p>What the model already "knows" from training. Moved by sustained, independently-authored mentions before the next training cutoff — not by anything you publish today.</p></div>
+        <div class="card"><h4><span class="chip chip--retrieval">Retrieval</span></h4><p>What live search/RAG pulls in right now. Moved by extractable on-page content, freshness, and crawler access — this is where most short-term wins live.</p></div>
+        <div class="card"><h4><span class="chip chip--entity">Entity Graph</span></h4><p>Whether the model can resolve "you" as one unambiguous thing across sources. Moved by consistent identity, `sameAs` linking, and a single canonical description.</p></div>
+      </div>
+    </section>
+
+    <!-- MODULE 03 -->
+    <section class="module" id="m03">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 03</span><span class="chip chip--entity">Entity Graph</span></div>
+        <h3>Entity Engineering</h3>
+        <p class="thesis-line">AI systems don't need to know "Acme makes software." They need to resolve Acme as a specific node with specific, verifiable edges.</p>
+      </div>
+
+      <p>The graph you're building isn't a metaphor — construct it as an actual spreadsheet, then attach evidence to every row:</p>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Entity</th><th>Type</th><th>Relationship</th></tr></thead>
+          <tbody>
+            <tr><td>Company</td><td>Organization</td><td>owns Product</td></tr>
+            <tr><td>Product</td><td>Software</td><td>solves Problem</td></tr>
+            <tr><td>Founder</td><td>Person</td><td>founded Company</td></tr>
+            <tr><td>Competitor</td><td>Organization</td><td>competes with Company</td></tr>
+            <tr><td>Category</td><td>Concept</td><td>Product belongs to Category</td></tr>
+            <tr><td>Customer segment</td><td>Audience</td><td>uses Product</td></tr>
+            <tr><td>Location</td><td>Place</td><td>Company operates there</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="section-label">Entity consistency audit</p>
+      <p>Check the description of the company across every surface it appears on: website, LinkedIn, Crunchbase, directories, review sites, industry publications, Reddit, YouTube, podcasts, GitHub, press releases, partner sites, comparison sites.</p>
+      <div class="compare">
+        <div class="bad"><span class="tag">Fragmented identity</span>Site A: "AI cybersecurity platform." Site B: "digital risk monitoring tool." Site C: "brand protection SaaS." The model has to reconcile three descriptions before it can even decide whether to mention you.</div>
+        <div class="good"><span class="tag">Dominant semantic identity</span>One canonical sentence, repeated verbatim (or near-verbatim) everywhere the entity is described: what category, what it does, for whom. Reconciliation cost drops to zero.</div>
+      </div>
+    </section>
+
+    <!-- ============================================================ PART II ============================================================ -->
+    <div class="part-header"><span class="roman">Part II</span><h2>Engineering the Signals</h2></div>
+    <p class="part-dek">Eight modules covering the actual production work: what to ask, what to publish on your own pages, what to earn off them, and what to wire into your infrastructure so the crawlers can see any of it.</p>
+
+    <!-- MODULE 04 -->
+    <section class="module" id="m04">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 04</span><span class="chip chip--measurement">Measurement</span></div>
+        <h3>The Question Map</h3>
+        <p class="thesis-line">Stop starting with keywords. Start with the questions AI users actually ask.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card"><h4>1. Discovery</h4><p>"What are the best AI visibility tools?"</p></div>
+        <div class="card"><h4>2. Comparison</h4><p>"Brand A vs. Brand B"</p></div>
+        <div class="card"><h4>3. Recommendation</h4><p>"What's the best tool for a small SaaS company?"</p></div>
+        <div class="card"><h4>4. Problem-solving</h4><p>"How do I know if ChatGPT mentions my company?"</p></div>
+        <div class="card"><h4>5. Transactional</h4><p>"Which AI visibility platform should I buy?"</p></div>
+        <div class="card"><h4>6. Validation</h4><p>"Is Brand A legitimate?"</p></div>
+      </div>
+      <p class="section-label">Build a 100-question baseline dataset per client</p>
+      <ul>
+        <li>20 category questions</li>
+        <li>20 problem questions</li>
+        <li>20 comparison questions</li>
+        <li>20 recommendation questions</li>
+        <li>10 reputation questions</li>
+        <li>10 transactional questions</li>
+      </ul>
+      <p>Run every question through every target engine and record: whether the company was mentioned, its position/order, which competitors appeared, the citation sources, recommendation status, sentiment, product attributes mentioned, incorrect claims, and missing information. That output is your <strong>AI Visibility Baseline</strong> — everything downstream is measured against it.</p>
+    </section>
+
+    <!-- MODULE 05 -->
+    <section class="module" id="m05">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 05</span><span class="chip chip--measurement">Measurement</span></div>
+        <h3>Prompt Mining</h3>
+        <p class="thesis-line">"What are the best AI visibility tools?" measures keyword visibility. Layered, realistic prompts measure recommendation behavior — a different thing entirely.</p>
+      </div>
+      <p>Escalate a single question through constraint layers to see where a recommendation actually breaks:</p>
+      <ol>
+        <li>"I'm a SaaS founder with a $5k/month marketing budget. What AI visibility tools should I consider?"</li>
+        <li>"Compare the best three options for a company with 20 employees."</li>
+        <li>"Which would you choose if accurate competitor monitoring mattered more than content generation?"</li>
+        <li>"Which companies have the best reputation for AI search visibility?"</li>
+      </ol>
+      <p class="section-label">Prompt matrix dimensions</p>
+      <div class="card-grid">
+        <div class="card"><h4>Intent</h4><p>informational · commercial · transactional</p></div>
+        <div class="card"><h4>User</h4><p>founder · marketer · enterprise buyer · developer · consumer</p></div>
+        <div class="card"><h4>Constraint</h4><p>budget · location · industry · company size · technical requirement</p></div>
+        <div class="card"><h4>Desired output</h4><p>list · comparison · recommendation · explanation</p></div>
+      </div>
+      <p>Cross these and you get hundreds of realistic AI queries — far more diagnostic than a handful of head-term prompts.</p>
+    </section>
+
+    <!-- MODULE 06 -->
+    <section class="module" id="m06">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 06</span><span class="chip chip--retrieval">Retrieval</span></div>
+        <h3>Citation Engineering</h3>
+        <p class="thesis-line">Getting cited is an information-architecture problem before it's a content problem. The model can only cite what it can cleanly extract.</p>
+      </div>
+
+      <div class="compare">
+        <div class="bad"><span class="tag">Almost useless</span>"Our platform is an innovative next-generation solution that revolutionizes how businesses manage their digital presence."</div>
+        <div class="good"><span class="tag">Extractable</span>"Brand Armor monitors how companies appear in AI-generated answers across ChatGPT, Gemini, Perplexity, and Google AI search." Followed by discrete lists: <em>Supported platforms</em> — ChatGPT, Google AI, Perplexity, Gemini. <em>Primary use cases</em> — brand monitoring, competitor monitoring, citation tracking, recommendation tracking.</div>
+      </div>
+
+      <p class="section-label">The Atomic Answer Principle</p>
+      <p>Every important question gets a direct, standalone answer — not one buried in paragraph four of 1,500 words. Pattern: <em>"Brand X is a [category] that helps [customer] achieve [outcome]"</em> — stated first, expanded after.</p>
+
+      <p class="section-label">The CITABLE framework</p>
+      <ul>
+        <li><strong>Clear statistics</strong> — claims anchored to quantitative values (percentages, benchmarks, sample sizes) hold up 30–40% better in RAG citation retention than generic qualitative claims.</li>
+        <li><strong>Isolated answers</strong> — each 80–120 word passage beneath a heading must be fully self-contained and resolve the question without depending on the copy before or after it.</li>
+        <li><strong>Tabular &amp; structured specifications</strong> — Entity-Attribute-Value matrices in Markdown or clean HTML tables keep their row/column context intact through vector chunking; prose doesn't.</li>
+        <li><strong>Inverse-pyramid answer block</strong> — the complete answer goes in the first sentence under the H2/H3, then supporting parameters and constraints follow.</li>
+      </ul>
+      <div class="term">
+### What is the maximum throughput of [Platform X]?
+
+[Platform X] processes up to <span class="c1">45,000</span> transactions per second (TPS)
+with an average p99 latency of <span class="c1">12 milliseconds</span>, verified across
+<span class="c2">500 enterprise production clusters</span> in 2026. Throughput scales
+horizontally using Kubernetes pods deployed across multi-region VPCs.
+      </div>
+    </section>
+
+    <!-- MODULE 07 -->
+    <section class="module" id="m07">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 07</span><span class="chip chip--entity">Entity Graph</span><span class="chip chip--retrieval">Retrieval</span></div>
+        <h3>Authority Outside Your Website</h3>
+        <p class="thesis-line">Optimizing your own site and expecting the model to conclude "this company is obviously great" is the single biggest misconception in this field.</p>
+      </div>
+      <p>LLM search doesn't lean primarily on PageRank-style link graphs. It leans on <strong>entity-attribute co-occurrence</strong> and <strong>cross-source consensus</strong>. If multiple trusted, independent sources associate your brand with a specific use case and a positive sentiment, the model assigns high confidence to recommending you. Roughly 90% of commercial citations in practice trace back to a short list of source types:</p>
+      <div class="card-grid">
+        <div class="card"><h4>Community discussions</h4><p>Reddit and niche forums — LLM engines heavily weight authentic user comparisons and edge-case validation. Active, natural presence here directly seeds Perplexity and ChatGPT Search.</p></div>
+        <div class="card"><h4>Review aggregators</h4><p>G2, Capterra, Trustpilot — structured, parsed pros/cons and rating attributes that RAG systems aggregate straight into recommendation summaries.</p></div>
+        <div class="card"><h4>Third-party comparisons</h4><p>Independent "top alternatives" posts and tier-one industry roundups — the cross-verification that parametric recommendation actually requires.</p></div>
+        <div class="card"><h4>Everything else</h4><p>Wikipedia, YouTube transcripts, case studies, and industry press round out the corroboration a model needs before it will stake an answer on you.</p></div>
+      </div>
+      <p class="principle">"We are the leading platform" is a claim. Ten independent sources describing you as "a platform used by…" is evidence. Only the second one is useful to a model that has to justify its answer.</p>
+    </section>
+
+    <!-- MODULE 08 -->
+    <section class="module" id="m08">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 08</span><span class="chip chip--entity">Entity Graph</span><span class="chip chip--retrieval">Retrieval</span></div>
+        <h3>Digital PR for AI Visibility</h3>
+        <p class="thesis-line">Traditional PR asks "can I get coverage?" AI-visibility PR asks "can I create a source an AI system will retrieve later, when someone in my category asks a question?"</p>
+      </div>
+      <div class="card-grid">
+        <div class="card"><h4>Original research</h4><p>"10,000 AI prompts analyzed across 50 industries."</p></div>
+        <div class="card"><h4>Benchmark</h4><p>"AI Visibility Benchmark 2026."</p></div>
+        <div class="card"><h4>Dataset</h4><p>"Which SaaS companies are most frequently cited by AI?"</p></div>
+        <div class="card"><h4>Study</h4><p>"1,000 ChatGPT recommendations analyzed."</p></div>
+        <div class="card"><h4>Free tool</h4><p>"Free AI Visibility Checker."</p></div>
+        <div class="card"><h4>Index</h4><p>"AI Brand Recommendation Index."</p></div>
+      </div>
+      <p>Any of these outperforms another generic blog post, because each one becomes something other sources want to cite — compounding your entity-graph and retrieval presence at the same time.</p>
+    </section>
+
+    <!-- MODULE 09 -->
+    <section class="module" id="m09">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 09</span><span class="chip chip--retrieval">Retrieval</span><span class="chip chip--entity">Entity Graph</span></div>
+        <h3>Content Architecture</h3>
+        <p class="thesis-line">Three layers, built in this order — most sites build layer three first and wonder why nothing gets cited.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card"><h4>Layer 1 — Entity pages</h4><p>About, Product, Founder, Locations, Services. These anchor the entity graph.</p></div>
+        <div class="card"><h4>Layer 2 — Topic authority</h4><p>Deep resources around the whole category, not just your product.</p></div>
+        <div class="card"><h4>Layer 3 — Question content</h4><p>Direct answers to the specific questions users ask, per Module 04's map.</p></div>
+      </div>
+      <p class="section-label">Example topic cluster</p>
+      <p style="font-family:var(--font-mono);font-size:.85rem;color:var(--color-text-muted);line-height:2;">AI Visibility → AI search optimization · GEO · AEO · ChatGPT visibility · AI citations · AI recommendations · AI brand monitoring · AI search analytics · AI crawler optimization · AI search ranking · AI reputation</p>
+      <p>Every spoke links back to the hub and to at least two neighboring spokes — that's what lets a retrieval system traverse the cluster instead of treating each page as isolated.</p>
+    </section>
+
+    <!-- MODULE 10 -->
+    <section class="module" id="m10">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 10</span><span class="chip chip--entity">Entity Graph</span></div>
+        <h3>Structured Data</h3>
+        <p class="thesis-line">Schema isn't a ranking switch. It's disambiguation — and it only works if it agrees with the visible page.</p>
+      </div>
+      <p>Use the schema types that actually apply: <code>Organization</code>, <code>Person</code>, <code>Product</code>, <code>SoftwareApplication</code>, <code>Article</code>, <code>Review</code>, <code>LocalBusiness</code>, <code>FAQPage</code> where genuinely appropriate, <code>Event</code>, <code>BreadcrumbList</code>, <code>WebSite</code>.</p>
+      <p class="section-label">Semantic schema injection</p>
+      <p>Go beyond a bare <code>Article</code> tag. Build a real identity graph with <code>sameAs</code> links connecting the organization node to its Wikidata item, LinkedIn page, Crunchbase profile, and GitHub org, then nest <code>Product</code>, <code>SoftwareApplication</code>, and <code>FAQPage</code> schema to disambiguate exactly what the entity does.</p>
+      <p class="principle">Never add structured data that isn't backed by visible, accurate on-page content. Manipulative markup creates more problems than it solves — models cross-check schema against the rendered page.</p>
+    </section>
+
+    <!-- MODULE 11 -->
+    <section class="module" id="m11">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 11</span><span class="chip chip--retrieval">Retrieval — gatekeeper</span></div>
+        <h3>Technical AI Accessibility</h3>
+        <p class="thesis-line">Every other module is irrelevant if the crawler can't reach the page. Start here when nothing else in the audit makes sense.</p>
+      </div>
+      <ol>
+        <li><strong>Server-side rendering</strong> — critical specs, answers, and data tables must exist in the raw initial HTML. AI crawlers enforce strict rendering timeouts and will not wait for client-side JavaScript.</li>
+        <li><strong>Robots.txt whitelisting</strong> — explicitly grant access to the foundational AI discovery bots.</li>
+      </ol>
+      <div class="term">User-agent: <span class="c1">GPTBot</span>
+Allow: /
+
+User-agent: <span class="c1">PerplexityBot</span>
+Allow: /
+
+User-agent: <span class="c1">Google-Extended</span>
+Allow: /
+
+User-agent: <span class="c1">ClaudeBot</span>
+Allow: /</div>
+      <ol start="3">
+        <li><strong>Explicit freshness signals</strong> — visible "Published on" and "Updated on" dates matching <code>dateModified</code> schema are critical for freshness-filtered queries (Perplexity and Grok weight this heavily; see Module 01's matrix).</li>
+      </ol>
+      <p>Round out the audit with: XML sitemap correctness, canonical URLs, HTTP status hygiene, page speed, internal linking, no authentication or paywall barriers on the pages meant to be cited, bot-blocking CDN/WAF rules, and metadata completeness. The full checklist is in <a href="#app-b">Appendix B</a>.</p>
+    </section>
+
+    <!-- ============================================================ PART III ============================================================ -->
+    <div class="part-header"><span class="roman">Part III</span><h2>Winning the Answer</h2></div>
+    <p class="part-dek">Nine modules on the commercially interesting part: converting presence into recommendation, displacing competitors on purpose, and proving any of it actually worked.</p>
+
+    <!-- MODULE 12 -->
+    <section class="module" id="m12">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 12</span><span class="chip chip--entity">Entity Graph</span><span class="chip chip--retrieval">Retrieval</span></div>
+        <h3>Recommendation Engineering</h3>
+        <p class="thesis-line">"Brand X exists" and "I'd choose Brand X" are won with different evidence. Most programs only ever build the first kind.</p>
+      </div>
+      <p class="section-label">Recommendation factors</p>
+      <div class="card-grid">
+        <div class="card"><h4>Fit</h4><p>Who is this best for, specifically?</p></div>
+        <div class="card"><h4>Differentiation</h4><p>Why this over the named competitors?</p></div>
+        <div class="card"><h4>Reputation</h4><p>What do independent sources say?</p></div>
+        <div class="card"><h4>Proof</h4><p>What evidence backs the claims?</p></div>
+        <div class="card"><h4>Availability</h4><p>Can someone actually buy or use it today?</p></div>
+        <div class="card"><h4>Quality</h4><p>Are there credible reviews?</p></div>
+        <div class="card"><h4>Specificity</h4><p>Is it clearly tied to one use case?</p></div>
+      </div>
+      <p class="section-label">Don't try to be "best" — occupy a constraint</p>
+      <div class="compare">
+        <div class="bad"><span class="tag">Unanchored</span>"We are the best AI visibility platform."</div>
+        <div class="good"><span class="tag">Better</span>"Best AI visibility platform for small SaaS companies."</div>
+      </div>
+      <p class="principle">Best still: "Best AI visibility platform for SaaS teams that need competitor citation tracking." Occupy a named constraint precisely enough that omitting you makes any shortlist for that constraint look incomplete.</p>
+    </section>
+
+    <!-- MODULE 13 -->
+    <section class="module" id="m13">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 13</span><span class="chip chip--measurement">Measurement</span></div>
+        <h3>Competitor Displacement</h3>
+        <p class="thesis-line">If A, B, and C keep getting recommended instead of you, the task isn't "write more blog posts." The task is diagnosing exactly why they win the selection.</p>
+      </div>
+      <p>Score each signal 0–3 for yourself and up to three competitors. The gaps are your roadmap, in priority order.</p>
+      <div class="table-wrap">
+        <table class="ledger worksheet">
+          <thead><tr><th>Signal</th><th>You</th><th>Competitor A</th><th>Competitor B</th><th>Competitor C</th></tr></thead>
+          <tbody>
+            <tr><td>Category clarity</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Independent mentions</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Reviews</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Editorial coverage</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Product comparisons</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Reddit mentions</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>YouTube presence</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Product documentation</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Freshness</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            <tr><td>Original research</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MODULE 14 -->
+    <section class="module" id="m14">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 14</span><span class="chip chip--measurement">Measurement</span></div>
+        <h3>The AI Visibility Audit</h3>
+        <p class="thesis-line">Ten sections, every time. Skipping one is how audits become one-sided.</p>
+      </div>
+      <div class="card-grid">
+        <div class="card"><h4>A · Entity</h4><p>Who does AI think you are?</p></div>
+        <div class="card"><h4>B · Visibility</h4><p>How often are you mentioned?</p></div>
+        <div class="card"><h4>C · Citation</h4><p>Which pages/sources get cited?</p></div>
+        <div class="card"><h4>D · Recommendation</h4><p>When are you actually recommended?</p></div>
+        <div class="card"><h4>E · Competitor</h4><p>Who gets recommended instead?</p></div>
+        <div class="card"><h4>F · Sentiment</h4><p>How is the company described?</p></div>
+        <div class="card"><h4>G · Accuracy</h4><p>Is AI saying anything incorrect?</p></div>
+        <div class="card"><h4>H · Technical</h4><p>Can crawlers actually reach the content?</p></div>
+        <div class="card"><h4>I · Authority</h4><p>Who independently validates you?</p></div>
+        <div class="card"><h4>J · Content gap</h4><p>Which questions go unanswered?</p></div>
+      </div>
+    </section>
+
+    <!-- MODULE 15 -->
+    <section class="module" id="m15">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 15</span><span class="chip chip--measurement">Measurement</span></div>
+        <h3>The AI Visibility Score</h3>
+        <p class="thesis-line">One operational number, weighted toward what actually matters commercially: being recommended, not merely known.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Weight</th><th>Component</th><th>Question it answers</th></tr></thead>
+          <tbody>
+            <tr><td class="num">30%</td><td><strong>Mention share</strong></td><td>How often does the brand appear at all?</td></tr>
+            <tr><td class="num">20%</td><td><strong>Recommendation share</strong></td><td>How often is it actively recommended?</td></tr>
+            <tr><td class="num">15%</td><td><strong>Citation share</strong></td><td>How often are owned sources cited as evidence?</td></tr>
+            <tr><td class="num">15%</td><td><strong>Competitive share</strong></td><td>How does it stack up against named competitors?</td></tr>
+            <tr><td class="num">10%</td><td><strong>Accuracy</strong></td><td>How accurately does AI describe the entity?</td></tr>
+            <tr><td class="num">10%</td><td><strong>Sentiment</strong></td><td>Positive, neutral, or negative framing?</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="section-label">Worked example — Share of AI Voice</p>
+      <p>Run 500 relevant prompts. Results: Brand A — 190 mentions, Brand B — 130, Brand C — 90, your company — 40, others — 50.</p>
+      <div class="formula">Share of Voice <span class="op">=</span> 40 / 500 <span class="op">=</span> 8%</div>
+      <p>Now it's a number you can move, on a schedule you control.</p>
+    </section>
+
+    <!-- MODULE 16 -->
+    <section class="module" id="m16">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 16</span><span class="chip chip--measurement">Measurement</span></div>
+        <h3>Citation Share</h3>
+        <p class="thesis-line">Being known and being trusted as evidence are two different rates. Confusing them hides an authority problem behind an awareness metric.</p>
+      </div>
+      <p>Of 500 AI answers, your company appears in 100 (mention rate 20%) — but your website is cited as the source only 20 times (citation rate 4%). The model knows about you; it doesn't yet consider your website authoritative enough to point to. That's an <strong>authority/evidence</strong> gap, not an awareness gap — the fix is Module 07 and Module 08, not more content about yourself.</p>
+
+      <p class="section-label">Three-tier monitoring matrix</p>
+      <ul>
+        <li><strong>Citation Frequency Rate (CFR)</strong> — the percentage of target conversational queries where your URL is cited as a source link in the response.</li>
+        <li><strong>Mention Share of Voice (M-SoV)</strong> — the ratio of times your brand is recommended in synthesized answers compared to primary category competitors, across a standardized prompt set.</li>
+        <li><strong>Attribute &amp; sentiment positioning</strong> — audit whether models classify your solution under your preferred market category (e.g. "fastest enterprise deployment") versus an undesired one (e.g. "budget tool").</li>
+      </ul>
+    </section>
+
+    <!-- MODULE 17 -->
+    <section class="module" id="m17">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 17</span><span class="chip chip--measurement">Measurement</span></div>
+        <h3>Experimentation</h3>
+        <p class="thesis-line">Don't blindly implement fifty SEO recommendations. Run one hypothesis at a time and prove the effect.</p>
+      </div>
+      <div class="timeline">
+        <div class="tblock"><div class="days">Hypothesis</div><div>Adding concise product-comparison pages will increase AI citation frequency.</div></div>
+        <div class="tblock"><div class="days">Baseline</div><div>Run 200 prompts and record current mentions, citations, and recommendation rate.</div></div>
+        <div class="tblock"><div class="days">Intervention</div><div>Ship a product comparison page, a competitor comparison page, a use-case page, and an evidence page.</div></div>
+        <div class="tblock"><div class="days">Wait</div><div>Allow sufficient crawl and index time before re-measuring — re-testing too early just adds noise.</div></div>
+        <div class="tblock"><div class="days">Re-test &amp; measure</div><div>Same 200 prompts. Compare mentions, citations, recommendation rate, and competitor displacement.</div></div>
+      </div>
+      <p>This is AI Visibility Engineering. Anything before the hypothesis line is content marketing.</p>
+    </section>
+
+    <!-- MODULE 18 -->
+    <section class="module" id="m18">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 18</span><span class="chip chip--system">Operating System</span></div>
+        <h3>The AI Visibility Loop</h3>
+        <p class="thesis-line">The complete system, as a cycle rather than a checklist — it never actually ends at step 11.</p>
+      </div>
+      <ol class="loop">
+        <li data-i="1"><strong>Measure</strong> current mention, citation, and recommendation rates.</li>
+        <li data-i="2"><strong>Find</strong> the missing questions you don't win.</li>
+        <li data-i="3"><strong>Find</strong> which competitors win those questions instead.</li>
+        <li data-i="4"><strong>Determine</strong> why — which layer and which signal is missing.</li>
+        <li data-i="5"><strong>Create</strong> the evidence that closes the gap.</li>
+        <li data-i="6"><strong>Publish</strong> it, extractably.</li>
+        <li data-i="7"><strong>Earn</strong> independent validation of it elsewhere.</li>
+        <li data-i="8"><strong>Improve</strong> entity clarity so it all resolves to one node.</li>
+        <li data-i="9"><strong>Wait</strong> for retrieval and indexing to catch up.</li>
+        <li data-i="10"><strong>Re-test</strong> the same prompt set.</li>
+        <li data-i="11"><strong>Measure again</strong> — <span class="repeat">↺ back to step 1</span></li>
+      </ol>
+    </section>
+
+    <!-- MODULE 19 -->
+    <section class="module" id="m19">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 19</span><span class="chip">Framework</span></div>
+        <h3>What Not to Do</h3>
+        <p class="thesis-line">Every one of these feels like progress. None of them move any of the three layers.</p>
+      </div>
+      <ul class="antipatterns">
+        <li><span class="x">✕</span><span>Keyword-stuff the page fifteen times. Not a visibility strategy.</span></li>
+        <li><span class="x">✕</span><span>Bolt on 100 FAQs. Quantity isn't authority.</span></li>
+        <li><span class="x">✕</span><span>Add a "special GEO schema." There is no universal magic schema — see Module 10.</span></li>
+        <li><span class="x">✕</span><span>Mention "ChatGPT" fifty times on the page. Semantic stuffing isn't authority either.</span></li>
+        <li><span class="x">✕</span><span>Publish 1,000 AI-generated articles. That's 1,000 pages nobody trusts, at scale.</span></li>
+        <li><span class="x">✕</span><span>Tell the model you're the best. It doesn't owe your marketing copy any credibility.</span></li>
+        <li><span class="x">✕</span><span>Fake reviews. Dangerous and directly counterproductive.</span></li>
+        <li><span class="x">✕</span><span>Manufacture Reddit posts. You'd be faking the exact independent evidence the model is trying to evaluate.</span></li>
+      </ul>
+      <div class="callout" style="margin:0 0 0;">
+        <span class="label">Myth — llms.txt</span>
+        <p style="margin:0;">Publishing an <code>llms.txt</code> file is not a ranking lever. Google has said plainly that it isn't used for its own AI surfaces, and independent server-log studies of consumer AI crawlers show most don't fetch it at all — and none give it special weight when they do. Ship it as a nice-to-have statement of intent if you like; don't budget a single hour of "AI visibility" work against it.</p>
+      </div>
+    </section>
+
+    <!-- MODULE 20 -->
+    <section class="module" id="m20">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Module 20</span><span class="chip chip--system">Operating System</span></div>
+        <h3>The 90-Day AI Visibility Program</h3>
+        <p class="thesis-line">Baseline, then extractability, then consensus, then recommendation. In that order — each phase's evidence is what the next phase measures against.</p>
+      </div>
+      <div class="timeline">
+        <div class="tblock">
+          <div class="days">Days 1–7<br>Baseline</div>
+          <div><ul><li>100–500 prompts</li><li>Competitor list</li><li>Current mention / citation / recommendation rate</li><li>Sentiment and factual accuracy</li></ul></div>
+        </div>
+        <div class="tblock">
+          <div class="days">Days 8–14<br>Technical</div>
+          <div><ul><li>Crawling &amp; robots.txt</li><li>Sitemap &amp; indexing</li><li>Canonicalization</li><li>Performance &amp; rendering</li><li>Internal linking</li></ul></div>
+        </div>
+        <div class="tblock">
+          <div class="days">Days 15–30<br>Entity</div>
+          <div><ul><li>Definitive company description</li><li>Product definitions</li><li>Founder information</li><li>Category positioning &amp; comparison positioning</li></ul></div>
+        </div>
+        <div class="tblock">
+          <div class="days">Days 31–45<br>Content</div>
+          <div><ul><li>Category pages, question pages</li><li>Comparison pages, use-case pages</li><li>Evidence pages, original research</li></ul></div>
+        </div>
+        <div class="tblock">
+          <div class="days">Days 46–65<br>Authority</div>
+          <div><ul><li>Editorial mentions, interviews, podcasts</li><li>Reviews, partner references</li><li>Specialist &amp; industry citations</li></ul></div>
+        </div>
+        <div class="tblock">
+          <div class="days">Days 66–80<br>Recommendation</div>
+          <div><ul><li>Target specific "best X for Y" queries</li><li>Build the evidence those contexts require</li></ul></div>
+        </div>
+        <div class="tblock">
+          <div class="days">Days 81–90<br>Measurement</div>
+          <div><ul><li>Re-run the full prompt dataset</li><li>Recalculate Share of Voice, mention/citation/recommendation rate, competitor share, accuracy, sentiment</li><li>Rank the next 20 highest-value opportunities</li></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ PART IV ============================================================ -->
+    <div class="part-header"><span class="roman">Part IV</span><h2>Prove It</h2></div>
+    <p class="part-dek">The final project, the mental model that ties the whole discipline together, and how to turn it into a service line.</p>
+
+    <section class="module" id="final-project">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Final Project</span></div>
+        <h3>Run the System on a Real Company</h3>
+        <p class="thesis-line">Choose one real company. Produce all ten deliverables — partial credit doesn't diagnose anything.</p>
+      </div>
+      <ol class="deliverables">
+        <li><strong>AI Visibility Baseline</strong><span>Minimum 250 prompts, across every target engine.</span></li>
+        <li><strong>Competitor Intelligence Report</strong><span>At least 5 competitors, scored on the Module 13 matrix.</span></li>
+        <li><strong>Entity Graph</strong><span>Company, products, people, categories, and the relationships between them.</span></li>
+        <li><strong>Technical Audit</strong><span>Crawler access, indexation, and accessibility per Module 11 / Appendix B.</span></li>
+        <li><strong>Question Map</strong><span>Minimum 200 questions across the six categories in Module 04.</span></li>
+        <li><strong>Content Gap Analysis</strong><span>Which questions do competitors answer that the company doesn't?</span></li>
+        <li><strong>Authority Strategy</strong><span>50 potential external authority sources, ranked by relevance and reach.</span></li>
+        <li><strong>Recommendation Strategy</strong><span>20 named recommendation contexts to deliberately occupy.</span></li>
+        <li><strong>90-Day Implementation Plan</strong><span>Prioritized by Impact × Probability × Effort.</span></li>
+        <li><strong>Measurement Dashboard</strong><span>Weekly tracking of mention rate, recommendation rate, citation rate, Share of Voice, competitor share, citation sources, accuracy, and sentiment — baseline vs. target.</span></li>
+      </ol>
+    </section>
+
+    <section class="module" id="mindset">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">The Expert Mindset</span></div>
+        <h3>The Question Actually Changed</h3>
+      </div>
+      <div class="mindset-split">
+        <div class="q old">"How do I rank this page?"</div>
+        <div class="arrow">→</div>
+        <div class="q new">"What evidence would cause an AI system to believe this entity is relevant, credible, and appropriate to recommend for this particular question?"</div>
+      </div>
+      <p>That second question is a broader discipline than SEO — it's SEO plus content engineering plus entity engineering plus digital PR plus reputation management plus structured data plus technical accessibility plus experimentation plus competitive intelligence. That's also why this is worth treating as "AI Visibility Engineering" rather than simply relabeling it "GEO": it's an observable system you can measure, experiment on, and improve — not a keyword trick with a new name.</p>
+    </section>
+
+    <section class="module" id="commercial">
+      <div class="module-head">
+        <div class="module-kicker"><span class="mnum">Commercial Opportunity</span></div>
+        <h3>Four Products, One Methodology</h3>
+      </div>
+      <div class="service-grid">
+        <div class="card"><span class="k">01 · One-off</span><h4>AI Visibility Audit</h4><p>A single diagnostic engagement — Module 14's ten-section audit, delivered as a report.</p></div>
+        <div class="card"><span class="k">02 · Retainer</span><h4>AI Visibility Monitoring</h4><p>Monthly tracking of the prompt set, mentions, citations, and competitor share.</p></div>
+        <div class="card"><span class="k">03 · Retainer</span><h4>AI Visibility Growth</h4><p>Ongoing content, authority, and entity work driven by the Module 18 loop.</p></div>
+        <div class="card"><span class="k">04 · Product</span><h4>AI Visibility Platform</h4><p>Automated prompt testing, competitor tracking, citation analysis, and recommendation monitoring. The most interesting category — the process is highly automatable. <a href="https://foreground.info" target="_blank" rel="noopener">Foreground</a> runs a free version of this for small businesses.</p></div>
+      </div>
+      <p class="principle">There is no legitimate, guaranteed hack that makes ChatGPT or Gemini recommend a company. The engines' own documentation is explicit about this: discoverability, relevance, reliable information, structure, and authority — not a trick — and GEO does not guarantee grounding or citation. Sell the system. Don't sell the hack.</p>
+    </section>
+
+    <!-- ============================================================ APPENDICES ============================================================ -->
+    <div class="part-header"><span class="roman">Appendices</span><h2>Reference</h2></div>
+
+    <section class="module" id="app-a">
+      <div class="module-head"><div class="module-kicker"><span class="mnum">Appendix A</span></div><h3>Frozen Prompt-Set Template</h3><p class="thesis-line">Re-run this exact set every cycle. Changing the prompts between baselines invalidates the comparison.</p></div>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Field</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>brand</code></td><td>Entity under test</td></tr>
+            <tr><td><code>website</code></td><td>Canonical URL for extraction and citation matching</td></tr>
+            <tr><td><code>competitors</code></td><td>3–5 named competitors to score alongside the brand</td></tr>
+            <tr><td><code>category</code></td><td>The market category the brand should be resolved into</td></tr>
+            <tr><td><code>use_case</code></td><td>The specific job-to-be-done the prompt implies</td></tr>
+            <tr><td><code>region</code></td><td>Geographic constraint, if any</td></tr>
+            <tr><td><code>customer_segment</code></td><td>Who's asking — founder, enterprise buyer, developer, consumer</td></tr>
+            <tr><td><code>question_category</code></td><td>One of the six from Module 04</td></tr>
+            <tr><td><code>engine</code></td><td>Which AI system ran the prompt</td></tr>
+            <tr><td><code>run_date</code></td><td>Timestamp — the axis every trend line is drawn against</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="module" id="app-b">
+      <div class="module-head"><div class="module-kicker"><span class="mnum">Appendix B</span></div><h3>Technical Checklist</h3></div>
+      <ul class="checklist">
+        <li>robots.txt allows GPTBot, PerplexityBot, Google-Extended, ClaudeBot</li>
+        <li>XML sitemap is current and submitted</li>
+        <li>Canonical URLs are correct and self-referencing</li>
+        <li>Critical answers/specs/tables exist in raw server-rendered HTML, not client-side JS</li>
+        <li>HTTP status codes are clean (no soft 404s, no redirect chains)</li>
+        <li>Page speed and Core Web Vitals are within acceptable range</li>
+        <li>Internal links connect entity pages, topic pages, and question pages</li>
+        <li>No authentication, paywall, or bot-blocking CDN rule sits in front of citable pages</li>
+        <li>Visible "Published on" / "Updated on" dates match <code>dateModified</code></li>
+        <li>Structured data validates and matches the visible content exactly</li>
+      </ul>
+    </section>
+
+    <section class="module" id="app-c">
+      <div class="module-head"><div class="module-kicker"><span class="mnum">Appendix C</span></div><h3>Schema Map</h3></div>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Type</th><th>Use it for</th><th>Key properties</th></tr></thead>
+          <tbody>
+            <tr><td><code>Organization</code></td><td>The company entity itself</td><td><code>name</code>, <code>url</code>, <code>sameAs</code>, <code>logo</code></td></tr>
+            <tr><td><code>Person</code></td><td>Founders, named experts</td><td><code>name</code>, <code>jobTitle</code>, <code>sameAs</code></td></tr>
+            <tr><td><code>Product</code></td><td>What's being sold</td><td><code>name</code>, <code>brand</code>, <code>description</code></td></tr>
+            <tr><td><code>SoftwareApplication</code></td><td>SaaS / app products specifically</td><td><code>applicationCategory</code>, <code>offers</code></td></tr>
+            <tr><td><code>Article</code></td><td>Editorial and blog content</td><td><code>author</code>, <code>datePublished</code>, <code>dateModified</code></td></tr>
+            <tr><td><code>Review</code></td><td>Genuine third-party or customer reviews</td><td><code>reviewRating</code>, <code>author</code></td></tr>
+            <tr><td><code>LocalBusiness</code></td><td>Physical location(s)</td><td><code>address</code>, <code>geo</code>, <code>openingHours</code></td></tr>
+            <tr><td><code>FAQPage</code></td><td>Genuine, visible Q&amp;A content only</td><td><code>mainEntity</code> (Question/Answer pairs)</td></tr>
+            <tr><td><code>Event</code></td><td>Webinars, launches, conferences</td><td><code>startDate</code>, <code>location</code></td></tr>
+            <tr><td><code>BreadcrumbList</code></td><td>Site hierarchy / navigation context</td><td><code>itemListElement</code></td></tr>
+            <tr><td><code>WebSite</code></td><td>Site-level search/identity</td><td><code>potentialAction</code> (sitelinks search box)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="module" id="app-d">
+      <div class="module-head"><div class="module-kicker"><span class="mnum">Appendix D</span></div><h3>Tooling Map</h3><p class="thesis-line">Capability categories, not vendor endorsements — the tooling landscape moves fast; evaluate against these jobs, not brand names.</p></div>
+      <div class="card-grid">
+        <div class="card"><h4>Prompt testing &amp; monitoring</h4><p>Runs a frozen prompt set across engines on a schedule and stores the raw answers for diffing.</p></div>
+        <div class="card"><h4>Citation / mention tracking</h4><p>Extracts and tags which URLs and brands appear in each stored answer.</p></div>
+        <div class="card"><h4>Technical crawlability auditing</h4><p>Confirms what a non-JS crawler actually sees, versus what a browser renders.</p></div>
+        <div class="card"><h4>Schema validation</h4><p>Confirms structured data parses and matches the visible page.</p></div>
+        <div class="card"><h4>Entity / knowledge-graph tools</h4><p>Manages Wikidata items, Knowledge Panel claims, and <code>sameAs</code> consistency.</p></div>
+        <div class="card"><h4>Digital PR / outreach</h4><p>Finds and pitches the community, review, and editorial sources from Module 07.</p></div>
+      </div>
+    </section>
+
+    <section class="module" id="app-e">
+      <div class="module-head"><div class="module-kicker"><span class="mnum">Appendix E</span></div><h3>Weekly Cadence</h3><p class="thesis-line">The rhythm underneath the 90-day arc — what actually happens in a given week once the program is running.</p></div>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Cadence</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Monday</strong></td><td>Pull last week's mention / citation data; flag any new competitor gains.</td></tr>
+            <tr><td><strong>Wednesday</strong></td><td>Publish one piece of evidence — an answer block, comparison page, or data point.</td></tr>
+            <tr><td><strong>Friday</strong></td><td>One off-site consensus action — a community answer, a review response, an outreach pitch.</td></tr>
+            <tr><td><strong>Monthly</strong></td><td>Re-run the full frozen prompt set; update the Module 15 score and the Module 13 competitor matrix.</td></tr>
+            <tr><td><strong>Quarterly</strong></td><td>Revisit the entity graph and category positioning — the slowest-moving layer, checked least often.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="colophon">
+      <p>AI Visibility Engineering — a practitioner course synthesizing a technical RAG/retrieval masterclass with a full-length applied curriculum on entity engineering, citation architecture, and recommendation strategy. Systems, not hacks.</p>
+      <p>Field notes from the team building <a href="https://foreground.info" target="_blank" rel="noopener">Foreground</a>, a free scan that runs Module 14's audit against your own company. Updates on <a href="https://x.com/foreground_info" target="_blank" rel="noopener">X @foreground_info</a>.</p>
+    </footer>
+  </main>
+</div>
+
+<script>
+(function(){
+  try{
+    var links = Array.prototype.slice.call(document.querySelectorAll('.toc nav a[href^="#"]'));
+    var map = {};
+    links.forEach(function(a){
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if(el) map[id] = a;
+    });
+    if('IntersectionObserver' in window){
+      var obs = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          var link = map[entry.target.id];
+          if(!link) return;
+          if(entry.isIntersecting){
+            links.forEach(function(l){ l.classList.remove('is-active'); });
+            link.classList.add('is-active');
+          }
+        });
+      }, { rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+      Object.keys(map).forEach(function(id){ obs.observe(document.getElementById(id)); });
+    }
+  }catch(e){ /* nav highlighting is progressive enhancement only */ }
+})();
+</script>
+
+</body></html>

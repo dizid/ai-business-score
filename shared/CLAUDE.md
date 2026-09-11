@@ -312,15 +312,18 @@ The single source of truth, imported by every consumer:
   completed scan, not automatic) — it roughly doubles Perplexity spend per
   scan. **Since 2026-08-24, plan-gated** (Milestone 1 of
   `~/.claude/plans/we-need-alot-of-transient-floyd.md`):
-  `generate-deep-advice.mts` requires `isPro(planTier)` OR a matching
-  `single_scan_purchases` row for that exact scan (the $19 one-time SKU,
-  Milestone 2, shipped the same day — see "Billing (Stripe)" in
-  `netlify/functions/CLAUDE.md`), returning `402 {error, upgradeRequired:
-  true}` otherwise. `ScanDetail.vue`'s `deepAdviceLocked` prop renders an
-  upgrade CTA in place of the button for non-entitled users rather than
-  hiding the section outright. The E0 manual-sales-validation step this
-  used to be gated on was explicitly waived by Marc for this round — pricing
-  ($199/mo Pro, $19 one-time) was decided directly instead. `buildDeepAdvicePrompt`
+  `generate-deep-advice.mts` requires `isPro(planTier)`, returning
+  `402 {error, upgradeRequired: true}` otherwise. Briefly also accepted a
+  matching `single_scan_purchases` row for that exact scan as an alternate
+  entitlement (the $19 one-time SKU, Milestone 2, shipped the same day) —
+  that fallback was removed 2026-09-11 along with the whole SKU (zero rows
+  had ever existed in that table), so it's Pro-only again. `ScanDetail.vue`'s
+  `deepAdviceLocked` prop renders an upgrade CTA in place of the button for
+  non-entitled users rather than hiding the section outright. The E0
+  manual-sales-validation step this used to be gated on was explicitly
+  waived by Marc for this round — pricing was decided directly instead
+  (currently $99/mo Pro, no other tier — see root `CLAUDE.md`'s Deployment
+  section for the current price). `buildDeepAdvicePrompt`
   grounds the prompt in the actual scan data (citation rate, competitor
   tallies) rather than generic SEO advice; `parseDeepAdviceResponse`
   follows the same lenient-JSON-extraction, always-safe-shape pattern as

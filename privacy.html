@@ -115,15 +115,10 @@
         <li><strong>Scan results</strong> — the AI models' responses to our prompts, the resulting
           visibility score, competitor tallies, and any advice generated from
           that scan.</li>
-        <li><strong>Single-scan purchase information</strong> — if you buy a one-time scan without
-          creating an account, we collect the email address and website you
-          provide to run that scan, generate its results, and send you the
-          private link to view them. This works the same as account data
-          above, just without a login.</li>
-        <li><strong>Payment information</strong> — if you upgrade to a paid plan or buy a single scan,
-          Stripe collects and processes your card details directly. Foreground
-          never sees or stores your card number; we only receive a
-          subscription/payment status from Stripe.</li>
+        <li><strong>Payment information</strong> — if you upgrade to the Pro plan, Stripe collects
+          and processes your card details directly. Foreground never sees or
+          stores your card number; we only receive a subscription/payment
+          status from Stripe.</li>
       </ul>
     </section>
 
@@ -158,11 +153,9 @@
           core scan itself: looking up your business details from a URL when
           you add a company, classifying the tone of a scan's mentions
           ("sentiment judging"), and generating AI-written deeper advice on a
-          scan (Pro accounts and single-scan purchases only).</li>
-        <li><strong>Stripe</strong> — handles all payment processing for paid plans and single-scan
-          purchases, including the email address you provide at checkout for
-          an anonymous single scan. Foreground never stores your card number
-          or full payment details.</li>
+          scan (Pro accounts only).</li>
+        <li><strong>Stripe</strong> — handles all payment processing for the Pro plan. Foreground
+          never stores your card number or full payment details.</li>
         <li><strong>Resend</strong> — sends the scan-complete email to your account's email address.</li>
         <li><strong>Neon</strong> — hosts our database and authentication (login/session) system.</li>
         <li><strong>Netlify</strong> — hosts the application and runs its backend functions.</li>

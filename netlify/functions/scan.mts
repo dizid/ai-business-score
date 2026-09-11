@@ -70,12 +70,7 @@ export default async (req: Request) => {
     if (count >= FREE_PLAN_SCAN_LIMIT) {
       return new Response(
         JSON.stringify({
-          // 2026-09-04 — free-only cost-control pass: reworded off "Upgrade
-          // to Pro" since checkout is hard-disabled for now (see root
-          // CLAUDE.md's Deployment section). FREE_PLAN_SCAN_LIMIT itself is
-          // unchanged; upgradeRequired/limit fields kept as-is for the
-          // frontend and for a cheap revert later.
-          error: `You've used all ${FREE_PLAN_SCAN_LIMIT} free scans for now — more capacity is coming soon.`,
+          error: `You've used all ${FREE_PLAN_SCAN_LIMIT} free scans on the free plan. Upgrade to Pro for more.`,
           upgradeRequired: true,
           limit: FREE_PLAN_SCAN_LIMIT,
         }),

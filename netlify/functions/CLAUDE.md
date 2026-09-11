@@ -19,9 +19,16 @@ See the root `CLAUDE.md` for overall project context.
   explicitly signed off by Marc): an anonymous $19 single-scan purchase
   creates a company before any account exists to own it. This doesn't
   reopen "single owner" — a company is never owned by more than one user,
-  just transiently zero until `claim-single-scan.mts` attaches it — and
-  every existing `WHERE owner_user_id = $userId` check stays safe by
-  construction (`NULL` never matches a real UUID). `is_legacy_import`
+  just transiently zero until claimed — and every existing
+  `WHERE owner_user_id = $userId` check stays safe by construction (`NULL`
+  never matches a real UUID). **The feature that created NULL-owner rows
+  was fully removed 2026-09-11** (`claim-single-scan.mts` deleted along with
+  the rest of the $19 SKU, see the Billing section below) — a live query
+  confirmed zero rows had ever actually had a NULL owner, so nothing was
+  orphaned by the removal. The column stays nullable (harmless — no code
+  writes NULL anymore, same "leave the dormant column" reasoning as
+  `is_public` below) rather than a needless tightening migration.
+  `is_legacy_import`
   flags companies created by the one-off Blobs backfill (Milestone 3) —
   those are the founder's own prospect-research history (scans of *other*
   businesses for outbound), not "the user's own company," labeled honestly
@@ -143,35 +150,36 @@ See the root `CLAUDE.md` for overall project context.
   it's a pure additive migration — the opposite case from `is_public`/
   `company_urls` above, which are dead columns from a *removed* feature;
   this one is prep for a feature that hasn't been built yet.
-- **`scan_credit_purchases`** — an **unused, present-but-dead table**
-  since 2026-09-04. Backed the Pro scan top-up pack feature (added
-  2026-08-23, shipped commit `cad4a34`) — a one-time $19/10-scan purchase
-  Pro users could buy on hitting the monthly fair-use cap. Removed
-  end-to-end (checkout function deleted, webhook branch removed, `scan.mts`/
-  `scheduled-rescan.mts` no longer factor it into the cap, the redirect-
-  completion banner removed from `CompanyDetailView.vue`, copy dropped from
-  `index.html`/`llms.txt`/`terms.html`) once Marc decided to simplify
-  pricing to just Free/Pro/single-scan — see `TODO.md`'s 2026-09-04 entry.
-  Table left in place rather than dropped, same reasoning as `is_public`/
-  `company_urls` above (historical data, no destructive migration for a
-  dead column/table). Production's `STRIPE_TOPUP_PRICE_ID` env var is a
-  stray leftover from this feature (a live Price from an unrelated
-  concurrent-session mistake on 2026-08-28, see `CLAUDE.md`'s Deployment
-  section) — left untouched rather than resolved, since deleting the only
-  function that ever read it makes the value permanently inert either way.
-- **`single_scan_purchases`** — added 2026-08-24, backs the $19 one-time
-  single-scan SKU (Milestone 2 of the monetization plan, see "Billing
-  (Stripe)" below). `email text not null`, `stripe_checkout_session_id text
-  unique not null` (idempotency guard, same `ON CONFLICT ... DO NOTHING`
-  pattern as `scan_credit_purchases`), `stripe_payment_intent_id`,
+- **`scan_credit_purchases`** — **DROPPED 2026-09-11** (was an unused,
+  present-but-dead table since 2026-09-04). Backed the Pro scan top-up pack
+  feature (added 2026-08-23, shipped commit `cad4a34`) — a one-time
+  $19/10-scan purchase Pro users could buy on hitting the monthly fair-use
+  cap. Removed end-to-end in code on 2026-09-04 once Marc decided to
+  simplify pricing (see `TODO.md`'s 2026-09-04 entry); left in place as a
+  dormant table at the time, same reasoning as `is_public`/`company_urls`
+  above. Actually dropped from the database 2026-09-11 as part of a
+  broader "clean up all old payment-related code" pass, once a live query
+  confirmed it held only a single stray test row and zero code referenced
+  it — see root `CLAUDE.md`'s 2026-09-11 Deployment entry. The stray
+  `STRIPE_TOPUP_PRICE_ID` env var this table's entry used to flag was
+  removed from Netlify the same day.
+- **`single_scan_purchases`** — **DROPPED 2026-09-11.** Had backed the $19
+  one-time single-scan SKU (Milestone 2 of the monetization plan) since
+  2026-08-24: `email text not null`, `stripe_checkout_session_id text
+  unique not null` (idempotency guard), `stripe_payment_intent_id`,
   `amount_cents`, `company_id`/`scan_id`/`user_id` all nullable FKs,
   `access_token text unique` (the unguessable lookup key for anonymous
-  buyers — `null` for the logged-in "topup" mode, which is looked up by
-  `scan_id` instead), `purchased_at`. One row per purchase, doubles as: the
-  deep-advice entitlement record for that scan (`generate-deep-advice.mts`
-  checks `EXISTS (... WHERE scan_id = $scanId)`), the free-cap-bypass
-  record, and — for anonymous purchases — the pending-claim record until
-  `claim-single-scan.mts` sets `user_id`.
+  buyers), `purchased_at`. Doubled as the deep-advice entitlement record,
+  the free-cap-bypass record, and the pending-claim record for anonymous
+  purchases. Dropped as part of the same 2026-09-11 pricing-simplification
+  pass as `scan_credit_purchases` above, after a live query confirmed it
+  held **zero rows, ever** — the $19 SKU was live for weeks but never
+  actually purchased, so there was no historical data to preserve. See root
+  `CLAUDE.md`'s 2026-09-11 Deployment entry for the full list of code this
+  went with (`create-single-scan-checkout-session.mts`,
+  `claim-single-scan.mts`, `single-scan-status.mts`,
+  `src/app/views/PublicScanView.vue` all deleted; `stripe-webhook.mts`'s and
+  `generate-deep-advice.mts`'s purchase-handling branches removed).
 - **`companies.language`** — added 2026-08-25 (Milestone C3, EN/NL prompt
   support), `text`, `'en'`|`'nl'`|`null`. Set at creation time by
   `companies.mts` from `SUPPORTED_LANGUAGES`; read by
@@ -280,29 +288,33 @@ gap this update fixes rather than something built this session.
   (`create-topup-checkout-session.mts`) was deleted; its own comment said
   "Remove this once that cleanup lands." **Recreated the same day**, hours
   later: Marc asked for the product to run free-only for now with real
-  cost control, so `checkoutTemporarilyDisabled()` is back (new message
+  cost control, so `checkoutTemporarilyDisabled()` came back (new message
   text — this time it's a deliberate product decision, not an incident-
-  response safety gate) and wired into both remaining checkout functions
-  below. See root `CLAUDE.md`'s Deployment section for the full detail and
-  exact revert steps.
+  response safety gate) and was wired into both remaining checkout
+  functions. **Deleted for good on 2026-09-11** once Marc decided to turn
+  real pricing back on — see root `CLAUDE.md`'s 2026-09-11 Deployment entry.
 - **`create-checkout-session.mts`** — POST, auth-gated. Creates a Stripe
   Checkout session, `mode: 'subscription'` (real recurring billing, not a
-  one-time charge), rejects if already Pro. **Hard-disabled again as of
-  2026-09-04** (returns `checkoutTemporarilyDisabled()`'s 503 before ever
-  reaching `requireAuth`) — see the `_shared/stripe.mts` bullet above.
+  one-time charge), rejects if already Pro. Was hard-disabled 2026-09-04→
+  2026-09-11 (see the `_shared/stripe.mts` bullet above); **re-enabled
+  2026-09-11**, now the only checkout-creating function in this repo (the
+  $19 single-scan one was deleted, not re-enabled — see below).
 - **`stripe-webhook.mts`** — POST, deliberately *not* `requireAuth` (Stripe
   signs the raw body itself, verified via `STRIPE_WEBHOOK_SECRET`).
   `checkout.session.completed` sets `plan_tier='pro'` on `user_profiles`
   for a subscription session. Used to also have a `scan_credit_pack`
   branch (`metadata.type === 'scan_credit_pack'`) inserting a
   `scan_credit_purchases` row — **removed 2026-09-04** along with the
-  top-up feature. **Not to be confused with** the still-live
-  `metadata.mode === 'topup'` branch inside the *single-scan-purchase*
-  handling below (a same-word, different-feature naming collision — that
-  one is a Pro/Free user buying one extra $19 scan when capped, unrelated
-  to the removed bulk credit pack, and was not touched).
-  `customer.subscription.updated`/`.deleted` sync `subscription_status` and
-  flip back to `'free'` if the subscription is no longer active/trialing.
+  top-up feature. It also used to have a `metadata.type ===
+  'single_scan_purchase'` branch (covering both an "anonymous" and a
+  logged-in "topup" sub-mode — the "topup" name there was an unrelated
+  naming collision with the already-removed bulk credit-pack feature) —
+  **removed 2026-09-11** along with the rest of the $19 SKU, once a live
+  query confirmed that table had zero rows, ever. All that remains in this
+  function now is the subscription path below plus
+  `customer.subscription.updated`/`.deleted` syncing `subscription_status`
+  and flipping back to `'free'` if the subscription is no longer
+  active/trialing.
 - **What Pro actually gates today**: `scan.mts` (3 scans lifetime on Free,
   20/calendar-month fair-use on Pro) and `companies.mts` (1 company on
   Free), both returning a `402 {error, upgradeRequired, limit}`. The
@@ -312,28 +324,20 @@ gap this update fixes rather than something built this session.
   gates on `isPro(planTier)`, returning `402 {error, upgradeRequired:
   true}`; `company.mts`'s weekly-rescan `PATCH` does the same for non-Pro
   callers.
-  **2026-09-04 — free-only cost-control pass**: checkout is hard-disabled
-  (see the `_shared/stripe.mts` bullet above), so every "Upgrade to Pro"
-  CTA these 402s used to drive was removed, and the 402 message text
-  itself was reworded to not point at a dead checkout flow (the
-  `upgradeRequired`/`limit` JSON fields are unchanged — only the `error`
-  string): `scan.mts`'s free-cap message is now "You've used all 3 free
-  scans for now — more capacity is coming soon."; `companies.mts`'s is
-  "You've reached the free plan's limit of 1 company for now — more
-  capacity is coming soon."; `generate-deep-advice.mts`'s is "Deeper
-  advice isn't available on the free plan right now."; `company.mts`'s is
-  "Automatic weekly scans aren't available on the free plan right now."
-  Frontend CTAs removed to match: `CompaniesListView.vue`'s header
-  "Upgrade to Pro" button and its inline 402 CTA (the now-dead
-  `createUpgradeRequired` ref was also removed); `CompanyDetailView.vue`'s
-  inline 402 CTA (`scanUpgradeRequired` ref also removed) and
-  `toggleAutoScan()`'s checkout call (now just sets a plain `scanError`
-  message); `ScanDetail.vue`'s `deep-advice-locked` card's button and its
-  `upgrade` emit. Each view's `startCheckout()` function was left in place
-  (body unchanged, dated comment added) even though every call site is
-  gone — dead code kept for a cheap revert, not deleted. `1`/`3`/`20`
+  **2026-09-04 — free-only cost-control pass**: checkout was hard-disabled,
+  so every "Upgrade to Pro" CTA these 402s drove was removed, and the 402
+  message text was reworded to not point at a dead checkout flow (the
+  `upgradeRequired`/`limit` JSON fields were unchanged throughout — only
+  the `error` string). **Reverted 2026-09-11**, alongside the pricing
+  restore: all four 402 messages went back to "Upgrade to Pro" wording, and
+  the CTAs came back — `CompaniesListView.vue`'s header button and inline
+  402 CTA (`createUpgradeRequired` restored); `CompanyDetailView.vue`'s
+  inline 402 CTA (`scanUpgradeRequired` restored) and `toggleAutoScan()`
+  routing straight into `startCheckout()` again instead of a dead-end
+  message; `ScanDetail.vue`'s `deep-advice-locked` card's button and
+  `upgrade` emit, wired from `CompanyDetailView.vue`. `1`/`3`/`50`
   (`FREE_PLAN_COMPANY_LIMIT`/`FREE_PLAN_SCAN_LIMIT`/
-  `PRO_PLAN_MONTHLY_SCAN_LIMIT`) were **not** changed by this pass.
+  `PRO_PLAN_MONTHLY_SCAN_LIMIT`) were **not** changed by either pass.
   The Pro subscription price was decided and shipped live on 2026-08-24 at
   **$199/month**, reflected in `index.html`'s pricing card, FAQ, and
   JSON-LD `Offer`, and `llms.txt`. **Confirmed 2026-08-24**: a direct
@@ -351,18 +355,31 @@ gap this update fixes rather than something built this session.
 - **Scan top-up packs — removed 2026-09-04.** See the
   `scan_credit_purchases` schema entry above for the full removal detail
   and `TODO.md`'s 2026-09-04 entry for the file-by-file list.
-- **Single-scan purchase — shipped 2026-08-24** (Milestone 2 of
-  `~/.claude/plans/we-need-alot-of-transient-floyd.md`): a $19 one-time
-  scan, serving both an anonymous lead-gen entry point and a logged-in
-  free-tier fallback for a user out of scans who doesn't want to
-  subscribe, bundling deep advice for that one scan. Still live and still
-  $19, but the **Price ID has since changed** — `price_1U7s9C8gBja0qkMxi4bLhk3X`
-  above was superseded during the 2026-09-02 live→test-mode reversion; see
-  root `CLAUDE.md`'s Deployment section for the current
-  `STRIPE_SINGLE_SCAN_PRICE_ID`. The E0 manual-sales-validation gate from
-  `PLAN_NEXT_PHASE.md` was explicitly waived by Marc for this round;
-  pricing was decided directly instead (originally $199/mo Pro, now
-  $99/mo; $19 one-time unchanged).
+- **Single-scan purchase — shipped 2026-08-24, removed 2026-09-11.**
+  (Milestone 2 of `~/.claude/plans/we-need-alot-of-transient-floyd.md`): a
+  $19 one-time scan, serving both an anonymous lead-gen entry point and a
+  logged-in free-tier fallback for a user out of scans who doesn't want to
+  subscribe, bundling deep advice for that one scan. The E0
+  manual-sales-validation gate from `PLAN_NEXT_PHASE.md` was explicitly
+  waived by Marc for this round; pricing was decided directly instead.
+  **Fully removed 2026-09-11** as part of a KISS pricing simplification to
+  Free + $99/mo Pro only — see root `CLAUDE.md`'s 2026-09-11 Deployment
+  entry and the `single_scan_purchases` schema entry above (confirmed via a
+  live query that the SKU had never actually been purchased, zero rows,
+  before deleting it).
+- **Manually granting a beta tester Pro** — there is no admin system in
+  this app (see `ops-failure-digest.mts`'s entry below), so this is a
+  direct SQL statement run via Neon MCP against `user_profiles`, the exact
+  same column the webhook itself writes on a real payment:
+  ```sql
+  UPDATE public.user_profiles
+  SET plan_tier = 'pro', subscription_status = 'active'
+  WHERE user_id = '<uuid>';
+  ```
+  Look up the `user_id` by joining `neon_auth."user"` on email if only an
+  email address is known. `stripe_customer_id`/`stripe_subscription_id` can
+  stay `NULL` — nothing dereferences them for a user who never goes through
+  Stripe. To revoke, set `plan_tier = 'free'` the same way.
 
 ### `netlify/functions/` — one function per file, all auth-scoped except `enrich`
 
@@ -546,35 +563,16 @@ gap this update fixes rather than something built this session.
   stateless research helper with no DB/company concept). Always returns 200
   even on internal failure (`{ ok: false, error }`); nothing here is
   persisted.
-- **`create-single-scan-checkout-session.mts`** — added 2026-08-24, POST
-  `/create-single-scan-checkout-session`. The one function in this repo
-  with *optional* auth rather than hard-`requireAuth` or fully public — a
-  valid bearer + owned `company_id` in the body promotes the request to a
-  logged-in top-up purchase; anything else falls back to the anonymous
-  `{email, website}` path. See "Billing (Stripe)" above for the full
-  purchase-flow design. **Hard-disabled again as of 2026-09-04** (returns
-  `checkoutTemporarilyDisabled(corsHeaders(req))`'s 503 before the
-  `priceId` lookup, covering both the anonymous and logged-in-topup paths
-  with one early return) — see the `_shared/stripe.mts` bullet above. The
-  one line of dead code this leaves behind (`metadata = {..., company_id:
-  body.company_id}` inside the now-unreachable topup branch) needs a
-  `@ts-expect-error` since TS loses `body.company_id`'s narrowing past the
-  early return — same fix the 2026-09-02 incident-driven disable already
-  needed here.
-- **`single-scan-status.mts`** — added 2026-08-24, GET
-  `/single-scan-status?token=…` or `?session_id=…`, fully public (no auth
-  at all — the token is the access control). Polled by
-  `PublicScanView.vue`; returns `{purchaseStatus: 'processing'}` if the
-  webhook hasn't landed yet rather than a 404, since an immediate
-  post-Checkout request commonly arrives first.
-- **`claim-single-scan.mts`** — added 2026-08-24, POST `/claim-single-scan`,
-  `{access_token}`, auth-gated. Atomically attaches an anonymous purchase's
-  ownerless `companies` row to the caller's account
-  (`UPDATE ... WHERE owner_user_id IS NULL`, same claim idiom
-  `run-scan-background.mts` uses for claiming pending scans). Called from
-  `SignupView.vue` (right after signup, via `?claim=`) and
-  `PublicScanView.vue` (auto-claim if already signed in when visiting the
-  link).
+- **`create-single-scan-checkout-session.mts`**, **`single-scan-status.mts`**,
+  **`claim-single-scan.mts`** — added 2026-08-24 for the $19 single-scan SKU
+  (see "Billing (Stripe)" above), **all three deleted 2026-09-11** along
+  with `src/app/views/PublicScanView.vue`, `SignupView.vue`'s `?claim=`
+  step, and `stripe-webhook.mts`'s/`generate-deep-advice.mts`'s
+  purchase-handling branches, once that SKU was confirmed (via a live
+  query — zero rows in `single_scan_purchases`, ever) to have never
+  actually been purchased and Marc decided to simplify pricing to Free +
+  Pro only. See root `CLAUDE.md`'s 2026-09-11 Deployment entry for the
+  full file list.
 - **`backfill-legacy-scans.mts`** — one-off Milestone 3 import of the
   pre-pivot `aivis-scans` Blobs store into Postgres (any authenticated
   caller becomes the owner of everything imported; idempotent, skips

@@ -9,9 +9,10 @@ root `CLAUDE.md` for overall project context.
 
 - **`router.ts`** — routes: `/app` (companies list), `/app/login`,
   `/app/signup`, `/app/companies/:id`, `/app/billing/success`
-  (`BillingSuccessView.vue`, the post-Stripe-Checkout landing page),
-  `/app/scan` (`PublicScanView.vue`, `meta: {requiresAuth: false}` — see
-  its own entry below). The three no-auth content routes added 2026-08-12
+  (`BillingSuccessView.vue`, the post-Stripe-Checkout landing page).
+  `/app/scan` (`PublicScanView.vue`, the $19 single-scan public landing
+  page) was **removed 2026-09-11** along with the rest of that SKU — see
+  root `CLAUDE.md`'s 2026-09-11 Deployment entry. The three no-auth content routes added 2026-08-12
   (`/app/privacy`, `/app/terms`, `/app/how-it-works`) were themselves
   **removed 2026-08-14** once their views were deleted and converted to
   static HTML — see those views' entries below; `router.ts` no longer has
@@ -53,13 +54,12 @@ root `CLAUDE.md` for overall project context.
   2026-08-13 when the model expansion changed those numbers). Never
   carried the draft notice.
 - **`views/LoginView.vue` / `SignupView.vue`** — plain email/password forms
-  against `lib/auth.ts`'s `signIn`/`signUp`. **`SignupView.vue` extended
-  2026-08-24**: reads `?claim=<access_token>` (set by `PublicScanView.vue`'s
-  "create a free account" CTA) and calls `POST /claim-single-scan` right
-  after a successful signup, before navigating on — best-effort, a claim
-  failure still lands the new user on `/app` rather than blocking signup.
-  **`LoginView.vue` gained a "Forgot password?" link 2026-09-02**, see
-  below.
+  against `lib/auth.ts`'s `signIn`/`signUp`. **`SignupView.vue` was
+  extended 2026-08-24** with a `?claim=<access_token>` post-signup step for
+  the $19 single-scan SKU's "create a free account" CTA — **removed
+  2026-09-11** along with the rest of that SKU, so signup is back to a
+  plain `signUp()` → `/app` redirect. **`LoginView.vue` gained a "Forgot
+  password?" link 2026-09-02**, see below.
 - **`views/ForgotPasswordView.vue` / `ResetPasswordView.vue`** — added
   2026-09-02 (`routes` `/app/forgot-password`/`/app/reset-password`,
   `lib/auth.ts`'s new `requestPasswordReset`/`resetPassword`, both thin
@@ -86,20 +86,12 @@ root `CLAUDE.md` for overall project context.
   token a second time correctly 400s ("Invalid token"), confirming
   single-use enforcement.
 - **`views/PublicScanView.vue`** — added 2026-08-24 (Milestone 2 of the
-  monetization plan), route `/app/scan`, `meta: {requiresAuth: false}` — the
-  one page in this app shell a signed-out visitor can see real scan data
-  on. Landed on either via `?session_id=` (straight off a $19 single-scan
-  Stripe Checkout redirect, before an `access_token` is known yet) or
-  `?token=` (the emailed receipt link). Polls `GET /single-scan-status`
-  (public, unauthenticated) the same way `CompanyDetailView.vue`'s
-  `pollScan()` polls `/scans/:id`, tolerant of a `purchaseStatus:
-  'processing'` state since the webhook that creates the purchase row runs
-  asynchronously relative to the Checkout redirect. Once resolved: renders
-  the completed scan via the shared `ScanDetail.vue` (same component
-  `result.html`/`CompanyDetailView.vue` use); auto-calls
-  `POST /claim-single-scan` if the visitor is already signed in, otherwise
-  shows a persistent "create a free account" banner linking to
-  `/app/signup?claim=<token>`.
+  monetization plan), route `/app/scan`, the one page in this app shell a
+  signed-out visitor could see real scan data on — reached via a $19
+  single-scan Stripe Checkout redirect or its emailed receipt link.
+  **Deleted 2026-09-11** along with the rest of that SKU (see root
+  `CLAUDE.md`'s 2026-09-11 Deployment entry) — no replacement, since the
+  underlying purchase flow it served no longer exists.
 - **`views/CompaniesListView.vue`** — lists the caller's companies
   (`GET /companies`), each with `scan_count`/`latest_score`/`prev_score`/
   `delta`/`latest_scan_status`/`last_scanned_at` computed server-side (see
@@ -179,4 +171,4 @@ root `CLAUDE.md` for overall project context.
   skill's "a legend is always present for 2+ series" rule.
 - **`views/BillingSuccessView.vue`** — route `/app/billing/success`, the
   page Stripe Checkout redirects back to after a successful Pro
-  subscription or credit-pack purchase.
+  subscription purchase.

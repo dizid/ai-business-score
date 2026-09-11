@@ -60,16 +60,13 @@ export default async (req: Request, context: Context) => {
       );
     }
 
-    // Weekly auto-scans are a Pro feature — it's what makes the recurring
-    // subscription rational vs. buying one-off scans as needed. 'off'
-    // requires no plan check so a downgraded user can always turn it off.
+    // Weekly auto-scans are a Pro feature. 'off' requires no plan check so a
+    // downgraded user can always turn it off.
     if (body.scan_frequency === 'weekly') {
       const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
       if (!isPro(profiles[0]?.plan_tier)) {
         return new Response(
-          // 2026-09-04 — free-only cost-control pass, see scan.mts's matching
-          // comment / root CLAUDE.md's Deployment section.
-          JSON.stringify({ error: "Automatic weekly scans aren't available on the free plan right now.", upgradeRequired: true }),
+          JSON.stringify({ error: 'Automatic weekly scans are a Pro feature. Upgrade to Pro to unlock them.', upgradeRequired: true }),
           { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
         );
       }
