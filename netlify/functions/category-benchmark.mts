@@ -26,38 +26,30 @@
 // not a bug — it gets more useful automatically as real usage grows, no
 // rework needed later.
 import type { Config } from '@netlify/functions';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 const MIN_CATEGORY_SAMPLE_SIZE = 5;
 
 export default async (req: Request) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
+  const cors = corsHeaders(req);
 
   if (req.method !== 'GET') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Method not allowed', 405, {}, cors);
   }
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   const url = new URL(req.url);
   const companyId = url.searchParams.get('company_id');
   if (!companyId) {
-    return new Response(JSON.stringify({ error: 'company_id is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('company_id is required', 400, {}, cors);
   }
 
   const db = sql();
@@ -69,17 +61,14 @@ export default async (req: Request) => {
     SELECT category FROM public.companies WHERE id = ${companyId} AND owner_user_id = ${userId}
   `;
   if (companies.length === 0) {
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Not found', 404, {}, cors);
   }
 
   const category = (companies[0].category || '').trim();
   if (!category) {
-    return new Response(
-      JSON.stringify({ ok: true, category: '', companyCount: 0, avgScore: null, medianScore: null, sufficientData: false, minSampleSize: MIN_CATEGORY_SAMPLE_SIZE }),
-      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+    return jsonResponse(
+      { ok: true, category: '', companyCount: 0, avgScore: null, medianScore: null, sufficientData: false, minSampleSize: MIN_CATEGORY_SAMPLE_SIZE },
+      { cors }
     );
   }
 
@@ -112,8 +101,8 @@ export default async (req: Request) => {
   const companyCount = row.company_count ?? 0;
   const sufficientData = companyCount >= MIN_CATEGORY_SAMPLE_SIZE;
 
-  return new Response(
-    JSON.stringify({
+  return jsonResponse(
+    {
       ok: true,
       category,
       companyCount,
@@ -121,8 +110,8 @@ export default async (req: Request) => {
       medianScore: sufficientData && row.median_score !== null ? Math.round(row.median_score) : null,
       sufficientData,
       minSampleSize: MIN_CATEGORY_SAMPLE_SIZE,
-    }),
-    { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+    },
+    { cors }
   );
 };
 

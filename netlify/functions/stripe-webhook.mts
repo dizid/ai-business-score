@@ -5,33 +5,25 @@
 import type { Config } from '@netlify/functions';
 import { sql } from './_shared/db.mts';
 import { stripe } from './_shared/stripe.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Method not allowed', 405);
   }
 
   const webhookSecret = Netlify.env.get('STRIPE_WEBHOOK_SECRET');
   if (!webhookSecret) {
     console.error('Server misconfigured: STRIPE_WEBHOOK_SECRET not set');
-    return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Server misconfigured', 500);
   }
 
   const signature = req.headers.get('stripe-signature');
   const rawBody = await req.text();
   if (!signature) {
-    return new Response(JSON.stringify({ error: 'Missing stripe-signature header' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Missing stripe-signature header', 400);
   }
 
   let event;
@@ -39,10 +31,7 @@ export default async (req: Request) => {
     event = stripe().webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (err) {
     console.error('Stripe webhook signature verification failed:', err);
-    return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Invalid signature', 400);
   }
 
   const db = sql();
@@ -92,10 +81,7 @@ export default async (req: Request) => {
       break;
   }
 
-  return new Response(JSON.stringify({ received: true }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return jsonResponse({ received: true });
 };
 
 export const config: Config = {

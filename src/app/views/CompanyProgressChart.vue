@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { formatDateShort } from '../lib/format';
 
 // Single-series line chart (score over time) — no legend needed per the
 // dataviz skill's rule ("a single series needs no legend box, the title
@@ -80,10 +81,6 @@ const linePaths = computed(() =>
 
 const gridlines = [0, 50, 100];
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
 // Anchor the first/last labels to the inside edge so they never clip past
 // the SVG viewport — only interior labels center on their point.
 function labelAnchor(index: number): 'start' | 'middle' | 'end' {
@@ -124,7 +121,7 @@ const hovered = computed(() => (hoveredIndex.value === null ? null : points.valu
             class="axis-label"
             :x="xFor(i)" :y="HEIGHT - 8"
             :text-anchor="labelAnchor(i)"
-          >{{ formatDate(p.generatedAt) }}</text>
+          >{{ formatDateShort(p.generatedAt) }}</text>
         </template>
 
         <!-- line segments (broken across no-data gaps) -->
@@ -145,7 +142,7 @@ const hovered = computed(() => (hoveredIndex.value === null ? null : points.valu
       </svg>
 
       <div class="tooltip" v-if="hovered && hovered.score !== null">
-        {{ formatDate(hovered.generatedAt) }}: <strong>{{ hovered.score }}</strong> / 100
+        {{ formatDateShort(hovered.generatedAt) }}: <strong>{{ hovered.score }}</strong> / 100
         <span class="tooltip-hint">· click to view</span>
       </div>
     </div>

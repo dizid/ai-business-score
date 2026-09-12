@@ -4,32 +4,27 @@
 // grounded Perplexity call; result stored on the scan row.
 import type { Config, Context } from '@netlify/functions';
 import { callModel, buildDeepAdvicePrompt, parseDeepAdviceResponse } from '../../shared/aivis-core.mjs';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { toScanPayload } from './_shared/scanRow.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 import { isPro } from './_shared/plan.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
 export default async (req: Request, context: Context) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
+  const cors = corsHeaders(req);
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Method not allowed', 405, {}, cors);
   }
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   const db = sql();
   const scanId = context.params.id;
@@ -40,34 +35,22 @@ export default async (req: Request, context: Context) => {
     WHERE scans.id = ${scanId} AND companies.owner_user_id = ${userId}
   `;
   if (rows.length === 0) {
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Not found', 404, {}, cors);
   }
   const scanRow = rows[0];
 
   const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
   if (!isPro(profiles[0]?.plan_tier)) {
-    return new Response(
-      JSON.stringify({ error: 'Deep advice is a Pro feature. Upgrade to Pro to unlock it.', upgradeRequired: true }),
-      { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
-    );
+    return errorResponse('Deep advice is a Pro feature. Upgrade to Pro to unlock it.', 402, { upgradeRequired: true }, cors);
   }
 
   if (scanRow.status !== 'completed') {
-    return new Response(JSON.stringify({ error: 'Scan is not completed yet' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Scan is not completed yet', 400, {}, cors);
   }
 
   const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Server misconfigured: PERPLEXITY_API_KEY not set' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Server misconfigured: PERPLEXITY_API_KEY not set', 500, {}, cors);
   }
 
   try {
@@ -83,15 +66,9 @@ export default async (req: Request, context: Context) => {
       WHERE id = ${scanId}
       RETURNING *
     `;
-    return new Response(JSON.stringify({ ok: true, scan: toScanPayload(updated[0]) }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: true, scan: toScanPayload(updated[0]) }, { cors });
   } catch (err) {
-    return new Response(JSON.stringify({ ok: false, error: (err as Error).message }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: false, error: (err as Error).message }, { cors });
   }
 };
 

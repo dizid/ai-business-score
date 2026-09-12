@@ -5,6 +5,65 @@ Scoped guidance for `shared/`, split out of the project root `CLAUDE.md` on
 this directory, instead of every session paying for it. See the root
 `CLAUDE.md` for overall project context.
 
+### 2026-09-12 — `aivis-core.mjs` split into `shared/aivis/*` submodules
+
+Architecture refactor: `shared/aivis-core.mjs` had grown to 1236 lines
+mixing prompt templates, provider transport, brand-detection, aggregation,
+scoring, advice, and four prompt-builder/parser pairs with no internal
+boundaries — the founder flagged this (and the rest of the codebase) as
+"spaghetti" and asked for it to be made extensible/maintainable. Full plan
+at `~/.claude/plans/check-everythink-i-am-foamy-candle.md`.
+
+**`aivis-core.mjs` is now a pure re-exporting facade** — all 36 original
+exports, same names, re-exported from the new submodules below. This is
+deliberate, not a half-finished migration: `proof-script/index.mjs` imports
+this file via a plain relative path with zero build step and zero deps, and
+~20 total consumers (Netlify functions, the Vue app) would otherwise all
+need touching for zero functional gain. New code should import directly
+from `shared/aivis/*`; existing consumers don't need to change.
+
+New layout:
+- `shared/timeout.mjs` — `withTimeout`/`withCombinedTimeout`, promoted from
+  harmonia.mjs's local helper + aivis-core.mjs's inline AbortController
+  logic (previously two independent implementations of the same thing).
+- `shared/textUtils.mjs` — `truncate()`, dedupes a `.slice(0, 300)` literal
+  that had been hand-copied at 4 call sites.
+- `shared/aivis/prompts.mjs`, `brand.mjs`, `aggregate.mjs`, `score.mjs`,
+  `advice.mjs`, `enrichment.mjs`, `deepAdvice.mjs`, `sentimentJudge.mjs`,
+  `clarityCheck.mjs`, `prospectFields.mjs` — one file per domain, same
+  logic as before, just relocated (see each file's own header comment).
+- `shared/aivis/providers/{anthropic,google,xai,openai}.mjs` — one adapter
+  module per provider, each exporting `call(apiKey, modelId, prompt,
+  signal)` (+ `parseResponse` where the shape is worth testing separately).
+  `responsesShapeClient.mjs` holds the OpenAI-Responses-API-compatible
+  transport Perplexity/xAI/OpenAI all share. `registry.mjs` holds `MODELS`
+  and the new `PROVIDER_ADAPTERS` config table, which replaced `callModel`'s
+  old imperative switch — **adding a 5th provider now means one new file +
+  one registry entry + one MODELS entry**, not editing ~6 scattered spots in
+  one large file. `client.mjs` holds `callModel`/`callModelWithRetry`/
+  `runWithConcurrency`, now reading the registry instead of a switch.
+  `PROVIDER_ADAPTERS`'s asymmetric `requireOwnKey` behavior (anthropic/
+  google/xai throw if their own key is missing; openai alone falls back to
+  the Perplexity gateway) is preserved exactly — this is real, documented,
+  load-bearing behavior from the 2026-08-15/08-25 migrations above, not
+  flattened by the rewrite. The dispatch rewrite was manually diffed
+  branch-by-branch against the old switch before shipping, and
+  `tests/aivis-providers.test.mjs` (new) specifically regression-tests the
+  fallback/missing-key asymmetry so a future change can't silently flatten
+  it again — verified by temporarily breaking `requireOwnKey` and
+  confirming the test suite actually catches it before trusting the test.
+
+**SSRF-guard test coverage** (`shared/harmonia.mjs`): `isPrivateIPv4`/
+`isPrivateIPv6`/`assertPublicHost`/`safeFetch` — the most security-sensitive
+code in the repo, previously untested — were promoted from internal to
+exported (additive) and now have real coverage in `tests/harmonia.test.mjs`,
+including a test asserting `safeFetch` refuses to follow a redirect to a
+cloud-metadata address (`169.254.169.254`) and an `analyzeHarmonia`
+end-to-end test confirming an SSRF rejection surfaces in `errors[]` rather
+than throwing. Verified by temporarily disabling the guard and confirming
+the redirect test fails, same discipline as the provider-dispatch tests
+above. Test count for `shared/`: 63 → 109.
+
 ### Update 2026-08-13 — call latency, concurrency, and retry history
 
 Migrated from root `CLAUDE.md` on 2026-08-20 (via `/doctor`) — that content

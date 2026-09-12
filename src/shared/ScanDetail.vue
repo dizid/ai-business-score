@@ -13,13 +13,12 @@ import ReportSeoSection from './report/ReportSeoSection.vue';
 import ReportScanDetails from './report/ReportScanDetails.vue';
 import {
   sentimentKey, deriveSentimentByKey, deriveSentimentSummaryRows, deriveCategoryBreakdown, deriveSentimentAdvice,
-  deriveRank1Count, deriveBeatenCount, deriveHeadlineKind, deriveScoreboardRows, scoreboardRowPct, shareOfVoicePct,
-  deriveCompetitorAppearances, deriveExecutiveSummary,
+  deriveRank1Count, deriveBeatenCount, deriveHeadlineKind, deriveScoreboardRows, deriveExecutiveSummary,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveVisibleAdvice,
   deriveHarmoniaPillars, deriveHarmoniaBand, cwvRating, formatSeconds, deriveScanDurationLabel,
   confidenceLabel, deriveKeyMetrics, deriveExtraPsiScores, deriveAdditionalAuditRows,
-  type ScoreboardRow,
 } from './scanDerived';
+import Scoreboard from './Scoreboard.vue';
 import { buildScanReportMarkdown, downloadMarkdown } from './scanReport';
 
 // Shared between result/App.vue (a shareable, standalone page) and
@@ -178,26 +177,12 @@ const confidence = computed(() =>
 );
 const keyMetrics = computed(() => deriveKeyMetrics(props.payload));
 
+// Scoreboard rendering itself moved to Scoreboard.vue (2026-09-12) — this
+// one-line computed is kept only to gate the <h2>Scoreboard</h2> heading
+// below, which stays in this file's own template rather than inside the
+// child component (see Scoreboard.vue's header comment for the
+// .theme-dashboard h2 scoped-CSS reason why).
 const scoreboardRows = computed(() => deriveScoreboardRows(props.payload));
-function rowPct(row: ScoreboardRow) {
-  return scoreboardRowPct(props.payload, row);
-}
-function rowSharePct(row: ScoreboardRow) {
-  return shareOfVoicePct(scoreboardRows.value, row);
-}
-
-// Click-through from a competitor's "beat you Nx" line to the specific
-// checks they won — expand/collapse per competitor name, computed lazily
-// (only when expanded) since it re-scans rawResponses.
-const expandedCompetitors = ref<Set<string>>(new Set());
-function toggleCompetitorExpanded(name: string) {
-  const next = new Set(expandedCompetitors.value);
-  if (next.has(name)) next.delete(name); else next.add(name);
-  expandedCompetitors.value = next;
-}
-function competitorAppearances(name: string) {
-  return deriveCompetitorAppearances(props.payload, name);
-}
 
 const checkBreakdown = computed(() => deriveCheckBreakdown(props.payload));
 
@@ -432,30 +417,7 @@ function copySchema(example: string, index: number) {
       <!-- scoreboard: emphasis bar chart (brand = accent, rivals = de-emphasis gray) -->
       <template v-if="scoreboardRows.length">
         <h2>Scoreboard</h2>
-        <div class="card">
-          <div class="board-row" v-for="row in scoreboardRows" :key="row.name + row.isYou">
-            <div class="board-label">
-              <span class="board-name" :title="row.name">{{ row.name }}<span v-if="row.isYou" class="you-tag"> (you)</span></span>
-              <span class="board-count">{{ row.mentionCount }}/{{ payload.completedCalls }} · {{ rowSharePct(row) }}% share of voice</span>
-            </div>
-            <div class="board-track"><div class="board-fill" :class="row.isYou ? 'you' : 'rival'" :style="{ width: rowPct(row) + '%' }"></div></div>
-            <button
-              v-if="!row.isYou && row.beatBrandCount > 0"
-              type="button"
-              class="board-beat board-beat-toggle"
-              :aria-expanded="expandedCompetitors.has(row.name)"
-              @click="toggleCompetitorExpanded(row.name)"
-            >beat you {{ row.beatBrandCount }}× <span class="board-beat-chevron">{{ expandedCompetitors.has(row.name) ? '▲' : '▼' }}</span></button>
-            <ul class="competitor-appearances" v-if="!row.isYou && expandedCompetitors.has(row.name)">
-              <li v-for="(a, i) in competitorAppearances(row.name)" :key="i">
-                <span class="citation-meta">{{ a.model }} &middot; {{ a.promptLabel }}</span>
-                <span class="competitor-snippet">&ldquo;&hellip;{{ a.snippet }}&hellip;&rdquo;</span>
-              </li>
-              <li v-if="competitorAppearances(row.name).length === 0" class="competitor-appearances-empty">No specific checks found for this name.</li>
-            </ul>
-            <div class="board-ambiguous" v-if="row.ambiguous">Name is a common word — automated detection was skipped for some checks. This tally may undercount.</div>
-          </div>
-        </div>
+        <Scoreboard :payload="payload" />
       </template>
 
       <!-- advice cards: moved directly after the Scoreboard (was after
@@ -949,36 +911,22 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
   margin-bottom: 12px;
 }
 
-/* ---- scoreboard (emphasis bar chart: brand = accent, rivals = de-emphasis gray) ---- */
-.board-row { margin-bottom: 12px; }
-.board-row:last-child { margin-bottom: 0; }
+/* ---- board-* below: Scoreboard's OWN rendering moved to Scoreboard.vue
+   (2026-09-12) — .board-label/.board-name/.board-count/.board-track/
+   .board-fill(.you/.rival) stay here too (duplicated in Scoreboard.vue)
+   because the entity-presence and Harmonia-pillar sections further down
+   this file still reuse these same class names for their own bars. ---- */
 .board-label {
   display: flex; justify-content: space-between; gap: 8px;
   font-size: 0.88rem; margin-bottom: 4px;
 }
 .board-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.board-name .you-tag { color: var(--accent); font-weight: 600; }
 .board-count { color: var(--muted); flex: none; font-variant-numeric: proportional-nums; }
 .board-track { height: 22px; border-radius: 6px; background: var(--gridline); overflow: hidden; }
 .board-fill { height: 100%; border-radius: 6px; transition: width 0.6s ease; }
 @media (prefers-reduced-motion: reduce) { .board-fill { transition: none; } }
 .board-fill.you { background: var(--accent); }
 .board-fill.rival { background: var(--debar); }
-.board-beat { color: var(--serious); font-size: 0.8rem; margin-top: 2px; }
-.board-beat-toggle {
-  background: none; border: none; padding: 0; font: inherit; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 4px;
-}
-.board-beat-chevron { font-size: 0.7em; }
-.competitor-appearances { list-style: none; margin: 6px 0 0; padding: 0; }
-.competitor-appearances li {
-  padding: 6px 0; border-top: 1px solid var(--border);
-  display: flex; flex-direction: column; gap: 2px;
-}
-.competitor-appearances li:first-child { border-top: none; }
-.competitor-snippet { font-size: 0.85rem; color: var(--text); }
-.competitor-appearances-empty { color: var(--muted); font-style: italic; }
-.board-ambiguous { color: var(--muted); font-size: 0.78rem; margin-top: 2px; font-style: italic; }
 
 /* ---- performance by query type ---- */
 .category-row { margin-bottom: 16px; }

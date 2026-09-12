@@ -13,50 +13,42 @@
 
 import type { Config } from '@netlify/functions';
 import { callModelWithRetry, buildEnrichPrompt, parseEnrichmentResponse, normalizeUrl } from '../../shared/aivis-core.mjs';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
 export default async (req: Request) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
+  const cors = corsHeaders(req);
 
+  // Plain-text body here (not JSON, unlike every error below) is a
+  // deliberate exception preserved from before this file's response-helper
+  // migration — not something to "fix" as part of a mechanical pass.
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders(req) });
+    return new Response('Method not allowed', { status: 405, headers: cors });
   }
 
-  try {
-    await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
 
   let body: { website?: string };
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Invalid JSON body', 400, {}, cors);
   }
 
   const website = (body.website || '').trim();
   if (!website) {
-    return new Response(JSON.stringify({ error: 'Missing website' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Missing website', 400, {}, cors);
   }
 
   const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Server misconfigured: PERPLEXITY_API_KEY not set' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Server misconfigured: PERPLEXITY_API_KEY not set', 500, {}, cors);
   }
 
   const normalizedWebsite = normalizeUrl(website);
@@ -89,10 +81,7 @@ export default async (req: Request) => {
     // and proof-script use the direct path for this reason.
     const result = await callModelWithRetry({ perplexity: apiKey }, 'openai/gpt-5-mini', buildEnrichPrompt(normalizedWebsite), CALL_TIMEOUT_MS, 3);
     const fields = parseEnrichmentResponse(result.text);
-    return new Response(JSON.stringify({ ok: true, website: normalizedWebsite, ...fields }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: true, website: normalizedWebsite, ...fields }, { cors });
   } catch (err) {
     // Enrichment failing is never fatal — the caller falls back to a blank,
     // manually-filled form. Report why (200, not 500) so the UI can show a
@@ -101,10 +90,7 @@ export default async (req: Request) => {
     // of exposing internal detail (timeout durations, model names, HTTP
     // status bodies) in end-user-facing copy.
     console.error(`Enrichment failed for ${normalizedWebsite}: ${(err as Error).message}`);
-    return new Response(JSON.stringify({ ok: false, error: "Couldn't research that site right now — try again, or fill in the details below." }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: false, error: "Couldn't research that site right now — try again, or fill in the details below." }, { cors });
   }
 };
 

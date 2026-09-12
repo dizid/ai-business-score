@@ -2,22 +2,20 @@
 // ownership-scoped via a join through companies (same pattern as
 // history.mts used before it was retired).
 import type { Config, Context } from '@netlify/functions';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { toScanPayload } from './_shared/scanRow.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 export default async (req: Request, context: Context) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
+  const cors = corsHeaders(req);
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   const scanId = context.params.id;
   const db = sql();
@@ -28,15 +26,12 @@ export default async (req: Request, context: Context) => {
     WHERE scans.id = ${scanId} AND companies.owner_user_id = ${userId}
   `;
   if (rows.length === 0) {
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Not found', 404, {}, cors);
   }
 
   const row = rows[0];
-  return new Response(
-    JSON.stringify({
+  return jsonResponse(
+    {
       ok: true,
       status: row.status,
       errorMessage: row.error_message,
@@ -50,8 +45,8 @@ export default async (req: Request, context: Context) => {
       // is still `running`, before toScanPayload() has anything to return.
       startedAt: row.started_at ?? null,
       scan: row.status === 'completed' ? toScanPayload(row) : null,
-    }),
-    { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } }
+    },
+    { cors }
   );
 };
 

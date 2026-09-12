@@ -12,47 +12,36 @@
 // different target field.
 import type { Config, Context } from '@netlify/functions';
 import { callModel, buildSentimentJudgePrompt, parseSentimentJudgeResponse } from '../../shared/aivis-core.mjs';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { toScanPayload } from './_shared/scanRow.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
 export default async (req: Request, context: Context) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
+  const cors = corsHeaders(req);
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Method not allowed', 405, {}, cors);
   }
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   let body: { promptIndex?: number; model?: string };
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Invalid JSON body', 400, {}, cors);
   }
   const { promptIndex, model } = body;
   if (typeof promptIndex !== 'number' || typeof model !== 'string' || !model) {
-    return new Response(JSON.stringify({ error: 'promptIndex (number) and model (string) are required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('promptIndex (number) and model (string) are required', 400, {}, cors);
   }
 
   const scanId = context.params.id;
@@ -64,34 +53,22 @@ export default async (req: Request, context: Context) => {
     WHERE scans.id = ${scanId} AND companies.owner_user_id = ${userId}
   `;
   if (rows.length === 0) {
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Not found', 404, {}, cors);
   }
   const scanRow = rows[0];
   if (scanRow.status !== 'completed') {
-    return new Response(JSON.stringify({ error: 'Scan is not completed yet' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Scan is not completed yet', 400, {}, cors);
   }
 
   const rawResponses: { promptIndex: number; model: string; text: string }[] = scanRow.raw_responses || [];
   const target = rawResponses.find((r) => r.promptIndex === promptIndex && r.model === model);
   if (!target) {
-    return new Response(JSON.stringify({ error: 'No matching check found on this scan' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('No matching check found on this scan', 400, {}, cors);
   }
 
   const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'Server misconfigured: PERPLEXITY_API_KEY not set' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Server misconfigured: PERPLEXITY_API_KEY not set', 500, {}, cors);
   }
 
   try {
@@ -120,15 +97,9 @@ export default async (req: Request, context: Context) => {
       WHERE id = ${scanId}
       RETURNING *
     `;
-    return new Response(JSON.stringify({ ok: true, scan: toScanPayload(updated[0]) }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: true, scan: toScanPayload(updated[0]) }, { cors });
   } catch (err) {
-    return new Response(JSON.stringify({ ok: false, error: (err as Error).message }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: false, error: (err as Error).message }, { cors });
   }
 };
 

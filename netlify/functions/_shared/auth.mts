@@ -50,3 +50,30 @@ export function authErrorResponse(err: unknown): Response {
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+// Added 2026-09-12 (architecture refactor) to collapse the
+// `requireAuth`-then-catch-`AuthError` block that had been copy-pasted
+// verbatim into 10 function files. Deliberately a plain function returning
+// `string | Response` rather than a `withAuth(handler)` HOC — the 10 real
+// call sites don't agree on a single method-check/auth/ownership ordering
+// (company.mts checks method then auth then row ownership;
+// create-checkout-session.mts checks method then auth then plan state), so
+// a wrapper would either have to become configurable (defeating the
+// simplification) or silently change one of those orderings. This preserves
+// each caller's own explicit control flow with a 3-line replacement for the
+// old 6-line block:
+//
+//   const auth = await authenticate(req);
+//   if (auth instanceof Response) return auth;
+//   const userId = auth;
+//
+// `requireAuth`/`authErrorResponse`/`AuthError` stay exported and unchanged
+// — still used here, and still independently useful/testable.
+export async function authenticate(req: Request): Promise<string | Response> {
+  try {
+    return await requireAuth(req);
+  } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
+    throw err;
+  }
+}

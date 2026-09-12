@@ -15,6 +15,7 @@
 
 import { promises as dns } from 'node:dns';
 import { isIP } from 'node:net';
+import { withTimeout } from './timeout.mjs';
 
 const HOMEPAGE_TIMEOUT_MS = 8000;
 const ROBOTS_TIMEOUT_MS = 5000;
@@ -29,7 +30,12 @@ const MAX_REDIRECTS = 3;
 // localhost) if not restricted. PageSpeed Insights is deliberately NOT
 // covered here — that fetch happens on Google's infrastructure, not ours.
 
-function isPrivateIPv4(ip) {
+// Exported 2026-09-12 (architecture refactor) — this SSRF guard is the most
+// security-sensitive code in the repo and had zero test coverage; promoting
+// these from internal to exported (additive, same pattern parseHtml/
+// validateJsonLdBlocks below already use) lets tests/harmonia.test.mjs
+// exercise them directly instead of only indirectly through analyzeHarmonia.
+export function isPrivateIPv4(ip) {
   const parts = ip.split('.').map(Number);
   if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) return true; // malformed -> fail closed
   const [a, b] = parts;
@@ -43,7 +49,7 @@ function isPrivateIPv4(ip) {
   return false;
 }
 
-function isPrivateIPv6(ip) {
+export function isPrivateIPv6(ip) {
   const lower = ip.toLowerCase();
   if (lower === '::1' || lower === '::') return true; // loopback / unspecified
   if (lower.startsWith('fe8') || lower.startsWith('fe9') || lower.startsWith('fea') || lower.startsWith('feb')) return true; // link-local fe80::/10
@@ -59,7 +65,7 @@ function isPrivateIP(address, family) {
   return family === 6 ? isPrivateIPv6(address) : isPrivateIPv4(address);
 }
 
-async function assertPublicHost(hostname) {
+export async function assertPublicHost(hostname) {
   const literalFamily = isIP(hostname);
   if (literalFamily) {
     if (isPrivateIP(hostname, literalFamily)) throw new Error(`Refusing to fetch private/internal address ${hostname}`);
@@ -81,7 +87,7 @@ async function assertPublicHost(hostname) {
 // following a redirect blindly (fetch's default) would let a public
 // hostname's response redirect the request to an internal address after
 // the initial check already passed.
-async function safeFetch(url, options, redirectsLeft = MAX_REDIRECTS) {
+export async function safeFetch(url, options, redirectsLeft = MAX_REDIRECTS) {
   const parsed = new URL(url);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error(`Refusing non-http(s) scheme: ${parsed.protocol}`);
@@ -111,12 +117,6 @@ const SCHEMA_REQUIRED_PROPS = {
   Article: ['headline'],
   BreadcrumbList: ['itemListElement'],
 };
-
-function withTimeout(ms) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  return { signal: controller.signal, clear: () => clearTimeout(timer) };
-}
 
 // ---------- HTML parsing (regex-based, no cheerio/jsdom dependency) ----------
 

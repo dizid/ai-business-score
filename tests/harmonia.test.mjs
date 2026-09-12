@@ -1,5 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { extractPsiSignals, parseHtml, parseSitemapXml, validateJsonLdBlocks } from '../shared/harmonia.mjs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  analyzeHarmonia,
+  assertPublicHost,
+  extractPsiSignals,
+  isPrivateIPv4,
+  isPrivateIPv6,
+  parseHtml,
+  parseSitemapXml,
+  safeFetch,
+  validateJsonLdBlocks,
+} from '../shared/harmonia.mjs';
 
 describe('parseHtml — new SEO signals (2026-08-31)', () => {
   const origin = 'https://example.com';
@@ -170,5 +180,267 @@ describe('extractPsiSignals', () => {
     const result = extractPsiSignals(json);
     const hreflangAudit = result.additionalAudits.find((a) => a.id === 'hreflang');
     expect(hreflangAudit.passed).toBe(false);
+  });
+});
+
+// ---------- SSRF guard (2026-09-12 — closing a real zero-coverage gap) ----------
+// website/robots.txt/sitemap.xml are all fetched by OUR server against a URL
+// a signed-up user fully controls — a classic SSRF vector (cloud metadata
+// endpoints, internal services, localhost) this guard exists specifically to
+// block, and it had zero test coverage before this. isPrivateIPv4/
+// isPrivateIPv6/assertPublicHost/safeFetch are pure/async-testable and were
+// promoted from internal to exported for exactly this (see harmonia.mjs's
+// own comment on the export).
+
+describe('isPrivateIPv4', () => {
+  it.each([
+    ['127.0.0.1', true, 'loopback'],
+    ['10.0.0.5', true, '10.0.0.0/8'],
+    ['172.16.0.1', true, '172.16.0.0/12 lower bound'],
+    ['172.31.255.255', true, '172.16.0.0/12 upper bound'],
+    ['172.15.255.255', false, 'just below the 172.16.0.0/12 range'],
+    ['172.32.0.0', false, 'just above the 172.16.0.0/12 range'],
+    ['192.168.1.1', true, '192.168.0.0/16'],
+    ['169.254.169.254', true, 'link-local — the cloud metadata endpoint'],
+    ['0.0.0.0', true, '0.0.0.0/8'],
+    ['224.0.0.1', true, 'multicast'],
+    ['8.8.8.8', false, 'a real public address'],
+    ['93.184.216.34', false, 'a real public address'],
+  ])('%s -> %s (%s)', (ip, expected) => {
+    expect(isPrivateIPv4(ip)).toBe(expected);
+  });
+
+  it('fails closed on a malformed address', () => {
+    expect(isPrivateIPv4('not.an.ip')).toBe(true);
+    expect(isPrivateIPv4('1.2.3')).toBe(true);
+    expect(isPrivateIPv4('999.999.999.999')).toBe(true);
+  });
+});
+
+describe('isPrivateIPv6', () => {
+  it.each([
+    ['::1', true, 'loopback'],
+    ['::', true, 'unspecified'],
+    ['fe80::1', true, 'link-local fe80::/10'],
+    ['fc00::1', true, 'unique local fc00::/7'],
+    ['fd12:3456::1', true, 'unique local fc00::/7'],
+    ['::ffff:127.0.0.1', true, 'IPv4-mapped loopback'],
+    ['::ffff:169.254.169.254', true, 'IPv4-mapped cloud metadata'],
+    ['::ffff:8.8.8.8', false, 'IPv4-mapped public address'],
+    ['2001:4860:4860::8888', false, 'a real public address (Google DNS)'],
+  ])('%s -> %s (%s)', (ip, expected) => {
+    expect(isPrivateIPv6(ip)).toBe(expected);
+  });
+});
+
+// dns.promises.lookup is mocked so assertPublicHost's hostname-resolution
+// path is deterministic and offline; a literal IP input (tested separately)
+// never reaches it at all.
+vi.mock('node:dns', () => ({
+  promises: { lookup: vi.fn() },
+}));
+
+describe('assertPublicHost', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('skips DNS entirely for a literal public IP', async () => {
+    const dns = await import('node:dns');
+    await expect(assertPublicHost('8.8.8.8')).resolves.toBeUndefined();
+    expect(dns.promises.lookup).not.toHaveBeenCalled();
+  });
+
+  it('rejects a literal private/internal IP without touching DNS', async () => {
+    const dns = await import('node:dns');
+    await expect(assertPublicHost('169.254.169.254')).rejects.toThrow('Refusing to fetch private/internal address');
+    expect(dns.promises.lookup).not.toHaveBeenCalled();
+  });
+
+  it('resolves a hostname that resolves only to public addresses', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    await expect(assertPublicHost('example.com')).resolves.toBeUndefined();
+  });
+
+  it('rejects a hostname that resolves to a private/metadata address — the core SSRF-via-DNS case', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }]);
+    await expect(assertPublicHost('attacker-controlled.example')).rejects.toThrow('Refusing to fetch private/internal address');
+  });
+
+  it('rejects when only one of several resolved addresses is private', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValueOnce([
+      { address: '93.184.216.34', family: 4 },
+      { address: '127.0.0.1', family: 4 },
+    ]);
+    await expect(assertPublicHost('mixed.example')).rejects.toThrow('Refusing to fetch private/internal address');
+  });
+
+  it('rejects when DNS resolution fails', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockRejectedValueOnce(new Error('ENOTFOUND'));
+    await expect(assertPublicHost('nonexistent.example')).rejects.toThrow('DNS resolution failed');
+  });
+
+  it('rejects when DNS resolution returns no addresses', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValueOnce([]);
+    await expect(assertPublicHost('empty.example')).rejects.toThrow('no addresses');
+  });
+});
+
+describe('safeFetch', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('refuses a non-http(s) scheme before ever calling fetch', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(safeFetch('ftp://example.com/x')).rejects.toThrow('Refusing non-http(s) scheme');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a request whose host resolves to a private address before calling fetch', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValueOnce([{ address: '10.0.0.1', family: 4 }]);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(safeFetch('http://internal.example/')).rejects.toThrow('Refusing to fetch private/internal address');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // The literal SSRF-via-redirect scenario this guard exists for: a
+  // public-looking hostname whose server responds with a redirect to a
+  // cloud metadata address. Following redirects blindly (fetch's default)
+  // would let the SECOND hop bypass the FIRST hop's host check entirely —
+  // this is the regression this test protects against.
+  it('does not follow a redirect to a private/metadata address', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      status: 302,
+      headers: { get: (name) => (name === 'location' ? 'http://169.254.169.254/latest/meta-data' : null) },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(safeFetch('http://looks-public.example/')).rejects.toThrow('Refusing to fetch private/internal address');
+    // Exactly one request was made — the redirect target (a literal private
+    // IP) was rejected before a second fetch call was ever issued.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('follows a redirect to a genuinely public address', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        status: 302,
+        headers: { get: (name) => (name === 'location' ? 'http://also-public.example/' : null) },
+      })
+      .mockResolvedValueOnce({ status: 200, headers: { get: () => null } });
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await safeFetch('http://looks-public.example/');
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after too many redirects rather than looping forever', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 302,
+      headers: { get: (name) => (name === 'location' ? 'http://looks-public.example/next' : null) },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(safeFetch('http://looks-public.example/')).rejects.toThrow('Too many redirects');
+  });
+});
+
+describe('analyzeHarmonia — end to end with the network fully mocked', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  const HOMEPAGE_HTML = `<html lang="en"><head>
+    <title>Acme Plumbing — 24/7 Emergency Service</title>
+    <meta name="description" content="Acme Plumbing offers fast, licensed emergency plumbing repairs across the metro area, day or night.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta property="og:title" content="Acme Plumbing">
+    <meta property="og:description" content="24/7 emergency plumbing">
+    <link rel="canonical" href="https://acme.example/">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Acme Plumbing"}</script>
+  </head><body>
+    <h1>Acme Plumbing</h1>
+    <h2>Our Services</h2>
+    <p>${'Reliable plumbing repair since 1998. '.repeat(30)}</p>
+    <a href="/about">About</a><a href="/contact">Contact</a><a href="/services">Services</a>
+  </body></html>`;
+
+  function fetchMockFor({ robotsStatus = 200, robotsBody = 'User-agent: *\nDisallow:\n', sitemapStatus = 200, sitemapBody = '<urlset><url><loc>a</loc></url></urlset>' } = {}) {
+    return vi.fn(async (url) => {
+      const href = typeof url === 'string' ? url : url.toString();
+      if (href.includes('robots.txt')) {
+        return { ok: robotsStatus < 400, status: robotsStatus, text: async () => robotsBody, headers: new Headers() };
+      }
+      if (href.includes('sitemap.xml')) {
+        return { ok: sitemapStatus < 400, status: sitemapStatus, text: async () => sitemapBody, headers: new Headers() };
+      }
+      // Homepage
+      return {
+        ok: true,
+        status: 200,
+        url: href,
+        text: async () => HOMEPAGE_HTML,
+        headers: new Headers({ 'content-security-policy': "default-src 'self'" }),
+      };
+    });
+  }
+
+  it('resolves a full, error-free result for a normally-reachable public site', async () => {
+    const dns = await import('node:dns');
+    dns.promises.lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    vi.stubGlobal('fetch', fetchMockFor());
+
+    // No psiApiKey passed — fetchCoreWebVitals short-circuits to
+    // { signals: null, error: null } without a network call, so this
+    // exercises the homepage/robots/sitemap path without needing a 4th
+    // mocked endpoint shape.
+    const result = await analyzeHarmonia({ website: 'https://acme.example', brand: 'Acme Plumbing', category: 'plumber' });
+
+    expect(result.errors).toEqual([]);
+    expect(result.statusCode).toBe(200);
+    expect(result.fetchedUrl).toBe('https://acme.example');
+    expect(typeof result.harmoniaScore).toBe('number');
+    expect(result.pillars.onPageSeo.score).toBeGreaterThan(0);
+    expect(result.schema.detected.some((n) => n.type === 'Organization' && n.valid)).toBe(true);
+    expect(result.homepageText).toContain('Reliable plumbing repair');
+  });
+
+  // The SSRF guard's job is to reject, not to crash the whole pipeline —
+  // analyzeHarmonia's documented contract (see its own header comment) is
+  // that it never throws, worst case resolving with mostly-null fields plus
+  // an errors[] entry. A company's `website` field is fully user-controlled,
+  // so this is the realistic "user pointed the scanner at an internal
+  // address" case, not a hypothetical.
+  it('surfaces an SSRF-guard rejection in errors[] instead of throwing', async () => {
+    const dns = await import('node:dns');
+    // Every hostname this run touches resolves to the cloud metadata
+    // address — simulates a DNS-rebinding-style or directly-internal target.
+    dns.promises.lookup.mockResolvedValue([{ address: '169.254.169.254', family: 4 }]);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await analyzeHarmonia({ website: 'https://attacker-controlled.example', brand: 'Acme', category: 'plumber' });
+
+    expect(result.errors.some((e) => e.includes('Refusing to fetch private/internal address'))).toBe(true);
+    expect(result.statusCode).toBeNull();
+    expect(result.homepageText).toBeNull();
+    // The guard rejected before any real network request was ever issued.
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

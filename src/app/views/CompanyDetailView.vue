@@ -1,41 +1,28 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { validatePayload } from '../../shared/scanPayload';
 import ScanDetail from '../../shared/ScanDetail.vue';
 import CompanyProgressChart from './CompanyProgressChart.vue';
-import CompetitorTrendChart from './CompetitorTrendChart.vue';
 import Icon from '../../shared/Icon.vue';
 import Breadcrumb from '../components/Breadcrumb.vue';
 import { authFetch } from '../lib/auth';
+import { formatDateTime } from '../lib/format';
+import { useCompany } from '../composables/useCompany';
+import { useScanSelection } from '../composables/useScanSelection';
+import { useCheckout } from '../composables/useCheckout';
+import { usePollScan } from '../composables/usePollScan';
 
 const route = useRoute();
 const router = useRouter();
 
-interface CompanyRow {
-  id: string;
-  brand: string;
-  website: string;
-  category: string;
-  use_case: string;
-  region: string;
-  customer_segment: string;
-  competitors: string[];
-  is_legacy_import: boolean;
-  scan_frequency: 'off' | 'weekly';
-}
-
-interface Profile {
-  plan_tier: string;
-  subscription_status: string | null;
-}
-
-const company = ref<CompanyRow | null>(null);
-const profile = ref<Profile>({ plan_tier: 'free', subscription_status: null });
-const scans = ref<Record<string, unknown>[]>([]);
-const loading = ref(true);
-const loadError = ref('');
-const selectedIndex = ref<number | null>(null);
+const {
+  company, profile, scans, loading, loadError, isProUser, allowDeepAdvice,
+  load: loadCompany,
+} = useCompany(() => route.params.id as string);
+const {
+  selectedIndex, selectedScan, selectedScanStatus, selectedPayload,
+  selectScan, selectScanById, backToList, keyOf,
+} = useScanSelection(scans);
 
 interface CategoryBenchmark {
   companyCount: number;
@@ -60,30 +47,10 @@ async function loadCategoryBenchmark(companyId: string) {
   }
 }
 
-const scanning = ref(false);
-const scanStatus = ref('');
-const scanError = ref('');
-const scanUpgradeRequired = ref(false);
-const upgrading = ref(false);
 const autoScanUpdating = ref(false);
-let pollHandle: ReturnType<typeof setTimeout> | null = null;
-// Tracked outside pollScan's own recursive param so the terminal-error
-// "Check again" button (added for QA-FIXES-PLAN.md #3a) can still know
-// which scan to re-check after polling has already given up.
-const pendingScanId = ref<string | null>(null);
 
 const deepAdviceLoading = ref(false);
 const sentimentJudgeLoadingKey = ref<string | null>(null);
-
-function keyOf(scan: Record<string, unknown>, index: number): string {
-  return (scan.id as string) || String(index);
-}
-
-function formatDate(generatedAt: unknown) {
-  return typeof generatedAt === 'string' && generatedAt
-    ? new Date(generatedAt).toLocaleString()
-    : 'unknown date';
-}
 
 // Non-completed scans have no generatedAt yet (only ever set on completion),
 // so the history list would otherwise show "unknown date" for a scan that's
@@ -97,176 +64,34 @@ function scanListStatusLabel(status: string) {
 }
 
 async function load() {
-  loading.value = true;
-  loadError.value = '';
-  try {
-    const res = await authFetch(`/companies/${route.params.id}`);
-    const data = await res.json();
-    if (!data.ok) {
-      loadError.value = data.error || 'Failed to load company.';
-      return;
-    }
-    company.value = data.company;
-    profile.value = data.profile || { plan_tier: 'free', subscription_status: null };
-    scans.value = data.scans;
-    // Scans come back newest-first (see CompanyProgressChart's own sort
-    // comment) — auto-selecting index 0 shows the latest report immediately
-    // instead of a blank "select a scan" placeholder, so the detail pane
-    // never opens empty when there's already a result to show.
-    selectedIndex.value = scans.value.length ? 0 : null;
-    if (company.value) {
-      document.title = `${company.value.brand} — Foreground`;
-      loadCategoryBenchmark(company.value.id);
-    }
-  } catch (err) {
-    loadError.value = (err as Error).message;
-  } finally {
-    loading.value = false;
+  await loadCompany();
+  // Scans come back newest-first (see CompanyProgressChart's own sort
+  // comment) — auto-selecting index 0 shows the latest report immediately
+  // instead of a blank "select a scan" placeholder, so the detail pane
+  // never opens empty when there's already a result to show.
+  selectedIndex.value = scans.value.length ? 0 : null;
+  if (company.value) {
+    document.title = `${company.value.brand} — Foreground`;
+    loadCategoryBenchmark(company.value.id);
   }
 }
 
-function stopPolling() {
-  if (pollHandle) {
-    clearTimeout(pollHandle);
-    pollHandle = null;
-  }
-}
+const {
+  scanning, scanStatus, scanError, scanUpgradeRequired, pendingScanId,
+  startScan, recheckPendingScan,
+} = usePollScan(scans, load);
+const { upgrading, startCheckout } = useCheckout((message) => { scanError.value = message; });
 
-// Backoff schedule for a *hard* fetch failure while polling (network blip,
-// DNS hiccup, the fetch itself throwing) — not a clean HTTP error response
-// from the server, which is handled separately below via `!data.ok` and
-// gives up immediately since that's a real, informative error. A transient
-// fetch failure used to abandon polling permanently on the very first
-// blip, surfacing as a raw "TypeError: Failed to fetch" with no recovery.
-const POLL_RETRY_BACKOFFS_MS = [2000, 4000, 8000];
-
-// Formats the live { completed, total, currentModels } progress the backend
-// now writes incrementally during a scan (run-scan-background.mts) into a
-// one-line status — replaces the old static "Running checks (~5-8 min)…"
-// that gave no signal of what was actually happening for the whole wait.
-// Falls back to a generic "Running checks…" line if progress hasn't arrived
-// yet (e.g. the very first poll, or a scan finalized before the `progress`
-// column existed) rather than showing a broken "0/0" line — no minute
-// estimate here since that's tied to provider count/concurrency, which has
-// already gone stale once (see HOSTED_MODELS in run-scan-background.mts).
-// `currentModels` (was
-// `currentModel: string | null`) became an array once provider lanes
-// started running concurrently — more than one model can be in flight at
-// once now, not just one.
-function formatRunningStatus(progress: { completed: number; total: number; currentModels: string[] } | null) {
-  if (!progress || !progress.total) return 'Running checks…';
-  const checking = progress.currentModels?.length ? ` — checking ${progress.currentModels.join(', ')}…` : '';
-  return `Running checks: ${progress.completed}/${progress.total} done${checking}`;
-}
-
-async function pollScan(scanId: string, retriesLeft = POLL_RETRY_BACKOFFS_MS.length) {
-  pendingScanId.value = scanId;
-  try {
-    const res = await authFetch(`/scans/${scanId}`);
-    const data = await res.json();
-    if (!data.ok) {
-      scanError.value = data.error || 'Failed to check scan status.';
-      scanning.value = false;
-      return;
-    }
-    if (data.status === 'completed') {
-      scanning.value = false;
-      scanStatus.value = '';
-      pendingScanId.value = null;
-      await load();
-      return;
-    }
-    if (data.status === 'failed') {
-      scanning.value = false;
-      pendingScanId.value = null;
-      scanError.value = data.errorMessage || 'Scan failed.';
-      return;
-    }
-    scanStatus.value = data.status === 'running' ? formatRunningStatus(data.progress) : 'Queued…';
-    pollHandle = setTimeout(() => pollScan(scanId), 2000);
-  } catch (err) {
-    if (retriesLeft > 0) {
-      const backoffMs = POLL_RETRY_BACKOFFS_MS[POLL_RETRY_BACKOFFS_MS.length - retriesLeft];
-      scanStatus.value = 'Connection hiccup, retrying…';
-      pollHandle = setTimeout(() => pollScan(scanId, retriesLeft - 1), backoffMs);
-      return;
-    }
-    // Retries exhausted — the scan may well have completed or failed
-    // server-side despite our connection trouble, so re-sync before giving
-    // up. A scan that already resolved (now present in scans.value after
-    // reload) just shows normally instead of dead-ending on an error the
-    // user can't act on (QA-FIXES-PLAN.md #3a).
-    scanning.value = false;
-    await load();
-    if (scans.value.some((s) => (s as { id?: string }).id === scanId)) {
-      pendingScanId.value = null;
-    } else {
-      scanError.value = (err as Error).message;
-    }
-  }
-}
-
-// "Check again" button for the terminal connection-error state — retries
-// load() (not a full page reload) rather than leaving the user stuck once
-// polling has given up.
-async function recheckPendingScan() {
-  await load();
-  if (!pendingScanId.value) return;
-  if (scans.value.some((s) => (s as { id?: string }).id === pendingScanId.value)) {
-    pendingScanId.value = null;
-    scanError.value = '';
-  }
-}
-
-async function runNewScan() {
+// Thin wrapper preserving the template/onMounted call sites' original
+// no-arg shape — usePollScan's startScan takes a companyId explicitly since
+// the composable itself has no notion of "the current company."
+function runNewScan() {
   if (!company.value) return;
-  scanning.value = true;
-  scanError.value = '';
-  scanUpgradeRequired.value = false;
-  scanStatus.value = 'Starting scan…';
-  try {
-    const res = await authFetch('/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ company_id: company.value.id }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      scanError.value = data.error || 'Failed to start scan.';
-      scanUpgradeRequired.value = !!data.upgradeRequired;
-      scanning.value = false;
-      return;
-    }
-    pollScan(data.scanId);
-  } catch (err) {
-    scanError.value = (err as Error).message;
-    scanning.value = false;
-  }
+  startScan(company.value.id);
 }
 
-// Same shape as CompaniesListView's startCheckout — kept duplicated rather
-// than shared, matching this codebase's convention of copy-pasted per-file
-// auth/billing calls over a shared abstraction (see auth.mts's own comment).
-async function startCheckout() {
-  upgrading.value = true;
-  try {
-    const res = await authFetch('/create-checkout-session', { method: 'POST' });
-    const data = await res.json();
-    if (!data.ok) {
-      scanError.value = data.error || 'Failed to start checkout.';
-      upgrading.value = false;
-      return;
-    }
-    window.location.href = data.url;
-  } catch (err) {
-    scanError.value = (err as Error).message;
-    upgrading.value = false;
-  }
-}
-
-// Weekly auto-scans (scheduled-rescan.mts) are Pro-only — reused for the
-// toggle below, same underlying check as allowDeepAdvice further down.
-const isProUser = computed(() => profile.value.plan_tier === 'pro');
+// isProUser now comes from useCompany() above — same underlying check
+// allowDeepAdvice further down uses, both derived from `profile.plan_tier`.
 
 // Toggles companies.scan_frequency between 'off' and 'weekly'. A non-Pro
 // caller PATCHing 'weekly' gets a 402 upgradeRequired from company.mts, so
@@ -306,40 +131,8 @@ const scanTrend = computed(() =>
   }))
 );
 
-// Same source data as scanTrend, reshaped for CompetitorTrendChart's
-// multi-series need (brand mention count + competitor tallies per scan) —
-// GET /companies/:id already returns competitorTallies on every scan row
-// via toScanPayload(), so no backend change was needed for this.
-const competitorTrend = computed(() =>
-  scans.value.map((s, index) => ({
-    id: keyOf(s, index),
-    generatedAt: typeof s.generatedAt === 'string' ? s.generatedAt : '',
-    brandMentionCount: typeof s.citedCount === 'number' ? s.citedCount : 0,
-    competitorTallies: Array.isArray(s.competitorTallies)
-      ? (s.competitorTallies as { name: string; mentionCount: number; ambiguous: boolean }[])
-      : [],
-  }))
-);
-
-function selectScanById(id: string) {
-  const idx = scans.value.findIndex((s, i) => keyOf(s, i) === id);
-  if (idx !== -1) selectScan(idx);
-}
-
-const selectedScan = computed(() =>
-  selectedIndex.value === null ? null : scans.value[selectedIndex.value] ?? null
-);
-// raw_responses/generated_at (and therefore validatePayload()) are only
-// ever populated once a scan reaches status='completed' — calling
-// validatePayload on a pending/running/failed row always returns null, which
-// used to render as a misleading generic "couldn't be rendered" message
-// indistinguishable from a genuinely malformed record. Gate on status first
-// so the real state (still running / actually failed, with its real
-// error_message) shows instead.
-const selectedScanStatus = computed(() => (selectedScan.value as any)?.status ?? 'completed');
-const selectedPayload = computed(() =>
-  selectedScan.value && selectedScanStatus.value === 'completed' ? validatePayload(selectedScan.value) : null
-);
+// selectedScan/selectedScanStatus/selectedPayload/selectScanById now come
+// from useScanSelection() above.
 
 // Entry point for ScanReportView.vue's dedicated Report page, for the
 // scan currently being viewed.
@@ -350,7 +143,7 @@ const reportHref = computed(() =>
 // Deep advice is Pro-gated (Milestone 1 of the monetization plan) — locked
 // means "signed in, has a completed scan, but not entitled," distinct from
 // simply not being allowed at all (result.html's unauthenticated context).
-const allowDeepAdvice = computed(() => profile.value.plan_tier === 'pro');
+// allowDeepAdvice comes from useCompany() above.
 const deepAdviceLocked = computed(() => !allowDeepAdvice.value && !selectedPayload.value?.deepAdvice);
 
 async function runDeepAdvice() {
@@ -400,12 +193,7 @@ async function runSentimentJudge(promptIndex: number, model: string) {
   }
 }
 
-function selectScan(index: number) {
-  selectedIndex.value = index;
-}
-function backToList() {
-  selectedIndex.value = null;
-}
+// selectScan/backToList now come from useScanSelection() above.
 
 onMounted(async () => {
   await load();
@@ -421,7 +209,7 @@ onMounted(async () => {
     router.replace({ query: cleanedQuery });
   }
 });
-onUnmounted(stopPolling);
+// stopPolling's onUnmounted cleanup now lives inside usePollScan() itself.
 watch(() => route.params.id, load);
 </script>
 
@@ -481,7 +269,6 @@ watch(() => route.params.id, load);
       </p>
 
       <CompanyProgressChart v-if="scans.length >= 2" :scans="scanTrend" @select-point="selectScanById" />
-      <CompetitorTrendChart v-if="scans.length >= 2" :scans="competitorTrend" @select-point="selectScanById" />
 
       <div class="dashboard" v-if="scans.length" :class="{ 'has-selection': selectedIndex !== null }">
         <div class="list-pane">
@@ -496,7 +283,7 @@ watch(() => route.params.id, load);
           >
             <div class="scan-row">
               <div class="scan-meta">
-                {{ (scan as any).status === 'completed' || !(scan as any).status ? formatDate(scan.generatedAt) : scanListStatusLabel((scan as any).status) }}
+                {{ (scan as any).status === 'completed' || !(scan as any).status ? formatDateTime(scan.generatedAt) : scanListStatusLabel((scan as any).status) }}
                 <span v-if="index === 0" class="latest-tag">Latest</span>
               </div>
               <div class="scan-row-right">

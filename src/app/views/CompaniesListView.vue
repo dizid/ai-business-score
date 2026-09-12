@@ -6,6 +6,7 @@ import { authFetch } from '../lib/auth';
 import Icon from '../../shared/Icon.vue';
 import ScanDetail from '../../shared/ScanDetail.vue';
 import { EXAMPLE_REPORT } from '../exampleReport';
+import { useCheckout } from '../composables/useCheckout';
 
 const router = useRouter();
 
@@ -57,8 +58,16 @@ const alerts = ref<AlertRow[]>([]);
 const profile = ref<Profile>({ plan_tier: 'free', subscription_status: null });
 const loading = ref(true);
 const loadError = ref('');
-const upgrading = ref(false);
 const upgradeError = ref('');
+// Reset-before-attempt preserved from this view's original startCheckout —
+// CompanyDetailView.vue's own copy never did this reset, so it's kept here
+// as a thin wrapper rather than folded into useCheckout() itself, which
+// would have silently added it to every caller.
+const { upgrading, startCheckout: startCheckoutBase } = useCheckout((message) => { upgradeError.value = message; });
+function startCheckout() {
+  upgradeError.value = '';
+  startCheckoutBase();
+}
 
 const showExample = ref(false);
 const showCreate = ref(false);
@@ -203,23 +212,6 @@ async function loadCompanies() {
   }
 }
 
-async function startCheckout() {
-  upgrading.value = true;
-  upgradeError.value = '';
-  try {
-    const res = await authFetch('/create-checkout-session', { method: 'POST' });
-    const data = await res.json();
-    if (!data.ok) {
-      upgradeError.value = data.error || 'Failed to start checkout.';
-      upgrading.value = false;
-      return;
-    }
-    window.location.href = data.url;
-  } catch (err) {
-    upgradeError.value = (err as Error).message;
-    upgrading.value = false;
-  }
-}
 
 function resetForm() {
   form.value = { brand: '', website: '', category: '', use_case: '', region: '', customer_segment: '', competitors: '', language: 'en' };

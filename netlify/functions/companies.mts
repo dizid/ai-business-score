@@ -2,44 +2,53 @@
 // SaaS-pivot plan (see /home/marc/.claude/plans/cheerful-leaping-dragon.md):
 // the authenticated app shell's first real data endpoint.
 import type { Config } from '@netlify/functions';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { normalizeUrl, SUPPORTED_LANGUAGES } from '../../shared/aivis-core.mjs';
 import { FREE_PLAN_COMPANY_LIMIT, isPro } from './_shared/plan.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
+import { getPreviousCompletedScore } from './_shared/scoreHistory.mts';
 
 export default async (req: Request) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
+  const cors = corsHeaders(req);
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   const db = sql();
 
   if (req.method === 'GET') {
     // Portfolio-dashboard fields (prev_score/delta/latest_scan_status/
     // last_scanned_at), added for CompaniesListView.vue's cockpit rework.
-    // `latest`/`prev` use the same "most recently completed scan" ordering
-    // the original latest_score subquery already relied on (generated_at is
+    // `latest` uses the same "most recently completed scan" ordering the
+    // original latest_score subquery already relied on (generated_at is
     // only ever set on completion, never on failure — so filtering
     // status='completed' here is equivalent to the old NULLS LAST ordering,
-    // just explicit) — same underlying definition of "previous score" as
-    // getPreviousCompletedScore() in _shared/scoreHistory.mts, expressed as
-    // an OFFSET 1 set query here since this is a bulk list, not a lookup for
-    // one specific scan.
+    // just explicit).
+    //
+    // 2026-09-12 (architecture refactor): `prev_score`/`delta` used to be
+    // computed here via a second LATERAL OFFSET 1 subquery — a second,
+    // independent expression of "previous completed score" alongside
+    // _shared/scoreHistory.mts's getPreviousCompletedScore(), which
+    // run-scan-background.mts already used for its regression-email check.
+    // Two definitions of the same fact risked drifting apart (this file's
+    // own comment used to flag exactly that risk). Now this query only
+    // fetches `latest_scan_id` alongside `latest_score`, and prev/delta are
+    // computed below by calling getPreviousCompletedScore() per company —
+    // trading one SQL round trip for up to N (bounded by realistic
+    // portfolio sizes for a "track a handful of companies" dashboard) in
+    // exchange for exactly one place "previous completed score" is defined
+    // anywhere in the codebase.
     const companies = await db`
       SELECT
         c.*,
         COALESCE(cnt.scan_count, 0) AS scan_count,
+        latest.id AS latest_scan_id,
         latest.score AS latest_score,
-        prev.score AS prev_score,
-        CASE WHEN latest.score IS NOT NULL AND prev.score IS NOT NULL THEN latest.score - prev.score ELSE NULL END AS delta,
         recent.status AS latest_scan_status,
         recent.created_at AS last_scanned_at
       FROM public.companies c
@@ -47,17 +56,11 @@ export default async (req: Request) => {
         SELECT count(*)::int AS scan_count FROM public.scans s WHERE s.company_id = c.id
       ) cnt ON true
       LEFT JOIN LATERAL (
-        SELECT s.score FROM public.scans s
+        SELECT s.id, s.score FROM public.scans s
         WHERE s.company_id = c.id AND s.status = 'completed'
         ORDER BY s.generated_at DESC
         LIMIT 1
       ) latest ON true
-      LEFT JOIN LATERAL (
-        SELECT s.score FROM public.scans s
-        WHERE s.company_id = c.id AND s.status = 'completed'
-        ORDER BY s.generated_at DESC
-        OFFSET 1 LIMIT 1
-      ) prev ON true
       LEFT JOIN LATERAL (
         SELECT s.status, s.created_at FROM public.scans s
         WHERE s.company_id = c.id
@@ -67,6 +70,13 @@ export default async (req: Request) => {
       WHERE c.owner_user_id = ${userId}
       ORDER BY c.created_at DESC
     `;
+    const companiesWithPrevScore = await Promise.all(
+      companies.map(async (c) => {
+        const prevScore = c.latest_scan_id ? await getPreviousCompletedScore(db, c.id, c.latest_scan_id) : null;
+        const delta = c.latest_score !== null && prevScore !== null ? c.latest_score - prevScore : null;
+        return { ...c, prev_score: prevScore, delta };
+      })
+    );
     // Lazily created if this is the caller's first request of any kind —
     // matches the POST handler's on-demand provisioning below.
     const profiles = await db`
@@ -103,10 +113,7 @@ export default async (req: Request) => {
       LIMIT 10
     `;
 
-    return new Response(JSON.stringify({ ok: true, companies, profile, alerts }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: true, companies: companiesWithPrevScore, profile, alerts }, { cors });
   }
 
   if (req.method === 'POST') {
@@ -121,13 +128,11 @@ export default async (req: Request) => {
         SELECT count(*)::int AS count FROM public.companies WHERE owner_user_id = ${userId}
       `;
       if (count >= FREE_PLAN_COMPANY_LIMIT) {
-        return new Response(
-          JSON.stringify({
-            error: `Free plan is limited to ${FREE_PLAN_COMPANY_LIMIT} company. Upgrade to Pro to track more.`,
-            upgradeRequired: true,
-            limit: FREE_PLAN_COMPANY_LIMIT,
-          }),
-          { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+        return errorResponse(
+          `Free plan is limited to ${FREE_PLAN_COMPANY_LIMIT} company. Upgrade to Pro to track more.`,
+          402,
+          { upgradeRequired: true, limit: FREE_PLAN_COMPANY_LIMIT },
+          cors
         );
       }
     }
@@ -136,19 +141,13 @@ export default async (req: Request) => {
     try {
       body = await req.json();
     } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-      });
+      return errorResponse('Invalid JSON body', 400, {}, cors);
     }
 
     const brand = (body.brand || '').trim();
     const website = (body.website || '').trim();
     if (!brand || !website) {
-      return new Response(JSON.stringify({ error: 'brand and website are required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-      });
+      return errorResponse('brand and website are required', 400, {}, cors);
     }
     const category = (body.category || '').trim();
     const useCase = (body.use_case || '').trim();
@@ -175,16 +174,10 @@ export default async (req: Request) => {
     `;
     const company = inserted[0];
 
-    return new Response(JSON.stringify({ ok: true, company }), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: true, company }, { status: 201, cors });
   }
 
-  return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-    status: 405,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-  });
+  return errorResponse('Method not allowed', 405, {}, cors);
 };
 
 export const config: Config = {

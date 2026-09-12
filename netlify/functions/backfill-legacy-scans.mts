@@ -11,9 +11,10 @@
 
 import type { Config } from '@netlify/functions';
 import { getStore } from '@netlify/blobs';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { normalizeUrl } from '../../shared/aivis-core.mjs';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 interface LegacyScan {
   id: string;
@@ -34,19 +35,12 @@ interface LegacyScan {
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Method not allowed', 405);
   }
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   const db = sql();
   await db`INSERT INTO public.user_profiles (user_id) VALUES (${userId}) ON CONFLICT (user_id) DO NOTHING`;
@@ -120,10 +114,7 @@ export default async (req: Request) => {
     imported++;
   }
 
-  return new Response(
-    JSON.stringify({ ok: true, totalBlobs: blobs.length, imported, skipped }),
-    { status: 200, headers: { 'Content-Type': 'application/json' } }
-  );
+  return jsonResponse({ ok: true, totalBlobs: blobs.length, imported, skipped });
 };
 
 export const config: Config = {

@@ -5,6 +5,49 @@ on 2026-08-17 (via `/doctor`) so it only loads when a session actually
 touches this directory, instead of every session paying for it. See the
 root `CLAUDE.md` for overall project context.
 
+### `src/app/composables/` (added 2026-09-12, architecture refactor)
+
+Didn't exist before this pass — `CompanyDetailView.vue` (651 lines) and
+`CompetitorBenchmarkView.vue` each had near-identical fetch/hydrate,
+checkout, and (for the former) polling logic hand-copied rather than
+shared. Full plan at `~/.claude/plans/check-everythink-i-am-foamy-candle.md`.
+
+- **`useCompany.ts`** — `useCompany(getCompanyId)`: fetches `GET
+  /companies/:id`, holds `company`/`profile`/`scans`/`loading`/`loadError`,
+  derives `isProUser`/`allowDeepAdvice` from `profile.plan_tier`. Used by
+  both `CompanyDetailView.vue` and `CompetitorBenchmarkView.vue` — their
+  `load()` functions were byte-for-byte near-identical before this.
+  Deliberately doesn't own `document.title` or view-specific side effects
+  (category-benchmark fetch, scan-selection reset) — each view's own `load`
+  wraps this composable's `load()` and layers those on top.
+- **`useScanSelection.ts`** — the master-detail `selectedIndex`/
+  `selectedScan`/`selectedScanStatus`/`selectedPayload`/`selectScan`/
+  `selectScanById`/`backToList` state. Only `CompanyDetailView.vue` uses
+  this — `CompetitorBenchmarkView.vue` always shows the latest completed
+  scan, a different selection rule entirely.
+- **`useCheckout.ts`** — `useCheckout(onError)`: wraps the
+  `POST /create-checkout-session` → redirect flow, replacing a
+  `startCheckout()` duplicated in both `CompanyDetailView.vue` and
+  `CompaniesListView.vue` (one of which was previously commented as
+  "kept duplicated rather than shared, matching this codebase's
+  convention" — that convention was reversed here). Takes an error
+  callback rather than owning an error ref, so each caller keeps routing
+  failures into its own existing error display
+  (`scanError`/`upgradeError`). `CompaniesListView.vue`'s own
+  reset-error-before-attempt behavior (which `CompanyDetailView.vue`'s copy
+  never had) is preserved via a thin wrapper in that view, not folded into
+  the composable itself.
+- **`usePollScan.ts`** — the scan-kickoff + status-polling state machine
+  (`scanning`/`scanStatus`/`scanError`/`scanUpgradeRequired`/
+  `pendingScanId`, `startScan(companyId)`, `recheckPendingScan()`), ~90
+  lines and the single most complex piece of `CompanyDetailView.vue`'s
+  original script. Takes `scans` (from `useCompany`) and the caller's
+  `reload` function directly, rather than an abstract callback — both the
+  completed-scan path and the connection-hiccup recovery path need to
+  inspect the freshly-reloaded scans list, not just get notified a reload
+  happened. Calls `onUnmounted(stopPolling)` internally so a consumer can't
+  forget cleanup.
+
 ### `src/app/` — the authenticated app shell
 
 - **`router.ts`** — routes: `/app` (companies list), `/app/login`,

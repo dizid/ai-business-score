@@ -2,32 +2,27 @@
 // its full scan history (transformed to the camelCase payload shape
 // ScanDetail.vue/validatePayload() already expect).
 import type { Config, Context } from '@netlify/functions';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { toScanPayload } from './_shared/scanRow.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 import { isPro } from './_shared/plan.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 const SCAN_FREQUENCIES = ['off', 'weekly'];
 
 export default async (req: Request, context: Context) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
+  const cors = corsHeaders(req);
 
   if (req.method !== 'GET' && req.method !== 'PATCH') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Method not allowed', 405, {}, cors);
   }
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   const companyId = context.params.id;
   const db = sql();
@@ -36,10 +31,7 @@ export default async (req: Request, context: Context) => {
     SELECT * FROM public.companies WHERE id = ${companyId} AND owner_user_id = ${userId}
   `;
   if (companies.length === 0) {
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Not found', 404, {}, cors);
   }
 
   if (req.method === 'PATCH') {
@@ -47,17 +39,11 @@ export default async (req: Request, context: Context) => {
     try {
       body = await req.json();
     } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-      });
+      return errorResponse('Invalid JSON body', 400, {}, cors);
     }
 
     if (!SCAN_FREQUENCIES.includes(body.scan_frequency as string)) {
-      return new Response(
-        JSON.stringify({ error: `scan_frequency must be one of: ${SCAN_FREQUENCIES.join(', ')}` }),
-        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
-      );
+      return errorResponse(`scan_frequency must be one of: ${SCAN_FREQUENCIES.join(', ')}`, 400, {}, cors);
     }
 
     // Weekly auto-scans are a Pro feature. 'off' requires no plan check so a
@@ -65,9 +51,11 @@ export default async (req: Request, context: Context) => {
     if (body.scan_frequency === 'weekly') {
       const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
       if (!isPro(profiles[0]?.plan_tier)) {
-        return new Response(
-          JSON.stringify({ error: 'Automatic weekly scans are a Pro feature. Upgrade to Pro to unlock them.', upgradeRequired: true }),
-          { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+        return errorResponse(
+          'Automatic weekly scans are a Pro feature. Upgrade to Pro to unlock them.',
+          402,
+          { upgradeRequired: true },
+          cors
         );
       }
     }
@@ -78,10 +66,7 @@ export default async (req: Request, context: Context) => {
       RETURNING *
     `;
 
-    return new Response(JSON.stringify({ ok: true, company: updated[0] }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return jsonResponse({ ok: true, company: updated[0] }, { cors });
   }
 
   const scanRows = await db`
@@ -95,14 +80,9 @@ export default async (req: Request, context: Context) => {
   `;
   const profile = profiles[0] || { plan_tier: 'free', subscription_status: null };
 
-  return new Response(
-    JSON.stringify({
-      ok: true,
-      company: companies[0],
-      scans: scanRows.map(toScanPayload),
-      profile,
-    }),
-    { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } }
+  return jsonResponse(
+    { ok: true, company: companies[0], scans: scanRows.map(toScanPayload), profile },
+    { cors }
   );
 };
 

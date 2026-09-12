@@ -1,38 +1,43 @@
 // AIVis Stripe Checkout — POST /create-checkout-session, auth-gated. Mints a
 // hosted Stripe Checkout Session for the Pro subscription and hands back its
 // URL; the frontend does a plain redirect, no custom card form. Same
-// auth-then-db shape as every other function here (requireAuth copy-pasted,
-// no shared middleware, per this repo's convention).
+// auth-then-db shape as every other function here (authenticate(), per
+// _shared/auth.mts's shared helper).
 import type { Config } from '@netlify/functions';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { stripe } from './_shared/stripe.mts';
 import { isPro } from './_shared/plan.mts';
+import { corsHeaders, handleOptions } from './_shared/cors.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
 export default async (req: Request) => {
+  // 2026-09-12 (architecture refactor): this is a normal browser-called POST
+  // endpoint (the frontend calls it directly to start checkout) — unlike
+  // stripe-webhook.mts/reap-stuck-scans.mts/scheduled-rescan.mts/
+  // ops-failure-digest.mts/run-scan-background.mts, which deliberately never
+  // want CORS handling (unauthenticated/signature-verified/cron/background),
+  // this file had simply never had it wired in. Added here, not because a
+  // cross-origin caller is expected today, but for the same defensive
+  // reasoning cors.mts's own header comment gives for every other real
+  // endpoint.
+  const preflight = handleOptions(req);
+  if (preflight) return preflight;
+  const cors = corsHeaders(req);
+
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Method not allowed', 405, {}, cors);
   }
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   const priceId = Netlify.env.get('STRIPE_PRICE_ID');
   if (!priceId) {
-    return new Response(JSON.stringify({ error: 'Server misconfigured: STRIPE_PRICE_ID not set' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Server misconfigured: STRIPE_PRICE_ID not set', 500, {}, cors);
   }
 
   const db = sql();
@@ -45,10 +50,7 @@ export default async (req: Request) => {
   `;
   const profile = profiles[0];
   if (isPro(profile?.plan_tier)) {
-    return new Response(JSON.stringify({ error: 'Already on the Pro plan' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Already on the Pro plan', 400, {}, cors);
   }
 
   const origin = new URL(req.url).origin;
@@ -67,16 +69,10 @@ export default async (req: Request) => {
       throw new Error('Stripe did not return a Checkout URL');
     }
 
-    return new Response(JSON.stringify({ ok: true, url: session.url }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ ok: true, url: session.url }, { cors });
   } catch (err) {
     console.error('Failed to create Stripe Checkout session:', err);
-    return new Response(JSON.stringify({ error: 'Failed to start checkout' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Failed to start checkout', 500, {}, cors);
   }
 };
 

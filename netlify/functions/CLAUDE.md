@@ -216,15 +216,50 @@ Schema and Neon Auth were provisioned via the Neon MCP tools
 verify on temp branch → `complete_database_migration`) — see the plan file
 for the exact migration SQL if it needs revisiting.
 
+**`netlify/functions/migrations/`** (added 2026-09-12, architecture
+refactor) — a git-tracked historical record for schema changes going
+forward. Does not change *how* migrations are applied (still Neon MCP by
+hand, same as above); just means the SQL text is committed here first
+instead of living only in prose after the fact. See that folder's own
+`README.md` for the naming/header convention. Not retroactive — history
+before this folder existed stays in this file's prose.
+
 ### Auth (Neon Auth / Better Auth), `netlify/functions/_shared/`
 
 - **`auth.mts`** — `requireAuth(req)` verifies an `Authorization: Bearer
   <jwt>` header against Neon Auth's JWKS (via `jose`'s `createRemoteJWKSet`
   + `jwtVerify`), returns the JWT's `sub` claim (the Neon Auth user id) or
-  throws. Every function that needs a caller identity uses this — there is
-  no shared middleware wrapper, each function calls it explicitly, same
-  pattern the old `SCAN_PASSPHRASE` check used before it (copy-pasted, not
-  abstracted, deliberately — see each function).
+  throws. **`authenticate(req)`** (added 2026-09-12, architecture refactor)
+  is now the preferred entry point for most functions: wraps
+  `requireAuth`'s try/catch-`AuthError`-else-rethrow block (previously
+  copy-pasted verbatim into 10 files — a past deliberate stylistic choice,
+  reversed once 16+ functions made the copy-paste cost more than it saved)
+  and returns `string | Response`, so a call site is 3 lines
+  (`const auth = await authenticate(req); if (auth instanceof Response)
+  return auth; const userId = auth;`) instead of 6. Deliberately a plain
+  function, not a `withAuth(handler)` HOC — real call sites don't agree on
+  a single method-check/auth/ownership ordering, so a wrapper would either
+  need to become configurable or silently change one function's behavior;
+  see `authenticate`'s own comment in `auth.mts` for the full reasoning.
+  `requireAuth`/`authErrorResponse`/`AuthError` stay exported and unchanged
+  for callers that still want the lower-level pieces (`backfill-legacy-scans.mts`
+  and a few others were migrated to `authenticate`; `stripe-webhook.mts`
+  and the cron functions deliberately never used `requireAuth` at all —
+  their own auth mechanisms are documented in their own entries below).
+- **`http.mts`** (added 2026-09-12) — `jsonResponse(body, {status, cors})`/
+  `errorResponse(message, status, extra, cors)` replace the 50+ hand-rolled
+  `new Response(JSON.stringify(...), {...})` call sites that had
+  accumulated with no shared helper. `cors` stays an explicit opt-in
+  parameter (never a default) matching `cors.mts`'s own design — webhook/
+  cron/background functions (`stripe-webhook.mts`, `reap-stuck-scans.mts`,
+  `ops-failure-digest.mts`, `scheduled-rescan.mts`, `run-scan-background.mts`)
+  pass none. Most functions have been migrated to these helpers; a few
+  intentional exceptions remain byte-for-byte as they were — `enrich.mts`'s
+  "Method not allowed" response is plain text, not JSON, predating this
+  helper, and was left as-is rather than silently changed to JSON.
+  `create-checkout-session.mts` was also given `corsHeaders`/`handleOptions`
+  in the same pass — it's a normal browser-called POST endpoint that had
+  simply never had CORS wired in, unlike the deliberate skips above.
 - **`db.mts`** — `sql()` returns a cached `@neondatabase/serverless` client
   (`neon<false, false>(...)`, generics pinned so every call site gets a
   plain `Record<string, any>[]` back instead of the driver's full
@@ -239,11 +274,21 @@ for the exact migration SQL if it needs revisiting.
   excludeScanId)`: most recent *other* completed scan's score for a
   company, `null` if there isn't one. Called by `run-scan-background.mts`
   to decide whether a just-finished scan counts as a score regression
-  (feeds `score_alerts` + the regression email); `companies.mts`'s
-  portfolio-dashboard list query re-expresses the same "previous score"
-  definition as a raw SQL `LATERAL` join instead of calling this function
-  (a per-row list query, not a single lookup) — its own comment points
-  back here so the two definitions don't drift apart.
+  (feeds `score_alerts` + the regression email). **Was also independently
+  re-expressed as a raw SQL `LATERAL` join in `companies.mts`'s
+  portfolio-dashboard list query** — collapsed 2026-09-12 (architecture
+  refactor): that query now only fetches `latest_scan_id` alongside
+  `latest_score`, and `prev_score`/`delta` are computed by calling this
+  function once per company with a latest score (trading one SQL round
+  trip for up to N — bounded by realistic portfolio sizes for a "track a
+  handful of companies" dashboard). `getPreviousCompletedScore` is now the
+  only place "previous completed score" is defined anywhere in the
+  codebase. **Not yet live-verified against a real multi-scan account** —
+  type-checks clean and the query logic was traced by hand to be
+  equivalent to the old LATERAL-join expression, but do a real before/after
+  diff of `GET /companies` for an account with several scans before fully
+  trusting this the way this codebase's own "verify live before trusting"
+  discipline expects.
 - **Frontend** (`src/app/lib/auth.ts`): wraps `better-auth`'s
   framework-agnostic client (`createAuthClient` from `'better-auth/client'`,
   cross-origin against Neon Auth's own domain — the client handles that

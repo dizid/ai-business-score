@@ -6,46 +6,35 @@
 // this site's plan. Auth + company-ownership scoped; replaces the old
 // passphrase-gated, synchronous, Blobs-backed /scan entirely.
 import type { Config } from '@netlify/functions';
-import { requireAuth, authErrorResponse, AuthError } from './_shared/auth.mts';
+import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { FREE_PLAN_SCAN_LIMIT, PRO_PLAN_MONTHLY_SCAN_LIMIT, isPro } from './_shared/plan.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
+import { jsonResponse, errorResponse } from './_shared/http.mts';
 
 export default async (req: Request) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
+  const cors = corsHeaders(req);
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Method not allowed', 405, {}, cors);
   }
 
-  let userId: string;
-  try {
-    userId = await requireAuth(req);
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    throw err;
-  }
+  const auth = await authenticate(req);
+  if (auth instanceof Response) return auth;
+  const userId = auth;
 
   let body: { company_id?: string };
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Invalid JSON body', 400, {}, cors);
   }
 
   const companyId = body.company_id;
   if (!companyId) {
-    return new Response(JSON.stringify({ error: 'company_id is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('company_id is required', 400, {}, cors);
   }
 
   const db = sql();
@@ -53,10 +42,7 @@ export default async (req: Request) => {
     SELECT * FROM public.companies WHERE id = ${companyId} AND owner_user_id = ${userId}
   `;
   if (companies.length === 0) {
-    return new Response(JSON.stringify({ error: 'Company not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Company not found', 404, {}, cors);
   }
   const company = companies[0];
 
@@ -68,13 +54,11 @@ export default async (req: Request) => {
       WHERE c.owner_user_id = ${userId}
     `;
     if (count >= FREE_PLAN_SCAN_LIMIT) {
-      return new Response(
-        JSON.stringify({
-          error: `You've used all ${FREE_PLAN_SCAN_LIMIT} free scans on the free plan. Upgrade to Pro for more.`,
-          upgradeRequired: true,
-          limit: FREE_PLAN_SCAN_LIMIT,
-        }),
-        { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+      return errorResponse(
+        `You've used all ${FREE_PLAN_SCAN_LIMIT} free scans on the free plan. Upgrade to Pro for more.`,
+        402,
+        { upgradeRequired: true, limit: FREE_PLAN_SCAN_LIMIT },
+        cors
       );
     }
   } else {
@@ -87,12 +71,11 @@ export default async (req: Request) => {
     `;
 
     if (count >= PRO_PLAN_MONTHLY_SCAN_LIMIT) {
-      return new Response(
-        JSON.stringify({
-          error: `Pro plan is limited to ${PRO_PLAN_MONTHLY_SCAN_LIMIT} scans this month (fair use) — resets at the start of next month.`,
-          limit: PRO_PLAN_MONTHLY_SCAN_LIMIT,
-        }),
-        { status: 402, headers: { 'Content-Type': 'application/json', ...corsHeaders(req) } },
+      return errorResponse(
+        `Pro plan is limited to ${PRO_PLAN_MONTHLY_SCAN_LIMIT} scans this month (fair use) — resets at the start of next month.`,
+        402,
+        { limit: PRO_PLAN_MONTHLY_SCAN_LIMIT },
+        cors
       );
     }
   }
@@ -117,16 +100,10 @@ export default async (req: Request) => {
       UPDATE public.scans SET status = 'failed', error_message = 'Failed to start scan'
       WHERE id = ${scanId}
     `;
-    return new Response(JSON.stringify({ error: 'Failed to start scan' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-    });
+    return errorResponse('Failed to start scan', 500, {}, cors);
   }
 
-  return new Response(JSON.stringify({ ok: true, scanId }), {
-    status: 202,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
-  });
+  return jsonResponse({ ok: true, scanId }, { status: 202, cors });
 };
 
 export const config: Config = {

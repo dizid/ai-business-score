@@ -5,6 +5,35 @@ Scoped guidance for `src/shared/`, split out of the project root
 actually touches this directory, instead of every session paying for it.
 See the root `CLAUDE.md` for overall project context.
 
+### `src/shared/Scoreboard.vue` (added 2026-09-12, architecture refactor)
+
+The Scoreboard section (emphasis bar chart: brand = accent, rivals =
+de-emphasis gray, expandable "beat you Nx" competitor excerpts) — split
+out of `ScanDetail.vue` and `CompetitorBenchmarkView.vue`, which had
+carried byte-for-byte identical markup/script for this one section
+(`CompetitorBenchmarkView.vue`'s own comment used to call the duplication
+out explicitly as deliberate). Purely presentational, `payload`-in only —
+same contract as the rest of `ScanDetail.vue`, so it's provably safe for
+`result.html`'s unauthenticated context too. A default slot renders extra
+content inside the card, below the rows — used only by
+`CompetitorBenchmarkView.vue`'s "no named competitors showed up" note,
+which has no equivalent in `ScanDetail.vue`.
+
+Deliberately does **not** extract a generic `.board-*` primitive —
+`ScanDetail.vue` reuses those same class names for unrelated sections
+(entity presence, Harmonia pillars) that this component doesn't touch, so
+`.board-label`/`.board-name`/`.board-count`/`.board-track`/`.board-fill`
+stay defined in **both** `ScanDetail.vue` (for those other sections) and
+`Scoreboard.vue` (duplicated, since Vue scoped styles don't cross component
+boundaries) — only the Scoreboard-exclusive classes
+(`.board-row`/`.board-beat*`/`.competitor-appearances*`/`.board-ambiguous`)
+were fully removed from `ScanDetail.vue`. Both callers keep their own
+`<h2>Scoreboard</h2>` (and any sub-heading) in their own template rather
+than inside this component — `ScanDetail.vue` has a `.theme-dashboard h2`
+scoped-CSS rule that only applies to `h2` elements declared directly in its
+own template, so a child component's `h2` wouldn't carry the right
+`data-v-` attribute for that rule to keep applying.
+
 ### `src/shared/scanPayload.ts` + `src/shared/ScanDetail.vue`
 
 Reused across every scan-rendering surface: `result/App.vue`,

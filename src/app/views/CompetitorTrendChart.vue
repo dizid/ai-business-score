@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { formatDateShort } from '../lib/format';
 
 // Multi-series sibling to CompanyProgressChart.vue (score-over-time, single
 // series, deliberately no legend). This plots mention-count-over-time for
@@ -120,9 +121,6 @@ const gridlines = computed(() => {
   return [0, Math.round(max / 2), max];
 });
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
 function labelAnchor(index: number): 'start' | 'middle' | 'end' {
   if (points.value.length <= 1) return 'middle';
   if (index === 0) return 'start';
@@ -158,7 +156,7 @@ const hoveredValues = computed(() => {
             class="axis-label"
             :x="xFor(i)" :y="HEIGHT - 8"
             :text-anchor="labelAnchor(i)"
-          >{{ formatDate(p.generatedAt) }}</text>
+          >{{ formatDateShort(p.generatedAt) }}</text>
         </template>
 
         <!-- one line per series (brand + top competitors) -->
@@ -195,7 +193,7 @@ const hoveredValues = computed(() => {
       </div>
 
       <div class="tooltip" v-if="hoveredPoint">
-        <span class="tooltip-date">{{ formatDate(hoveredPoint.generatedAt) }}</span>
+        <span class="tooltip-date">{{ formatDateShort(hoveredPoint.generatedAt) }}</span>
         <span v-for="h in hoveredValues" :key="h.key" class="tooltip-entry">
           <span class="legend-swatch" :style="{ background: h.color }"></span>{{ h.label }}: <strong>{{ h.value }}</strong>
         </span>
