@@ -1,7 +1,7 @@
 ---
 title: We ran Foreground's own scan on Foreground. Here's what came back.
 description: A real self-scan turned up a problem no amount of schema markup fixes — most models don't know which "Foreground" we mean, and one partly made up a fake version of our own company.
-date: 2026-09-15
+date: 2026-09-13
 ---
 
 If you build a tool that checks whether AI models know who you are, the
