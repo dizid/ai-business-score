@@ -58,6 +58,22 @@ const routes = [
     component: () => import('./views/BillingSuccessView.vue'),
     meta: { requiresAuth: true, title: 'Billing — Foreground' },
   },
+  {
+    // Full alert history — the "See all alerts" destination
+    // CompaniesListView.vue's dashboard widget links out to.
+    path: '/app/alerts',
+    name: 'alerts',
+    component: () => import('./views/AlertHistoryView.vue'),
+    meta: { requiresAuth: true, title: 'Alert history — Foreground' },
+  },
+  {
+    // Portfolio-wide competitor rollup — the cross-company sibling of
+    // CompetitorBenchmarkView.vue's per-company "vs. Competitors" page.
+    path: '/app/competitors',
+    name: 'portfolio-competitors',
+    component: () => import('./views/PortfolioCompetitorsView.vue'),
+    meta: { requiresAuth: true, title: 'Competitors across your portfolio — Foreground' },
+  },
 ];
 
 const router = createRouter({

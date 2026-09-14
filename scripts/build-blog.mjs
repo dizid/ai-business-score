@@ -70,9 +70,11 @@ function resolveAuthNavAssetPath() {
 let authNavAssetPath;
 
 // --- frontmatter: plain `key: value` lines between `---` fences. Simple on
-// purpose — content/blog/*.md only ever needs title/description/date, no
-// arrays or nesting, so a hand-rolled parser avoids a dependency
-// (gray-matter et al.) for a format this small. -----------------------
+// purpose — content/blog/*.md only ever needs title/description/date (plus
+// an optional `updated` date, added 2026-09-14 for a real dateModified
+// freshness signal — see buildPostPage()), no arrays or nesting, so a
+// hand-rolled parser avoids a dependency (gray-matter et al.) for a format
+// this small. -----------------------
 function parseFrontmatter(raw) {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) throw new Error('Missing frontmatter fence (---...---) at top of file');
@@ -217,18 +219,27 @@ function buildPostPage(post) {
         headline: post.title,
         description: post.description,
         datePublished: post.date,
-        dateModified: post.date,
+        // updated is an optional frontmatter field (added 2026-09-14) — a
+        // real freshness signal for posts that get revised after
+        // publishing, instead of dateModified always trailing
+        // datePublished verbatim regardless of actual edits. Falls back to
+        // post.date so existing posts (none of which set this field yet)
+        // are unaffected.
+        dateModified: post.updated || post.date,
         author: { '@type': 'Person', name: 'Marc de Ruijter' },
         publisher: { '@id': `${siteUrl}/#organization` },
         mainEntityOfPage: `${siteUrl}/blog/${post.slug}/`,
       },
     ],
   };
+  const updatedNote = post.updated && post.updated !== post.date
+    ? ` &middot; updated ${formatDate(post.updated)}`
+    : '';
   const bodyHtml = `
   <article class="blog-post">
     <a class="blog-back" href="/blog/">&larr; All posts</a>
     <h1>${escapeHtml(post.title)}</h1>
-    <div class="blog-meta">${formatDate(post.date)}</div>
+    <div class="blog-meta">${formatDate(post.date)}${updatedNote}</div>
     <div class="blog-body">
 ${post.bodyHtml}
     </div>

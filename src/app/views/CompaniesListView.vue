@@ -55,6 +55,7 @@ interface AlertRow {
 
 const companies = ref<CompanyRow[]>([]);
 const alerts = ref<AlertRow[]>([]);
+const dismissingAlertId = ref<string | null>(null);
 const profile = ref<Profile>({ plan_tier: 'free', subscription_status: null });
 const loading = ref(true);
 const loadError = ref('');
@@ -181,6 +182,23 @@ function formatAlertAge(iso: string): string {
   if (age < 1) return 'today';
   if (age < 2) return 'yesterday';
   return `${Math.floor(age)}d ago`;
+}
+
+async function dismissAlert(alertId: string) {
+  dismissingAlertId.value = alertId;
+  try {
+    const res = await authFetch(`/alerts/${alertId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dismissed: true }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      alerts.value = alerts.value.filter((a) => a.id !== alertId);
+    }
+  } finally {
+    dismissingAlertId.value = null;
+  }
 }
 
 function formatLastScanned(c: CompanyRow): string {
@@ -367,17 +385,27 @@ onMounted(loadCompanies);
       </button>
     </div>
 
+    <div class="portfolio-competitors-link-row" v-if="companies.length > 1 && !showCreate && !showExample">
+      <router-link to="/app/competitors">See competitors across your whole portfolio →</router-link>
+    </div>
+
     <div class="alerts-section" v-if="alerts.length > 0 && !showCreate && !showExample">
-      <h2 class="alerts-heading">Alerts</h2>
-      <router-link
-        v-for="alert in alerts"
-        :key="alert.id"
-        class="alert-row"
-        :to="`/app/companies/${alert.company_id}`"
-      >
-        <strong>{{ alert.brand }}</strong> dropped {{ Math.abs(alert.delta) }} points
-        ({{ alert.prior_score }} → {{ alert.new_score }}) · {{ formatAlertAge(alert.created_at) }}
-      </router-link>
+      <div class="alerts-header">
+        <h2 class="alerts-heading">Alerts</h2>
+        <router-link class="alerts-history-link" to="/app/alerts">See all alerts →</router-link>
+      </div>
+      <div class="alert-row" v-for="alert in alerts" :key="alert.id">
+        <router-link class="alert-link" :to="`/app/companies/${alert.company_id}`">
+          <strong>{{ alert.brand }}</strong> dropped {{ Math.abs(alert.delta) }} points
+          ({{ alert.prior_score }} → {{ alert.new_score }}) · {{ formatAlertAge(alert.created_at) }}
+        </router-link>
+        <button
+          type="button"
+          class="alert-dismiss"
+          :disabled="dismissingAlertId === alert.id"
+          @click="dismissAlert(alert.id)"
+        >{{ dismissingAlertId === alert.id ? 'Dismissing…' : 'Dismiss' }}</button>
+      </div>
     </div>
 
     <form class="card create-card" v-if="showCreate" @submit.prevent="onSubmit">
@@ -598,13 +626,28 @@ p.sub { color: var(--muted); margin: 0; }
   border: 1px solid color-mix(in srgb, var(--critical) 30%, var(--border));
   border-radius: 12px; padding: 16px 18px; margin-bottom: 24px;
 }
-.alerts-heading { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--critical); margin: 0 0 10px; }
+.portfolio-competitors-link-row { margin-bottom: 16px; }
+.portfolio-competitors-link-row a { font-size: 0.85rem; color: var(--muted); text-decoration: none; }
+.portfolio-competitors-link-row a:hover { color: var(--fg); text-decoration: underline; }
+
+.alerts-header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.alerts-heading { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--critical); margin: 0; }
+.alerts-history-link { font-size: 0.8rem; color: var(--muted); text-decoration: none; flex: none; }
+.alerts-history-link:hover { color: var(--critical); text-decoration: underline; }
 .alert-row {
-  display: block; padding: 7px 0; font-size: 0.88rem; color: var(--fg);
-  text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--critical) 12%, transparent);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid color-mix(in srgb, var(--critical) 12%, transparent);
 }
 .alert-row:last-child { border-bottom: none; }
-.alert-row:hover { color: var(--critical); }
+.alert-link { font-size: 0.88rem; color: var(--fg); text-decoration: none; min-width: 0; }
+.alert-link:hover { color: var(--critical); }
+.alert-dismiss {
+  flex: none; padding: 4px 10px; font-size: 0.76rem; font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--critical) 30%, var(--border)); border-radius: 999px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.alert-dismiss:hover:not(:disabled) { border-color: var(--critical); color: var(--critical); }
+.alert-dismiss:disabled { opacity: 0.6; cursor: wait; }
 
 .list-controls {
   display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; justify-content: space-between;

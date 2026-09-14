@@ -50,5 +50,14 @@ export function toScanPayload(row: Record<string, any>) {
     // started_at is new (scan timing) — same null default for pre-migration
     // rows and any scan still `pending`/`running`.
     startedAt: row.started_at ?? null,
+    // trigger_source/total_tokens both already existed on this row (see
+    // netlify/functions/CLAUDE.md's scans schema entry) but were dropped at
+    // this exact conversion point — trigger_source distinguishes a manual
+    // "Run new scan" click from scheduled-rescan.mts's daily auto-trigger
+    // (DB default 'manual', same default for pre-migration rows); total_tokens
+    // was previously "DB-only, never surfaced in UI" — both now flow through
+    // to scanPayload.ts/ScanDetail.vue.
+    triggerSource: row.trigger_source ?? 'manual',
+    totalTokens: typeof row.total_tokens === 'number' ? row.total_tokens : null,
   };
 }

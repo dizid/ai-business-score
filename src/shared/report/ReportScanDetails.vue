@@ -6,7 +6,7 @@
 import { computed } from 'vue';
 import { type ValidatedPayload } from '../scanPayload';
 import { CITATION_TIER_LABEL } from '../scanLabels';
-import { deriveOwnSiteCitationRows, deriveFailureRows, deriveScanDurationLabel } from '../scanDerived';
+import { deriveOwnSiteCitationRows, deriveThirdPartyCitationRows, deriveFailureRows, deriveScanDurationLabel } from '../scanDerived';
 import CollapsibleSection from '../CollapsibleSection.vue';
 
 const props = withDefaults(
@@ -21,6 +21,7 @@ const props = withDefaults(
 defineEmits<{ 'generate-deep-advice': []; 'upgrade': [] }>();
 
 const ownSiteCitationRows = computed(() => deriveOwnSiteCitationRows(props.payload));
+const thirdPartyCitationRows = computed(() => deriveThirdPartyCitationRows(props.payload));
 const failureRows = computed(() => deriveFailureRows(props.payload));
 const scanDurationLabel = computed(() => deriveScanDurationLabel(props.payload));
 </script>
@@ -96,6 +97,16 @@ const scanDurationLabel = computed(() => deriveScanDurationLabel(props.payload))
       </ul>
     </CollapsibleSection>
 
+    <CollapsibleSection v-if="thirdPartyCitationRows.length" title="Who else gets cited" :status-text="`${thirdPartyCitationRows.length}`">
+      <p class="citations-intro">Other sources AI models cited while answering — a concrete list of where to try to get listed:</p>
+      <ul class="citation-list">
+        <li v-for="row in thirdPartyCitationRows" :key="row.hostname">
+          <a :href="row.exampleUrl" target="_blank" rel="noopener">{{ row.hostname }}</a>
+          <span class="citation-meta">cited {{ row.count }}&times; &middot; e.g. &ldquo;{{ row.exampleTitle }}&rdquo;</span>
+        </li>
+      </ul>
+    </CollapsibleSection>
+
     <CollapsibleSection v-if="failureRows.length" title="Failed checks" :status-text="`${payload.failedCalls}`">
       <ul class="fail-reasons">
         <li v-for="(f, i) in failureRows" :key="i">
@@ -114,12 +125,14 @@ const scanDurationLabel = computed(() => deriveScanDurationLabel(props.payload))
         <div><dt>Checked</dt><dd>{{ payload.generatedAtDate.toLocaleString() }}</dd></div>
         <div v-if="scanDurationLabel"><dt>Duration</dt><dd>{{ scanDurationLabel }}</dd></div>
         <div><dt>Successful checks</dt><dd>{{ payload.completedCalls }} / {{ payload.completedCalls + payload.failedCalls }}</dd></div>
+        <div><dt>Triggered by</dt><dd>{{ payload.triggerSource === 'scheduled' ? 'Automatic weekly scan' : 'Manual' }}</dd></div>
+        <div v-if="payload.totalTokens !== null"><dt>Tokens used</dt><dd>{{ payload.totalTokens.toLocaleString() }}</dd></div>
       </dl>
     </div>
 
     <p
       class="details-empty"
-      v-if="!payload.deepAdvice && !allowDeepAdvice && !deepAdviceLocked && !payload.entityPresence && !payload.clarityCheck && !ownSiteCitationRows.length && !failureRows.length && payload.failedCalls === 0"
+      v-if="!payload.deepAdvice && !allowDeepAdvice && !deepAdviceLocked && !payload.entityPresence && !payload.clarityCheck && !ownSiteCitationRows.length && !thirdPartyCitationRows.length && !failureRows.length && payload.failedCalls === 0"
     >No additional scan details available.</p>
   </div>
 </template>

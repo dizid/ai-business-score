@@ -183,6 +183,8 @@ export const EXAMPLE_REPORT: ValidatedPayload = {
     quote: null,
     reasoning: 'Homepage copy is generic ("quality service you can trust") with no named service, credential, or response-time commitment.',
   },
+  triggerSource: 'manual',
+  totalTokens: 18420,
 };
 
 function PROMPT_LABEL(_index: number): string {

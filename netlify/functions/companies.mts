@@ -44,12 +44,18 @@ export default async (req: Request) => {
     // portfolio sizes for a "track a handful of companies" dashboard) in
     // exchange for exactly one place "previous completed score" is defined
     // anywhere in the codebase.
+    //
+    // `latest_competitor_tallies` added 2026-09-14 (Phase 5 of the deep-
+    // research pass) for PortfolioCompetitorsView.vue's cross-company
+    // rollup — reads the same jsonb column `latest` already joins against,
+    // no new subquery.
     const companies = await db`
       SELECT
         c.*,
         COALESCE(cnt.scan_count, 0) AS scan_count,
         latest.id AS latest_scan_id,
         latest.score AS latest_score,
+        latest.competitor_tallies AS latest_competitor_tallies,
         recent.status AS latest_scan_status,
         recent.created_at AS last_scanned_at
       FROM public.companies c
@@ -57,7 +63,7 @@ export default async (req: Request) => {
         SELECT count(*)::int AS scan_count FROM public.scans s WHERE s.company_id = c.id
       ) cnt ON true
       LEFT JOIN LATERAL (
-        SELECT s.id, s.score FROM public.scans s
+        SELECT s.id, s.score, s.competitor_tallies FROM public.scans s
         WHERE s.company_id = c.id AND s.status = 'completed'
         ORDER BY s.generated_at DESC
         LIMIT 1
@@ -89,14 +95,17 @@ export default async (req: Request) => {
     // dashboard's "Alerts" section — surfaces what sendScoreRegressionEmail
     // already computes, since the email alone is invisible until someone
     // checks their inbox. Last 30 days, most recent first, capped at 10 —
-    // still no read/dismissed state, but `a.scan_id = latest_scan.id` keeps
-    // an alert from outliving its own relevance: score_alerts is an
-    // append-only log written once when a regression is detected, so
-    // without this filter an old regression keeps showing even after a
-    // company's score has since recovered on a later scan (found 2026-09-07
-    // dogfooding — the list card's live latest/prev delta and this alert
-    // disagreed because the alert was stale, not because the two used
-    // different scan-ordering logic).
+    // `a.scan_id = latest_scan.id` keeps an alert from outliving its own
+    // relevance: score_alerts is an append-only log written once when a
+    // regression is detected, so without this filter an old regression keeps
+    // showing even after a company's score has since recovered on a later
+    // scan (found 2026-09-07 dogfooding — the list card's live latest/prev
+    // delta and this alert disagreed because the alert was stale, not
+    // because the two used different scan-ordering logic).
+    // dismissed_at added 2026-09-14 (Phase 4b of the deep-research pass) —
+    // excluded here so a dismissed alert drops out of this capped widget;
+    // GET /alerts (alerts.mts) is the undismissed-and-dismissed full history
+    // view this widget links out to.
     const alerts = await db`
       SELECT a.id, a.company_id, c.brand, a.prior_score, a.new_score, a.delta, a.created_at
       FROM public.score_alerts a
@@ -110,6 +119,7 @@ export default async (req: Request) => {
       WHERE c.owner_user_id = ${userId}
         AND a.created_at >= now() - interval '30 days'
         AND a.scan_id = latest_scan.id
+        AND a.dismissed_at IS NULL
       ORDER BY a.created_at DESC
       LIMIT 10
     `;

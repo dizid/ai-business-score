@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ScanDetail from '../../shared/ScanDetail.vue';
+import ScanDiff from '../../shared/ScanDiff.vue';
+import { validatePayload } from '../../shared/scanPayload';
 import CompanyProgressChart from './CompanyProgressChart.vue';
 import Icon from '../../shared/Icon.vue';
 import Breadcrumb from '../components/Breadcrumb.vue';
@@ -42,6 +44,24 @@ function pickScan(index: number) {
 function onHistoryDocClick(e: MouseEvent) {
   if (showHistory.value && historyRef.value && !historyRef.value.contains(e.target as Node)) closeHistory();
 }
+
+// "Compare to previous scan" — the nearest earlier COMPLETED scan after
+// selectedIndex in this newest-first list (a pending/failed scan in
+// between doesn't count as a comparison point, same "only completed scans
+// render" rule selectedPayload itself already applies).
+const previousCompletedPayload = computed(() => {
+  if (selectedIndex.value === null) return null;
+  for (let i = selectedIndex.value + 1; i < scans.value.length; i++) {
+    const row = scans.value[i] as { status?: string };
+    if (row.status === 'completed' || !row.status) {
+      const payload = validatePayload(scans.value[i]);
+      if (payload) return payload;
+    }
+  }
+  return null;
+});
+const showDiff = ref(false);
+watch(selectedIndex, () => { showDiff.value = false; });
 function onHistoryKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') closeHistory();
 }
@@ -328,6 +348,7 @@ watch(() => route.params.id, load);
                 <div class="scan-meta">
                   {{ (scan as any).status === 'completed' || !(scan as any).status ? formatDateTime(scan.generatedAt) : scanListStatusLabel((scan as any).status) }}
                   <span v-if="index === 0" class="latest-tag">Latest</span>
+                  <span v-if="(scan as any).triggerSource === 'scheduled'" class="auto-tag" title="Triggered by the automatic weekly scan, not a manual click">Auto</span>
                 </div>
                 <div class="scan-row-right">
                   <span v-if="typeof scan.score !== 'number'" class="scan-score na">no data</span>
@@ -344,8 +365,18 @@ watch(() => route.params.id, load);
             <p class="empty placeholder">Select a scan from "Scan history" above to see full details.</p>
           </template>
           <template v-else>
+            <div class="diff-toggle-row" v-if="selectedPayload && previousCompletedPayload">
+              <button type="button" class="diff-toggle" @click="showDiff = !showDiff">
+                {{ showDiff ? '← Back to full report' : 'Compare to previous scan' }}
+              </button>
+            </div>
+            <ScanDiff
+              v-if="selectedPayload && previousCompletedPayload && showDiff"
+              :prior="previousCompletedPayload"
+              :current="selectedPayload"
+            />
             <ScanDetail
-              v-if="selectedPayload"
+              v-else-if="selectedPayload"
               :payload="selectedPayload"
               theme="dashboard"
               :allow-deep-advice="allowDeepAdvice"
@@ -464,6 +495,14 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .history-toggle .caret { width: 16px; height: 16px; color: var(--faint); transition: transform 0.15s ease; }
 .history-toggle .caret.open { transform: rotate(180deg); }
 
+.diff-toggle-row { margin-bottom: 16px; }
+.diff-toggle {
+  padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg); cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.diff-toggle:hover { border-color: var(--accent); }
+
 .history-panel {
   position: absolute; top: calc(100% + 8px); left: 0; z-index: 30;
   width: min(380px, calc(100vw - 32px));
@@ -496,6 +535,11 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .latest-tag {
   display: inline-block; margin-left: 8px; padding: 1px 8px; font-size: 0.68rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.02em; color: var(--accent-ink); background: var(--accent);
+  border-radius: 999px; vertical-align: middle;
+}
+.auto-tag {
+  display: inline-block; margin-left: 8px; padding: 1px 8px; font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); border: 1px solid var(--border);
   border-radius: 999px; vertical-align: middle;
 }
 .scan-score { font-weight: 700; font-size: 1.1rem; font-variant-numeric: proportional-nums; }

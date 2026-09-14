@@ -21,10 +21,11 @@
 import { computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { formatDate } from '../lib/format';
-import { validatePayload } from '../../shared/scanPayload';
-import { deriveScoreboardRows, deriveKeyMetrics } from '../../shared/scanDerived';
+import { validatePayload, type Rank } from '../../shared/scanPayload';
+import { deriveScoreboardRows, deriveKeyMetrics, deriveProviderBreakdown } from '../../shared/scanDerived';
 import Scoreboard from '../../shared/Scoreboard.vue';
 import CompetitorTrendChart from './CompetitorTrendChart.vue';
+import ProviderTrendChart from './ProviderTrendChart.vue';
 import Breadcrumb from '../components/Breadcrumb.vue';
 import { useCompany } from '../composables/useCompany';
 
@@ -62,6 +63,23 @@ const competitorTrend = computed(() =>
     competitorTallies: Array.isArray(s.competitorTallies)
       ? (s.competitorTallies as { name: string; mentionCount: number; ambiguous: boolean }[])
       : [],
+  }))
+);
+
+// Same lenient raw-field extraction as competitorTrend above (this is the
+// app's own trusted GET /companies/:id response, not an untrusted payload —
+// validatePayload()'s fail-closed handling is for result.html's forgeable
+// URL fragment, not needed here) — reuses deriveProviderBreakdown's grouping
+// logic rather than re-implementing it, since that function only needs
+// rawResponses/perPromptRank, not a full ValidatedPayload.
+const providerTrend = computed(() =>
+  scans.value.map((s, index) => ({
+    id: (s.id as string) || String(index),
+    generatedAt: typeof s.generatedAt === 'string' ? s.generatedAt : '',
+    providers: deriveProviderBreakdown({
+      rawResponses: Array.isArray(s.rawResponses) ? (s.rawResponses as { promptIndex: number; model: string }[]) : [],
+      perPromptRank: Array.isArray(s.perPromptRank) ? (s.perPromptRank as { rank: Rank }[]) : [],
+    }).map((row) => ({ model: row.model, presencePct: row.presencePct })),
   }))
 );
 
@@ -121,6 +139,8 @@ function goToFullReport() {
 
         <CompetitorTrendChart v-if="scans.length >= 2" :scans="competitorTrend" @select-point="goToFullReport" />
         <p class="trend-note" v-else>Run another scan later to see a mentions-over-time trend here.</p>
+
+        <ProviderTrendChart v-if="scans.length >= 2" :scans="providerTrend" @select-point="goToFullReport" />
 
         <h2>Scoreboard</h2>
         <p class="section-sub" v-if="latestCompletedScan">

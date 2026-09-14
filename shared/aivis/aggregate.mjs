@@ -100,7 +100,7 @@ export function aggregateProspect(prospect, callResults) {
       }
     }
 
-    perPromptRank.push({ promptIndex: r.promptIndex, rank: rankValue });
+    perPromptRank.push({ promptIndex: r.promptIndex, rank: rankValue, model: r.model });
   }
 
   return {

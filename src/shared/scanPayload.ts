@@ -16,7 +16,11 @@ export type AdviceTone = 'critical' | 'warning' | 'positive' | 'neutral';
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
-export interface PerPromptRank { promptIndex: number; rank: Rank; }
+// model is optional — added 2026-09-14 (aggregateProspect now attaches the
+// call's provider/model string alongside its rank), so scans persisted
+// before that change have no model on their stored perPromptRank entries.
+// Every consumer must treat a missing model as "unknown provider," not throw.
+export interface PerPromptRank { promptIndex: number; rank: Rank; model?: string; }
 export interface CompetitorTally { name: string; mentionCount: number; beatBrandCount: number; ambiguous: boolean; }
 export interface AdviceCard { id: AdviceId; tone: AdviceTone; params: Record<string, unknown>; }
 export interface Citation { url: string; title: string; }
@@ -140,7 +144,14 @@ export interface ValidatedPayload {
   harmonia: HarmoniaResult | null;
   entityPresence: EntityPresenceResult | null;
   clarityCheck: ClarityCheckResult | null;
+  triggerSource: TriggerSource;
+  totalTokens: number | null;
 }
+
+// 'manual' (a user clicked "Run new scan") or 'scheduled'
+// (scheduled-rescan.mts's daily auto-trigger for Pro weekly-scan opt-ins) —
+// see netlify/functions/CLAUDE.md's scans.trigger_source column entry.
+export type TriggerSource = 'manual' | 'scheduled';
 
 const RANKS = new Set(['ranked-1', 'ranked-2', 'ranked-3', 'mentioned', 'not-mentioned', 'beaten']);
 const ADVICE_IDS = new Set(['no-data', 'zero-citations', 'consistently-beaten', 'leading', 'mixed', 'top-rival']);
@@ -461,7 +472,8 @@ export function validatePayload(raw: any): ValidatedPayload | null {
   for (const r of raw.perPromptRank) {
     const promptIndex = asNonNegativeInt(r && r.promptIndex);
     if (promptIndex === null || !RANKS.has(r.rank)) return null;
-    perPromptRank.push({ promptIndex, rank: r.rank });
+    const model = typeof r.model === 'string' ? r.model : undefined;
+    perPromptRank.push(model ? { promptIndex, rank: r.rank, model } : { promptIndex, rank: r.rank });
   }
 
   // score: null (unavailable) or a 0-100 integer. Never trust a forged
@@ -601,6 +613,14 @@ export function validatePayload(raw: any): ValidatedPayload | null {
   // HTML-escaping a URL does not neutralize a javascript: scheme.
   const safeWebsiteHref = /^https?:\/\//i.test(raw.website) ? raw.website : null;
 
+  // triggerSource/totalTokens are both new (2026-09-14) — same lenient
+  // degrade pattern as every other additive field above: an invalid or
+  // missing triggerSource defaults to 'manual' (matching the DB column's
+  // own default) rather than rejecting the payload; totalTokens degrades to
+  // null.
+  const triggerSource: TriggerSource = raw.triggerSource === 'scheduled' ? 'scheduled' : 'manual';
+  const totalTokens = typeof raw.totalTokens === 'number' && raw.totalTokens >= 0 ? raw.totalTokens : null;
+
   return {
     id: raw.id,
     brand: raw.brand,
@@ -626,5 +646,7 @@ export function validatePayload(raw: any): ValidatedPayload | null {
     harmonia: raw.harmonia !== undefined ? asHarmonia(raw.harmonia) : null,
     entityPresence: raw.entityPresence !== undefined ? asEntityPresence(raw.entityPresence) : null,
     clarityCheck: raw.clarityCheck !== undefined ? asClarityCheck(raw.clarityCheck) : null,
+    triggerSource,
+    totalTokens,
   };
 }

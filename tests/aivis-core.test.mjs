@@ -273,6 +273,19 @@ describe('aggregateProspect', () => {
     expect(agg.perPromptRank[0].rank).toBe('ranked-1');
   });
 
+  // Regression: perPromptRank used to drop which model produced each rank
+  // entry, even though the call result it's derived from already carries
+  // one — the root blocker for any per-provider breakdown.
+  it('attaches the call\'s model to its perPromptRank entry', () => {
+    const callResults = [
+      { ok: true, model: 'anthropic/claude-haiku-4-5', promptIndex: 0, text: 'ASML is a leader in lithography.' },
+      { ok: true, model: 'google/gemini-3-flash-preview', promptIndex: 1, text: 'No mention here.' },
+    ];
+    const agg = aggregateProspect(baseProspect, callResults);
+    expect(agg.perPromptRank[0].model).toBe('anthropic/claude-haiku-4-5');
+    expect(agg.perPromptRank[1].model).toBe('google/gemini-3-flash-preview');
+  });
+
   // Regression: an ambiguous competitor name used to look identical to
   // "never mentioned" (tally stuck at 0 either way). It should now be
   // visibly flagged instead of silently indistinguishable.

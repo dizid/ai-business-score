@@ -11,7 +11,7 @@ import { type ValidatedPayload, type Rank } from '../scanPayload';
 import { SENTIMENT_LABEL, CHECK_BADGE_LABEL, CATEGORY_EXPLAIN } from '../scanLabels';
 import {
   sentimentKey, deriveSentimentByKey, deriveScoreboardRows, scoreboardRowPct, shareOfVoicePct,
-  deriveCompetitorAppearances, deriveCategoryBreakdown, deriveCheckBreakdown,
+  deriveCompetitorAppearances, deriveCategoryBreakdown, deriveCheckBreakdown, deriveProviderBreakdown,
   type ScoreboardRow, type CheckGroup,
 } from '../scanDerived';
 
@@ -39,6 +39,7 @@ function toggleCompetitorExpanded(name: string) {
 function competitorAppearances(name: string) { return deriveCompetitorAppearances(props.payload, name); }
 
 const categoryBreakdown = computed(() => deriveCategoryBreakdown(props.payload));
+const providerBreakdown = computed(() => deriveProviderBreakdown(props.payload));
 
 // Mention highlighting for the detail pane's raw response text — same
 // segment-based (non-v-html) approach as the legacy theme's Details tab,
@@ -139,6 +140,20 @@ function selectPrompt(promptIndex: number) { selectedPromptIndex.value = promptI
               class="sentiment-badge" :class="`sentiment-${s.classification}`"
             >{{ s.count }} {{ s.label }}</span>
           </div>
+        </div>
+      </div>
+    </template>
+
+    <template v-if="providerBreakdown.length > 1">
+      <h2>Which AI favors you</h2>
+      <div class="card">
+        <div class="category-row" v-for="row in providerBreakdown" :key="row.model">
+          <div class="board-label">
+            <span class="board-name check-model">{{ row.model }}</span>
+            <span class="board-count">{{ row.ranked1 + row.beaten }}/{{ row.total }} mentioned</span>
+          </div>
+          <div class="board-track"><div class="board-fill you" :style="{ width: row.presencePct + '%' }"></div></div>
+          <div class="category-detail">{{ row.ranked1 }} first, {{ row.beaten }} beaten to it, {{ row.notMentioned }} not mentioned</div>
         </div>
       </div>
     </template>

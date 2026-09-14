@@ -18,7 +18,7 @@ import {
   deriveSentimentSummaryRows, deriveSentimentAdvice, deriveVisibleAdvice, deriveHarmoniaPillars, deriveHarmoniaBand,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveScanDurationLabel, cwvRating,
   formatSeconds, sentimentKey, deriveSentimentByKey, deriveExtraPsiScores, deriveAdditionalAuditRows,
-  resolveCitationTitle,
+  resolveCitationTitle, deriveProviderBreakdown, deriveThirdPartyCitationRows,
 } from './scanDerived';
 import { scoreBand } from '../../shared/aivis-core.mjs';
 
@@ -105,6 +105,8 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
   push(`- **Checked:** ${payload.generatedAtDate.toLocaleString()}`);
   const duration = deriveScanDurationLabel(payload);
   if (duration) push(`- **Scan duration:** ${duration}`);
+  push(`- **Triggered by:** ${payload.triggerSource === 'scheduled' ? 'Automatic weekly scan' : 'Manual'}`);
+  if (payload.totalTokens !== null) push(`- **Tokens used:** ${payload.totalTokens.toLocaleString()}`);
   push();
 
   // ---- Executive summary ----
@@ -230,6 +232,19 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
     push();
   }
 
+  // ---- Which AI favors you ----
+  const providerBreakdown = deriveProviderBreakdown(payload);
+  if (providerBreakdown.length > 1) {
+    push('## Which AI favors you');
+    push();
+    push('| Model | Mentioned | First | Beaten | Not mentioned |');
+    push('|---|---|---|---|---|');
+    for (const row of providerBreakdown) {
+      push(`| ${row.model} | ${row.ranked1 + row.beaten}/${row.total} | ${row.ranked1} | ${row.beaten} | ${row.notMentioned} |`);
+    }
+    push();
+  }
+
   // ---- Site Health score ----
   if (payload.harmonia) {
     const h = payload.harmonia;
@@ -326,6 +341,19 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
     push();
     for (const c of ownSiteCitationRows) {
       push(`- [${mdEscapeCell(c.title)}](${c.url}) — ${c.model}, ${c.promptLabel}, ${CITATION_TIER_LABEL[c.tier]}`);
+    }
+    push();
+  }
+
+  // ---- Who else gets cited ----
+  const thirdPartyCitationRows = deriveThirdPartyCitationRows(payload);
+  if (thirdPartyCitationRows.length) {
+    push('## Who else gets cited');
+    push();
+    push('Other sources AI models cited while answering — a concrete list of where to try to get listed:');
+    push();
+    for (const row of thirdPartyCitationRows) {
+      push(`- [${mdEscapeCell(row.hostname)}](${row.exampleUrl}) — cited ${row.count}×, e.g. "${mdEscapeCell(row.exampleTitle)}"`);
     }
     push();
   }

@@ -6,7 +6,7 @@
 // apart. Each function here is the same logic the matching computed() in
 // ScanDetail.vue used to contain, just taking `payload` as a parameter
 // instead of closing over `props.payload`.
-import { scoreBand, PROMPT_LABELS, PROMPT_CATEGORIES, findMentions } from '../../shared/aivis-core.mjs';
+import { scoreBand, PROMPT_LABELS, PROMPT_CATEGORIES, findMentions, hostnameOf } from '../../shared/aivis-core.mjs';
 import { asShortString, type ValidatedPayload, type Rank } from './scanPayload';
 import { SENTIMENT_SUMMARY_ORDER, CATEGORY_LABEL, CATEGORY_ORDER, HARMONIA_PILLAR_LABELS, SENTIMENT_LABEL, BAND_LABEL, BAND_EXPLAIN } from './scanLabels';
 
@@ -80,6 +80,34 @@ export function deriveCategoryBreakdown(payload: ValidatedPayload): CategoryRow[
       })),
     };
   });
+}
+
+// Which AI provider actually favors this brand — grouped by rawResponses[i]
+// .model (always present, even on scans predating perPromptRank's own
+// optional `model` field — see scanPayload.ts) zipped with
+// perPromptRank[i].rank by index, the same "safe to zip" index alignment
+// deriveCheckBreakdown/deriveOwnSiteCitationRows already rely on. Takes only
+// the two fields it needs (not a full ValidatedPayload) so
+// CompetitorBenchmarkView.vue's cross-scan trend computed can reuse this
+// exact grouping logic against a raw (not validatePayload()'d) scan record,
+// instead of re-implementing the same loop a second time.
+export interface ProviderBreakdownRow { model: string; total: number; ranked1: number; beaten: number; notMentioned: number; presencePct: number; }
+export function deriveProviderBreakdown(payload: { rawResponses: { promptIndex: number; model: string }[]; perPromptRank: { rank: Rank }[] }): ProviderBreakdownRow[] {
+  const byModel = new Map<string, Rank[]>();
+  payload.rawResponses.forEach((r, i) => {
+    const rank = payload.perPromptRank[i]?.rank ?? 'not-mentioned';
+    if (!byModel.has(r.model)) byModel.set(r.model, []);
+    byModel.get(r.model)!.push(rank);
+  });
+  return [...byModel.entries()]
+    .map(([model, ranks]) => {
+      const total = ranks.length;
+      const ranked1 = ranks.filter((r) => r === 'ranked-1').length;
+      const beaten = ranks.filter((r) => ['ranked-2', 'ranked-3', 'mentioned', 'beaten'].includes(r)).length;
+      const notMentioned = total - ranked1 - beaten;
+      return { model, total, ranked1, beaten, notMentioned, presencePct: total > 0 ? Math.round(((ranked1 + beaten) / total) * 100) : 0 };
+    })
+    .sort((a, b) => b.presencePct - a.presencePct);
 }
 
 export interface SentimentAdvice { unfavorable: number; negative: number; comparisonOnly: number; total: number; }
@@ -328,6 +356,34 @@ export function deriveOwnSiteCitationRows(payload: ValidatedPayload): OwnCitatio
       totalCitations,
     };
   });
+}
+
+// Third-party citation domains — where AI models actually sourced their
+// answers, excluding the scanned company's own site (that's
+// deriveOwnSiteCitationRows above). A concrete, actionable GEO/PR signal:
+// "get listed on these sites" rather than generic SEO advice. Every
+// citation is already stored per rawResponses[i] (own-domain or not) — this
+// is pure re-aggregation of data already fetched, no new call. hostnameOf()
+// never throws (falls back to best-effort string parsing internally), so no
+// try/catch needed here unlike aggregateProspect's own citation loop, which
+// guards a different, less-forgiving URL constructor call.
+export interface ThirdPartyCitationRow { hostname: string; count: number; exampleTitle: string; exampleUrl: string; }
+export function deriveThirdPartyCitationRows(payload: ValidatedPayload): ThirdPartyCitationRow[] {
+  const ownHostname = hostnameOf(payload.website);
+  const byHost = new Map<string, ThirdPartyCitationRow>();
+  for (const r of payload.rawResponses) {
+    for (const c of r.citations) {
+      const hostname = hostnameOf(c.url);
+      if (hostname === ownHostname || hostname.endsWith(`.${ownHostname}`)) continue;
+      const existing = byHost.get(hostname);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        byHost.set(hostname, { hostname, count: 1, exampleTitle: resolveCitationTitle(c.title, c.url), exampleUrl: c.url });
+      }
+    }
+  }
+  return [...byHost.values()].sort((a, b) => b.count - a.count);
 }
 
 // Only 'top-rival' can produce an empty body (when no valid competitor name
