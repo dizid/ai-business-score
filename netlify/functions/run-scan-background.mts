@@ -129,6 +129,11 @@ export default async (req: Request) => {
     google: Netlify.env.get('GOOGLE_API_KEY'),
     xai: Netlify.env.get('XAI_API_KEY'),
     openai: Netlify.env.get('OPENAI_API_KEY'),
+    // Added 2026-09-14. Read here for the same reason xai still is despite
+    // neither being in HOSTED_MODELS (see that constant's comment below) —
+    // this file's apiKeys object always carries every configured provider
+    // key, independent of which models the main loop actually iterates.
+    mistral: Netlify.env.get('MISTRAL_API_KEY'),
   };
   // PageSpeed Insights, for the Harmonia audit's UX Signals pillar below.
   // Tries a dedicated key first, falls back to reusing GOOGLE_API_KEY (same

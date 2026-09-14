@@ -337,6 +337,27 @@ enterprise deal requiring a DPA).
   before being caught by that same manual pass and fixed to wait for
   `DOMContentLoaded`.
 
+- **`MISTRAL_API_KEY`** — added 2026-09-14 for a 5th direct-call provider
+  (`mistral/mistral-small-latest`), the first added since the 2026-09-12
+  `shared/aivis/providers/registry.mjs` refactor. Key found in `DEV.md`
+  (gitignored scratch notes, same location `OPENAI_API_KEY` was originally
+  found). Live-verified before being set — two real smoke-test calls
+  against `POST https://api.mistral.ai/v1/conversations` (not the more
+  commonly-documented Chat Completions endpoint; Mistral's own docs state
+  `web_search`/`web_search_premium` only work on the Conversations/Agents
+  APIs, not Chat Completions) — see `shared/aivis/providers/mistral.mjs`'s
+  header comment for the full response-shape detail. Set on Netlify
+  (`envVarIsSecret: false`, context `all`). No Perplexity-gateway fallback
+  exists for `mistral/*` (`requireOwnKey: true` in `registry.mjs`, same as
+  anthropic/google/xai). **Not added to `run-scan-background.mts`'s
+  `HOSTED_MODELS`** — that stays a deliberate cost-control filter
+  (google+anthropic only, see `shared/CLAUDE.md`), a separate decision from
+  making the provider available. `apiKeys.mistral` is threaded through both
+  `proof-script/index.mjs` (runs the full unfiltered `MODELS`, so it will
+  actually call mistral) and `run-scan-background.mts` (read into
+  `apiKeys` for consistency with `xai`, even though `HOSTED_MODELS`
+  doesn't currently dispatch to it).
+
 ## Commands
 
 **Local script** (from `proof-script/`):

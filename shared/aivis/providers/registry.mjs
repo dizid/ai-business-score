@@ -18,12 +18,18 @@ import { call as anthropicCall } from './anthropic.mjs';
 import { call as googleCall } from './google.mjs';
 import { call as xaiCall } from './xai.mjs';
 import { call as openaiCall } from './openai.mjs';
+import { call as mistralCall } from './mistral.mjs';
 
 export const PROVIDER_ADAPTERS = {
   anthropic: { call: anthropicCall, requireOwnKey: true, keyName: 'ANTHROPIC_API_KEY' },
   google: { call: googleCall, requireOwnKey: true, keyName: 'GOOGLE_API_KEY' },
   xai: { call: xaiCall, requireOwnKey: true, keyName: 'XAI_API_KEY' },
   openai: { call: openaiCall, requireOwnKey: false, keyName: 'OPENAI_API_KEY' },
+  // No Perplexity-gateway fallback exists for mistral/* (the gateway only
+  // ever proxied openai/google/anthropic/xai model names) — requireOwnKey:
+  // true throws a clear, attributable error instead of silently falling
+  // through to a gateway call that would 400 on an unrecognized model name.
+  mistral: { call: mistralCall, requireOwnKey: true, keyName: 'MISTRAL_API_KEY' },
 };
 
 // ---------- Models (4, cheap tier, live-verified) ----------
@@ -54,9 +60,16 @@ export const PROVIDER_ADAPTERS = {
 // dropping a large fraction of calls to 429 — see
 // run-scan-background.mts's CONCURRENCY_LIMIT comment for the resulting
 // fix (concurrency dropped to 1, i.e. fully sequential).
+// 2026-09-14: grew from 4 to 5. 'mistral/mistral-small-latest' (the cheap
+// tier, matching the other four's mini/flash/haiku naming convention) was
+// smoke-tested live via the Conversations API (see mistral.mjs's header
+// comment for why that endpoint, not Chat Completions) before being trusted
+// — both a trivial no-search call and a real web-search-triggering call
+// returned 200 with the expected shape.
 export const MODELS = [
   'openai/gpt-5-mini',
   'google/gemini-3-flash-preview',
   'anthropic/claude-haiku-4-5',
   'xai/grok-4.6',
+  'mistral/mistral-small-latest',
 ];

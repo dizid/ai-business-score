@@ -260,6 +260,45 @@ The single source of truth, imported by every consumer:
   change `run-scan-background.mts`'s main loop back to
   `for (const model of MODELS)` (or delete the `HOSTED_MODELS` line) to
   restore all 4 providers.
+- **5th provider added 2026-09-14: `mistral/mistral-small-latest`.** First
+  provider added since the 2026-09-12 registry refactor —
+  `shared/aivis/providers/mistral.mjs` + one `PROVIDER_ADAPTERS` entry +
+  one `MODELS` entry, per `registry.mjs`'s own "one new file" recipe.
+  **Uses the Conversations API (`POST /v1/conversations`), not Chat
+  Completions** — confirmed against Mistral's own docs (and two live smoke
+  tests) that `web_search`/`web_search_premium` only work on the
+  Conversations/Agents APIs, since Chat Completions responses don't carry
+  search-result references. Every other provider branch always attaches a
+  search tool (see `responsesShapeClient.mjs`'s "no ungrounded call path"
+  comment), so this had to be the Conversations API to stay consistent, not
+  the more commonly-documented endpoint. Response shape (live-confirmed,
+  not guessed): `outputs[]` holds a `tool.execution` entry (raw search
+  results, unused) and a `message.output` entry whose `content` is either a
+  bare string (model answered without searching) or an array of `{type:
+  'text', text}` chunks interleaved with `{type: 'tool_reference', tool:
+  'web_search', url, title}` citation chunks — `mistral.mjs`'s
+  `parseResponse` concatenates the text chunks with no separator (a chunk
+  routinely ends mid-sentence right before a citation and resumes exactly
+  where it left off) and dedupes citations by URL. `requireOwnKey: true`
+  (same as anthropic/google/xai) — there's no Perplexity-gateway route for
+  `mistral/*` model names, so a missing key fails loudly rather than
+  silently 400ing through the gateway. `mistral-small-latest` picked to
+  match the other four's cheap-tier naming convention (mini/flash/haiku);
+  not cost-compared against Mistral's other tiers (no per-call cost data
+  exists anywhere in this codebase for any provider, same caveat
+  `HOSTED_MODELS` above already notes). **Deliberately not added to
+  `HOSTED_MODELS`** — that stays a separate cost-control decision, untouched
+  by this addition. `MISTRAL_API_KEY` set on Netlify — see root
+  `CLAUDE.md`'s Deployment section. Regression coverage in
+  `tests/aivis-providers.test.mjs`: request-shape (`inputs` not `messages`),
+  missing-key-doesn't-fall-back, and a `parseResponse` test built from a
+  trimmed real captured response (text-chunk concatenation + citation
+  dedup). **Not yet live-verified through the full `callModelWithRetry`/
+  `runWithConcurrency` machinery in `proof-script`** — the two smoke tests
+  behind this addition were raw single calls against the Conversations API
+  directly, not a full `proof-script` run; do that once before fully
+  trusting this the way this file's own "verify live before trusting"
+  discipline expects for a new provider.
 - **Detection** (`findBrandMention`, `findMentions`) — whole-word,
   case-insensitive regex match on the brand name and a domain-derived alias.
   Presence-only, not sentiment-aware. Common-word brand names (from a

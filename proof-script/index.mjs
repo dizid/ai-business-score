@@ -228,10 +228,11 @@ async function main() {
     google: process.env.GOOGLE_API_KEY,
     xai: process.env.XAI_API_KEY,
     openai: process.env.OPENAI_API_KEY,
+    mistral: process.env.MISTRAL_API_KEY,
   };
-  if (!args.dryRun && !apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai && !apiKeys.openai) {
+  if (!args.dryRun && !apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai && !apiKeys.openai && !apiKeys.mistral) {
     console.error(
-      'No model API keys set (PERPLEXITY_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY / XAI_API_KEY / OPENAI_API_KEY). ' +
+      'No model API keys set (PERPLEXITY_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY / XAI_API_KEY / OPENAI_API_KEY / MISTRAL_API_KEY). ' +
       'Copy .env.example to .env and fill in at least one, or use --dry-run.'
     );
     process.exit(1);

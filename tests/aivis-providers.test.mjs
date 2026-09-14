@@ -71,6 +71,48 @@ describe('callModel — per-provider request shape', () => {
     expect(url).toBe('https://api.openai.com/v1/responses');
     expect(options.headers.Authorization).toBe('Bearer test-key');
   });
+
+  it('sends the mistral request to the Conversations API with inputs (not messages) and the web_search tool', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockFetchResponse({ outputs: [{ type: 'message.output', content: 'hi' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    await callModel({ mistral: 'test-key' }, 'mistral/mistral-small-latest', 'prompt');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.mistral.ai/v1/conversations');
+    expect(options.headers.Authorization).toBe('Bearer test-key');
+    const body = JSON.parse(options.body);
+    expect(body.model).toBe('mistral-small-latest');
+    expect(body.inputs).toBe('prompt');
+    expect(body.tools[0]).toEqual({ type: 'web_search' });
+  });
+
+  it('parses a real mistral response shape — concatenates text chunks and dedupes tool_reference citations', async () => {
+    // Trimmed down from an actual captured 2026-09-14 live response: a
+    // 'tool.execution' entry (search-engine raw results, ignored — this app
+    // only needs the model's own answer + which sources it cited) followed
+    // by a 'message.output' entry whose content interleaves text chunks
+    // with tool_reference citation chunks, including a repeated URL.
+    const fetchMock = vi.fn().mockResolvedValue(mockFetchResponse({
+      outputs: [
+        { type: 'tool.execution', name: 'web_search', info: { result: '{}' } },
+        {
+          type: 'message.output',
+          content: [
+            { type: 'text', text: 'Otterly.AI is affordable' },
+            { type: 'tool_reference', tool: 'web_search', url: 'https://example.com/a', title: 'A' },
+            { type: 'text', text: '. Peec AI is too' },
+            { type: 'tool_reference', tool: 'web_search', url: 'https://example.com/a', title: 'A' },
+          ],
+        },
+      ],
+      usage: { total_tokens: 500 },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await callModel({ mistral: 'test-key' }, 'mistral/mistral-small-latest', 'prompt');
+    expect(result.text).toBe('Otterly.AI is affordable. Peec AI is too');
+    expect(result.citations).toEqual([{ url: 'https://example.com/a', title: 'A' }]);
+    expect(result.usage).toEqual({ total_tokens: 500 });
+  });
 });
 
 describe('callModel — fallback and missing-key behavior (the registry-rewrite regression surface)', () => {
@@ -120,6 +162,15 @@ describe('callModel — fallback and missing-key behavior (the registry-rewrite 
     vi.stubGlobal('fetch', fetchMock);
     await expect(callModel({ perplexity: 'pplx-key' }, 'xai/grok-4.6', 'prompt')).rejects.toThrow(
       'No XAI_API_KEY configured for direct call to xai/grok-4.6'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT fall back mistral/* to the gateway when MISTRAL_API_KEY is missing, even if perplexity is configured', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(callModel({ perplexity: 'pplx-key' }, 'mistral/mistral-small-latest', 'prompt')).rejects.toThrow(
+      'No MISTRAL_API_KEY configured for direct call to mistral/mistral-small-latest'
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
