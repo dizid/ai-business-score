@@ -58,7 +58,13 @@ export function useCompany(getCompanyId: () => string) {
       profile.value = data.profile || { plan_tier: 'free', subscription_status: null };
       scans.value = data.scans;
     } catch (err) {
-      loadError.value = (err as Error).message;
+      // Network/DNS/CORS-level failures land here (not a clean HTTP error
+      // response, which is handled above via `!data.ok` and is already a
+      // real, informative server-authored message). Log the raw exception
+      // for debugging but never surface it verbatim — a bare "TypeError:
+      // Failed to fetch" means nothing to a non-technical user.
+      console.error('Failed to load company:', err);
+      loadError.value = "Couldn't load this company right now — check your connection and try again.";
     } finally {
       loading.value = false;
     }

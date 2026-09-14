@@ -245,7 +245,10 @@ watch(() => route.params.id, load);
 
 <template>
   <main>
-    <p class="status error" v-if="loadError">{{ loadError }}</p>
+    <div class="status error" v-if="loadError">
+      {{ loadError }}
+      <button type="button" class="inline-upgrade" @click="load">Try again</button>
+    </div>
     <div class="skeleton" v-else-if="loading" aria-hidden="true">
       <div class="skeleton-bar skeleton-crumb"></div>
       <div class="skeleton-bar skeleton-title"></div>
@@ -390,10 +393,31 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .scan-trigger button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .auto-scan-toggle {
   margin-top: 8px; margin-left: 0;
-  background: transparent !important; color: var(--muted) !important;
-  border: 1px solid var(--border) !important; box-shadow: none !important;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--card) !important; color: var(--fg) !important;
+  border: 1px solid var(--border) !important; box-shadow: var(--shadow) !important;
 }
-.auto-scan-toggle.active { border-color: var(--accent) !important; color: var(--fg) !important; }
+/* CSS-only toggle-switch track+knob, drawn as a pseudo-element so no extra
+   markup is needed — a hard-edged radial-gradient "dot" inside a pill track,
+   sliding from left (off) to right (active) via background-position math. */
+.auto-scan-toggle::before {
+  content: ''; flex: none; width: 30px; height: 17px; border-radius: 999px;
+  background-color: var(--border);
+  background-image: radial-gradient(circle 6px at 8px 8.5px, var(--faint) 100%, transparent 100%);
+  transition: background-color 0.15s ease, background-image 0.15s ease;
+}
+.auto-scan-toggle:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 6%, var(--card)) !important;
+}
+.auto-scan-toggle.active {
+  border-color: var(--accent) !important; color: var(--fg) !important;
+  background: color-mix(in srgb, var(--accent) 10%, var(--card)) !important;
+}
+.auto-scan-toggle.active::before {
+  background-color: var(--accent);
+  background-image: radial-gradient(circle 6px at 22px 8.5px, var(--accent-ink) 100%, transparent 100%);
+}
 .competitors-link {
   display: inline-block; margin-top: 8px; margin-left: 8px;
   padding: 10px 16px; font-size: 0.9rem; font-weight: 600;

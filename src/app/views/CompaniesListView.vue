@@ -689,7 +689,7 @@ p.sub { color: var(--muted); margin: 0; }
 }
 .summary-row:last-child { border-bottom: none; }
 .summary-label { flex: none; color: var(--muted); font-weight: 600; }
-.summary-row span:last-child { text-align: right; overflow-wrap: anywhere; }
+.summary-row span:last-child { flex: 1 1 auto; min-width: 0; text-align: right; overflow-wrap: anywhere; }
 .edit-details-link {
   display: block; margin: 10px auto 0; padding: 0; border: none; background: none;
   color: var(--muted); font-size: 0.85rem; text-decoration: underline; cursor: pointer;
