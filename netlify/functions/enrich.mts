@@ -13,6 +13,7 @@
 
 import type { Config } from '@netlify/functions';
 import { callModelWithRetry, buildEnrichPrompt, parseEnrichmentResponse, normalizeUrl } from '../../shared/aivis-core.mjs';
+import { isValidWebsiteUrl } from '../../shared/aivis/brand.mjs';
 import { authenticate } from './_shared/auth.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 import { jsonResponse, errorResponse } from './_shared/http.mts';
@@ -44,6 +45,20 @@ export default async (req: Request) => {
   const website = (body.website || '').trim();
   if (!website) {
     return errorResponse('Missing website', 400, {}, cors);
+  }
+  // Recovered from an orphaned agent worktree (2026-09-02): a typo like
+  // "reuters com" (space instead of dot) used to sail straight through to
+  // normalizeUrl(), get echoed back in the 200 response below, and
+  // silently pre-fill the review step with a URL the WHATWG parser itself
+  // considers invalid. Caught here, before spending a Perplexity call
+  // researching an unresearchable URL, using the same ok:false / 200-status
+  // contract every other enrichment failure already uses (never fatal —
+  // the caller falls back to a blank, manually-filled form).
+  if (!isValidWebsiteUrl(website)) {
+    return jsonResponse(
+      { ok: false, error: "That doesn't look like a valid website URL — check for typos and try again." },
+      { cors },
+    );
   }
 
   const apiKey = Netlify.env.get('PERPLEXITY_API_KEY');

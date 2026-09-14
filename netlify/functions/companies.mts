@@ -5,6 +5,7 @@ import type { Config } from '@netlify/functions';
 import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
 import { normalizeUrl, SUPPORTED_LANGUAGES } from '../../shared/aivis-core.mjs';
+import { isValidWebsiteUrl } from '../../shared/aivis/brand.mjs';
 import { FREE_PLAN_COMPANY_LIMIT, isPro } from './_shared/plan.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 import { jsonResponse, errorResponse } from './_shared/http.mts';
@@ -148,6 +149,17 @@ export default async (req: Request) => {
     const website = (body.website || '').trim();
     if (!brand || !website) {
       return errorResponse('brand and website are required', 400, {}, cors);
+    }
+    // Recovered from an orphaned agent worktree (2026-09-02): a typo like
+    // "reuters com" (space instead of dot) previously sailed through
+    // normalizeUrl()'s deliberately-lenient https:// prefixing and got
+    // persisted verbatim — a URL the WHATWG parser itself considers
+    // invalid, which then made harmonia.mjs's `new URL(website)` throw at
+    // scan time. This insert is the actual data-writing boundary
+    // regardless of how the request got here, so it's the right place to
+    // fail closed rather than insert.
+    if (!isValidWebsiteUrl(website)) {
+      return errorResponse('Please enter a valid website URL (e.g. acme.com or https://acme.com).', 400, {}, cors);
     }
     const category = (body.category || '').trim();
     const useCase = (body.use_case || '').trim();
