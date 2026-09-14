@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* YouTube thumbnail — 1280x720. Loss-framed ad-copy tagline from BRAND.md */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: #0a0a0d;
+    font-family: "Space Grotesk", sans-serif;
+    position: relative;
+    display: flex; align-items: center;
+  }
+  .glow {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 700px 500px at 78% 50%,
+      rgba(255, 184, 48, 0.25) 0%,
+      rgba(255, 184, 48, 0.10) 40%,
+      transparent 70%);
+  }
+  .text {
+    position: relative; padding-left: 80px; max-width: 760px;
+  }
+  h1 {
+    color: #f5f4f0; font-size: 82px; font-weight: 700; line-height: 1.08;
+    letter-spacing: -0.02em;
+  }
+  h1 .gold { color: #ffb830; }
+  .brand {
+    margin-top: 42px;
+    color: #a8a6a0; font-size: 34px; font-weight: 600;
+  }
+  .brand .fg { color: #ffb830; }
+  .brand .rest { color: #f5f4f0; }
+  /* Score ring — the brand's conic-gradient dial motif, 72% gold arc */
+  .ring-wrap {
+    position: absolute; right: 110px; top: 50%; transform: translateY(-50%);
+    width: 340px; height: 340px;
+  }
+  .ring {
+    width: 340px; height: 340px; border-radius: 50%;
+    background: conic-gradient(#ffb830 0turn 0.72turn, #3a3a40 0.72turn 1turn);
+    -webkit-mask: radial-gradient(circle, transparent 118px, #000 119px);
+    mask: radial-gradient(circle, transparent 118px, #000 119px);
+    filter: drop-shadow(0 0 46px rgba(255, 184, 48, 0.45));
+  }
+  .score {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .score .num { color: #f5f4f0; font-size: 96px; font-weight: 700; line-height: 1; }
+  .score .of { color: #a8a6a0; font-size: 30px; font-weight: 500; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="text">
+    <h1>AI already picked someone.<br><span class="gold">Was it you?</span></h1>
+    <div class="brand"><span class="fg">Fore</span><span class="rest">ground</span></div>
+  </div>
+  <div class="ring-wrap">
+    <div class="ring"></div>
+    <div class="score"><div class="num">72</div><div class="of">/ 100</div></div>
+  </div>
+</body>
+</html>

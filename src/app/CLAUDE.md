@@ -22,9 +22,11 @@ shared. Full plan at `~/.claude/plans/check-everythink-i-am-foamy-candle.md`.
   wraps this composable's `load()` and layers those on top.
 - **`useScanSelection.ts`** — the master-detail `selectedIndex`/
   `selectedScan`/`selectedScanStatus`/`selectedPayload`/`selectScan`/
-  `selectScanById`/`backToList` state. Only `CompanyDetailView.vue` uses
-  this — `CompetitorBenchmarkView.vue` always shows the latest completed
-  scan, a different selection rule entirely.
+  `selectScanById` state. Only `CompanyDetailView.vue` uses this —
+  `CompetitorBenchmarkView.vue` always shows the latest completed scan, a
+  different selection rule entirely. `backToList` (deselect-to-show-list)
+  was removed 2026-09-14 when the scan list stopped being a separate view
+  to go back to — see `CompanyDetailView.vue`'s entry below.
 - **`useCheckout.ts`** — `useCheckout(onError)`: wraps the
   `POST /create-checkout-session` → redirect flow, replacing a
   `startCheckout()` duplicated in both `CompanyDetailView.vue` and
@@ -165,10 +167,19 @@ shared. Full plan at `~/.claude/plans/check-everythink-i-am-foamy-candle.md`.
   the form and staying on the list — a brand-new, never-scanned company
   used to show the same bare `0` a real zero score would, which read as
   broken.
-- **`views/CompanyDetailView.vue`** — one company's master-detail dashboard:
+- **`views/CompanyDetailView.vue`** — one company's dashboard:
   `CompanyProgressChart.vue` (score-over-time, shown once a company has 2+
-  scans — a single point isn't a trend) above a scan list, selecting a scan
-  renders it via the shared `ScanDetail.vue`. Also owns the "Run new scan"
+  scans — a single point isn't a trend) above the report, rendered via the
+  shared `ScanDetail.vue`. **Reworked 2026-09-14**: the scan list used to
+  be a permanent 360px column beside the report (a two-column
+  "master-detail" layout, collapsing to a list/detail toggle only on
+  mobile via a `.has-selection` class + "← Back to list" button). It's now
+  a "Scan history ▾" dropdown (`showHistory`/`historyRef` in the script,
+  same click-outside + Escape-key convention as
+  `components/AccountMenu.vue`'s dropdown) so the report gets full width
+  on every viewport size, not just mobile. Picking a scan from the
+  dropdown (`pickScan`) selects it and closes the panel. Also owns the
+  "Run new scan"
   button (POSTs `/scan`, then polls `/scans/:id` every ~2s — `pollScan()`
   now retries a transient fetch failure up to 3x with backoff before giving
   up, added 2026-08-12, since it previously abandoned polling permanently

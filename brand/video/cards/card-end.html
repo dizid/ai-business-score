@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Scene 11 (final CTA) full-frame card — 1920x1080 */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1920px; height: 1080px; overflow: hidden;
+    background: #0a0a0d;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: "Space Grotesk", sans-serif;
+    position: relative;
+  }
+  .glow {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 900px 620px at 50% 42%,
+      rgba(255, 184, 48, 0.20) 0%,
+      rgba(255, 184, 48, 0.09) 35%,
+      rgba(255, 184, 48, 0.03) 60%,
+      transparent 75%);
+  }
+  .wordmark {
+    position: relative;
+    color: #f5f4f0; font-size: 120px; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .wordmark .fg { color: #ffb830; }
+  .free {
+    position: relative;
+    margin-top: 26px;
+    color: #f5f4f0; font-size: 52px; font-weight: 600;
+  }
+  .cta {
+    position: relative;
+    margin-top: 56px;
+    background: #ffb830; color: #0a0a0d;
+    font-size: 54px; font-weight: 700; letter-spacing: 0.01em;
+    padding: 28px 72px; border-radius: 16px;
+    box-shadow: 0 0 80px rgba(255, 184, 48, 0.35);
+  }
+  .sub {
+    position: relative;
+    margin-top: 40px;
+    color: #a8a6a0; font-size: 32px; font-weight: 500;
+  }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="wordmark"><span class="fg">Fore</span>ground</div>
+  <div class="free">3 free scans. No credit card.</div>
+  <div class="cta">foreground.info</div>
+  <div class="sub">Every AI answer has a foreground. Make sure you're in it.</div>
+</body>
+</html>

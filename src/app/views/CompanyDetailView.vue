@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ScanDetail from '../../shared/ScanDetail.vue';
 import CompanyProgressChart from './CompanyProgressChart.vue';
@@ -21,8 +21,38 @@ const {
 } = useCompany(() => route.params.id as string);
 const {
   selectedIndex, selectedScan, selectedScanStatus, selectedPayload,
-  selectScan, selectScanById, backToList, keyOf,
+  selectScan, selectScanById, keyOf,
 } = useScanSelection(scans);
+
+// Scan-history dropdown (replaces the old permanent list column so the
+// report itself gets full width) — same click-outside/Escape convention
+// as AccountMenu.vue's dropdown.
+const showHistory = ref(false);
+const historyRef = ref<HTMLElement | null>(null);
+function toggleHistory() {
+  showHistory.value = !showHistory.value;
+}
+function closeHistory() {
+  showHistory.value = false;
+}
+function pickScan(index: number) {
+  selectScan(index);
+  closeHistory();
+}
+function onHistoryDocClick(e: MouseEvent) {
+  if (showHistory.value && historyRef.value && !historyRef.value.contains(e.target as Node)) closeHistory();
+}
+function onHistoryKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeHistory();
+}
+onMounted(() => {
+  document.addEventListener('click', onHistoryDocClick);
+  document.addEventListener('keydown', onHistoryKeydown);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onHistoryDocClick);
+  document.removeEventListener('keydown', onHistoryKeydown);
+});
 
 interface CategoryBenchmark {
   companyCount: number;
@@ -193,7 +223,7 @@ async function runSentimentJudge(promptIndex: number, model: string) {
   }
 }
 
-// selectScan/backToList now come from useScanSelection() above.
+// selectScan now comes from useScanSelection() above.
 
 onMounted(async () => {
   await load();
@@ -270,37 +300,47 @@ watch(() => route.params.id, load);
 
       <CompanyProgressChart v-if="scans.length >= 2" :scans="scanTrend" @select-point="selectScanById" />
 
-      <div class="dashboard" v-if="scans.length" :class="{ 'has-selection': selectedIndex !== null }">
-        <div class="list-pane">
-          <h2 class="list-heading">Scan history</h2>
+      <div class="dashboard" v-if="scans.length">
+        <div class="history-toolbar" ref="historyRef">
           <button
-            v-for="(scan, index) in scans"
-            :key="keyOf(scan, index)"
             type="button"
-            class="scan-card"
-            :class="{ active: index === selectedIndex }"
-            @click="selectScan(index)"
+            class="history-toggle"
+            :aria-expanded="showHistory"
+            @click="toggleHistory"
           >
-            <div class="scan-row">
-              <div class="scan-meta">
-                {{ (scan as any).status === 'completed' || !(scan as any).status ? formatDateTime(scan.generatedAt) : scanListStatusLabel((scan as any).status) }}
-                <span v-if="index === 0" class="latest-tag">Latest</span>
-              </div>
-              <div class="scan-row-right">
-                <span v-if="typeof scan.score !== 'number'" class="scan-score na">no data</span>
-                <span v-else class="scan-score">{{ scan.score }}</span>
-                <Icon name="chevron" class="chevron" />
-              </div>
-            </div>
+            Scan history
+            <Icon name="caret-down" class="caret" :class="{ open: showHistory }" />
           </button>
+          <div class="history-panel" v-if="showHistory">
+            <h2 class="list-heading">Scan history</h2>
+            <button
+              v-for="(scan, index) in scans"
+              :key="keyOf(scan, index)"
+              type="button"
+              class="scan-card"
+              :class="{ active: index === selectedIndex }"
+              @click="pickScan(index)"
+            >
+              <div class="scan-row">
+                <div class="scan-meta">
+                  {{ (scan as any).status === 'completed' || !(scan as any).status ? formatDateTime(scan.generatedAt) : scanListStatusLabel((scan as any).status) }}
+                  <span v-if="index === 0" class="latest-tag">Latest</span>
+                </div>
+                <div class="scan-row-right">
+                  <span v-if="typeof scan.score !== 'number'" class="scan-score na">no data</span>
+                  <span v-else class="scan-score">{{ scan.score }}</span>
+                  <Icon name="chevron" class="chevron" />
+                </div>
+              </div>
+            </button>
+          </div>
         </div>
 
         <div class="detail-pane">
           <template v-if="!selectedScan">
-            <p class="empty placeholder">Select a scan from the list to see full details.</p>
+            <p class="empty placeholder">Select a scan from "Scan history" above to see full details.</p>
           </template>
           <template v-else>
-            <button type="button" class="back" @click="backToList">&larr; Back to list</button>
             <ScanDetail
               v-if="selectedPayload"
               :payload="selectedPayload"
@@ -388,8 +428,25 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
   .skeleton-bar, .skeleton-card { animation: none; background: var(--gridline); }
 }
 
-.dashboard { margin-top: 24px; display: block; }
-.list-pane { display: block; }
+.dashboard { margin-top: 24px; }
+.history-toolbar { position: relative; margin-bottom: 16px; }
+.history-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg); cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.history-toggle:hover { border-color: var(--accent); }
+.history-toggle .caret { width: 16px; height: 16px; color: var(--faint); transition: transform 0.15s ease; }
+.history-toggle .caret.open { transform: rotate(180deg); }
+
+.history-panel {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 30;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(60vh, 480px); overflow-y: auto;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px; box-shadow: var(--shadow);
+}
 .list-heading {
   font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
   color: var(--muted); margin: 0 0 10px; padding: 0 2px;
@@ -422,34 +479,9 @@ p.sub { color: var(--muted); margin: 0; overflow-wrap: anywhere; }
 .chevron { width: 18px; height: 18px; color: var(--faint); transition: transform 0.15s ease, color 0.15s ease; }
 
 .detail-pane {
-  display: none;
   background: var(--card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 20px; margin-top: 20px;
+  border-radius: 12px; padding: 20px;
   box-shadow: var(--shadow);
 }
 .detail-pane .placeholder { padding: 20px 0; text-align: center; }
-.back {
-  display: inline-block; margin-bottom: 16px; padding: 6px 10px;
-  border: 1px solid var(--border); border-radius: 8px;
-  background: transparent; color: var(--fg); font: inherit; cursor: pointer;
-}
-.back:hover { border-color: var(--accent); }
-
-.has-selection .list-pane { display: none; }
-.has-selection .detail-pane { display: block; }
-
-/* Single scroll region only (2026-09-11 fix): previously both panes carried
-   their own `max-height: 80vh; overflow-y: auto`, while nothing above them
-   constrained the page — so the window scrollbar and .detail-pane's own
-   scrollbar were both active at once whenever a report exceeded 80vh
-   (almost always). .list-pane now just sticks to the viewport as the page
-   scrolls (position: sticky, no overflow/max-height of its own — it's short
-   enough to never need internal scrolling) and .detail-pane flows normally,
-   so the browser window is the only scrollable region. */
-@media (min-width: 900px) {
-  .dashboard { display: grid; grid-template-columns: 360px 1fr; align-items: start; gap: 24px; }
-  .list-pane { display: block !important; position: sticky; top: 24px; }
-  .detail-pane { display: block; margin-top: 0; }
-  .back { display: none; }
-}
 </style>

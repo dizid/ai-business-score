@@ -1,0 +1,5 @@
+FLOW SETUP: mode "Ingredients to Video", add your avatar as the ingredient, 16:9, Fast quality. Paste everything below the line as one prompt.
+---
+The person from the ingredient image, in a modern small office at evening, warm practical lamp light, a laptop open in front of them, dark background with soft golden highlights. Realistic premium TV-commercial look, shallow depth of field, steady camera with a very slow push-in. No captions, no on-screen text, no logos.
+
+The person looks straight into the camera, holds up their phone, and says with calm confidence: "Someone just asked ChatGPT for the best business in your category. It gave ONE answer. Was it you?" A slight pause, one raised eyebrow on the last line.

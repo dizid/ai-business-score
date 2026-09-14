@@ -40,9 +40,6 @@ export function useScanSelection(scans: Ref<Record<string, unknown>[]>) {
     const idx = scans.value.findIndex((s, i) => keyOf(s, i) === id);
     if (idx !== -1) selectScan(idx);
   }
-  function backToList() {
-    selectedIndex.value = null;
-  }
 
-  return { selectedIndex, selectedScan, selectedScanStatus, selectedPayload, selectScan, selectScanById, backToList, keyOf };
+  return { selectedIndex, selectedScan, selectedScanStatus, selectedPayload, selectScan, selectScanById, keyOf };
 }
