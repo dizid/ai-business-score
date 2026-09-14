@@ -23,23 +23,21 @@ assuming nothing else is in flight.
 
 ## Marc
 
-- [ ] **Supply `sameAs` profile URLs (LinkedIn/X/GitHub, whichever exist)**
-      to unblock Phase 6 of the 2026-09-14 deep-research improvement pass
-      (plan: `~/.claude/plans/do-deep-research-and-cozy-neumann.md`) —
+- [ ] **Still open: supply `sameAs` profile URLs (LinkedIn/X/GitHub)**,
+      Phase 6 of the 2026-09-14 deep-research pass (plan:
+      `~/.claude/plans/do-deep-research-and-cozy-neumann.md`) —
       strengthening the bare `{name: "Marc de Ruijter"}`/`{name:
-      "Foreground"}` JSON-LD `Person`/`Organization` nodes (appear in
-      `index.html`, `scripts/build-blog.mjs`'s per-post `@graph`, and
-      could extend to `privacy.html`/`terms.html`) with `sameAs`/`jobTitle`/
-      `@id` for real E-E-A-T signal. Deliberately not guessed — see that
-      plan's Phase 6 for the full scope, which also adds `BreadcrumbList`/
-      `HowTo` schema to blog posts (no input needed for that half, still
-      open).
-- [ ] **Decide on Phase 7 of the same plan** (new citable content): a
-      glossary/definitions page ("What is GEO?", etc.) and, separately, an
-      explicit go-ahead before running the "we scanned ourselves" self-scan
-      case study — that one spends real API money (25 live calls against
-      Foreground's own listing), same standing "ask before spending" rule
-      this repo's `CLAUDE.md` has used everywhere else. Not started.
+      "Foreground"}` JSON-LD `Person`/`Organization` nodes with `sameAs`/
+      `jobTitle`/`@id`. **Deliberately skipped, not guessed**, when the
+      rest of Phase 6/7 shipped 2026-09-15 (commits `dc6f3d3` + the one
+      after) — no real URLs were available and fabricating one risks a
+      broken or simply wrong link on the live site. The rest of Phase 6
+      (BreadcrumbList + HowTo schema on blog posts) and all of Phase 7
+      (the `/glossary` page, and the "we scanned ourselves" self-scan case
+      study — Marc's 2026-09-15 "just do it" covered the real API spend)
+      are done; this one field is the only piece still open. Trivial to
+      add once URLs exist: `index.html`'s Organization/founder nodes and
+      `scripts/build-blog.mjs`'s per-post `@graph`.
 - [ ] **Supply a real prospect list (10-15 local businesses)** to unblock
       cold outreach — plumbers/dentists/contractors/HVAC/local law-
       accounting type "who does X near me" categories, per
