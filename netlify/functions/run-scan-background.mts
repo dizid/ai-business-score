@@ -1,14 +1,16 @@
-// Does the actual scan (5 prompts x 4 models = 20 calls as of 2026-08-13,
-// corrected 2026-09-04: the main loop now uses HOSTED_MODELS, a 2-provider
-// subset of MODELS, for a free-only cost-control pass — see that constant's
-// own comment below and root CLAUDE.md's Deployment section — so the hosted
-// site's main loop is 5 prompts x 2 models = 10 calls; proof-script is
-// unaffected and still runs the full 4-model set — see
-// aivis-core.mjs's PROMPT_TEMPLATES/MODELS comments for the full model
-// history, and this file's CONCURRENCY_LIMIT comment below for why the
-// hosted site uses a 5-prompt SLICE of the 10-prompt PROMPT_TEMPLATES array
-// while proof-script always runs the full 10) after being triggered by
-// scan.mts. Background Functions get up to 15 minutes of wall-clock time
+// Does the actual scan (5 prompts x 4 models = 20 calls as of 2026-08-13;
+// briefly 5 prompts x 2 models = 10 calls between 2026-09-04's free-only
+// cost-control pass and 2026-09-14, when HOSTED_MODELS was restored to the
+// full provider set — now 5 prompts x 5 models = 25 calls, Mistral having
+// landed as a 5th provider the same day. See HOSTED_MODELS' own comment
+// below and root CLAUDE.md's Deployment section for the full history.
+// proof-script always runs the full unfiltered MODELS set regardless of
+// HOSTED_MODELS — see aivis-core.mjs's PROMPT_TEMPLATES/MODELS comments for
+// the full model history, and this file's CONCURRENCY_LIMIT comment below
+// for why the hosted site uses a 5-prompt SLICE of the 10-prompt
+// PROMPT_TEMPLATES array while proof-script always runs the full 10) after
+// being triggered by scan.mts. Background Functions get up to 15 minutes of
+// wall-clock time
 // and Netlify returns 202 to the trigger immediately, so this can safely
 // take the several minutes real Perplexity calls (sequential, with
 // retries) need — the constraint that forced the old /scan to stay
@@ -326,19 +328,19 @@ export default async (req: Request) => {
   // — last, so model-major queueing means a slow xai run can only eat into
   // xai's own remaining checks instead of starving faster providers that
   // would otherwise have completed fine.
-  // Hosted-scan-only reduced model list, 2026-09-04 cost-control pass — see
-  // root CLAUDE.md's Deployment section / shared/CLAUDE.md's MODELS entry
-  // for the full reasoning (latency-only, no per-call cost data exists
-  // anywhere in this codebase) and revert instructions. Does NOT touch
-  // aivis-core.mjs's own MODELS export — proof-script still imports that
-  // directly and keeps running all 4 providers, same "shared source stays
-  // whole, this file takes a reduced view of it" pattern scanPrompts above
-  // already uses for PROMPT_TEMPLATES. Filtered by provider prefix so a
-  // future model-id bump within either kept provider doesn't silently fall
-  // out of this list. openai/gpt-5-mini's clarity-check and sentiment-judge
-  // calls further down are unaffected by this — they're hardcoded to that
-  // model directly, not sourced from this list.
-  const HOSTED_MODELS = MODELS.filter((m) => m.startsWith('google/') || m.startsWith('anthropic/'));
+  // Was a hosted-scan-only reduced model list (google+anthropic only) from
+  // 2026-09-04's free-only cost-control pass through 2026-09-14. Restored
+  // to the full provider set 2026-09-14 at Marc's explicit request, once
+  // live Pro billing was back (2026-09-11) and Mistral landed as a 5th
+  // provider the same day — see root CLAUDE.md's Deployment section /
+  // shared/CLAUDE.md's MODELS entry for the full history. `HOSTED_MODELS`
+  // stays a named alias to `MODELS` (not inlined into the loop below)
+  // rather than removed outright, so a future cost-control pass has one
+  // obvious place to reintroduce a filter instead of hunting for the raw
+  // loop again. openai/gpt-5-mini's clarity-check and sentiment-judge
+  // calls further down are unaffected either way — they're hardcoded to
+  // that model directly, not sourced from this list.
+  const HOSTED_MODELS = MODELS;
   const tasks: { prompt: string; model: string; promptIndex: number }[] = [];
   for (const model of HOSTED_MODELS) {
     for (const [promptIndex, template] of scanPrompts.entries()) {

@@ -76,7 +76,7 @@ I ran that question against my own site the first time mostly out of
 curiosity. I was not thrilled with the answer. That's a decent reason to
 check yours before you assume you already know.
 
-— Marc. I build Foreground, which checks exactly this across four AI
+— Marc. I build Foreground, which checks exactly this across five AI
 models. I'll drop the link in the comments.
 
 ---

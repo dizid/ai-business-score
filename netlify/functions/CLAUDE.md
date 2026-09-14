@@ -318,10 +318,17 @@ gap this update fixes rather than something built this session.
 - **`_shared/plan.mts`** — `FREE_PLAN_COMPANY_LIMIT = 1`,
   `FREE_PLAN_SCAN_LIMIT = 3` (lifetime), `PRO_PLAN_MONTHLY_SCAN_LIMIT`
   (calendar-month fair-use cap, added 2026-08-13 at `20` — see `scan.mts`'s
-  entry below; **raised to `50` on 2026-09-07**, now that the hosted scan's
-  main loop only calls `HOSTED_MODELS`/10 calls per scan rather than the
+  entry below; **raised to `50` on 2026-09-07**, when the hosted scan's
+  main loop only called `HOSTED_MODELS`/10 calls per scan rather than the
   4-provider/20-call scan the original `20` was sized against — see the
-  constant's own comment in `plan.mts` for the cost math), `isPro(planTier)`. `SCAN_CREDIT_PACK_SIZE`/
+  constant's own comment in `plan.mts` for the cost math. **Stale as a cost
+  justification since 2026-09-14**: `HOSTED_MODELS` was restored to all 5
+  providers that day (25 calls/scan, more than the original 20-call/4-provider
+  scan this `50` was never actually sized against either) — the `50` figure
+  itself was NOT revisited alongside that change, so a Pro user maxing out
+  monthly scans now drives 2.5x the API calls this cap was last
+  cost-justified against. Worth a deliberate look, not an oversight to fix
+  silently), `isPro(planTier)`. `SCAN_CREDIT_PACK_SIZE`/
   `SCAN_CREDIT_PACK_PRICE_USD`/`MAX_CREDIT_PACKS_PER_MONTH` (added
   2026-08-23 for the scan top-up feature) were **removed 2026-09-04** along
   with the whole feature — see the `scan_credit_purchases` schema entry
@@ -451,22 +458,22 @@ gap this update fixes rather than something built this session.
   limit, reverted 2026-09-04 with the top-up feature's removal) — both
   cases 402 with a plain `error` message; free-tier sets
   `upgradeRequired: true` (see "Billing (Stripe)" above).
-- **`run-scan-background.mts`** — the actual 20-call scan (a 5-prompt slice
-  × 4 models, updated 2026-08-13 — this bullet previously said "10 prompts
-  × 2 models," stale since that date's model expansion) (`-background`
-  filename suffix required by Netlify's convention).
-  **Corrected 2026-09-04**: the main loop's own call count above is stale
-  again — a free-only cost-control pass added a `HOSTED_MODELS` constant
-  (`MODELS` filtered to just `google/`/`anthropic/`) and the main loop now
-  iterates that instead of the full `MODELS`, so the hosted site's main
-  loop is actually 5 prompts × 2 models = **10 calls**, not 20. `MODELS`
-  itself is untouched and `proof-script` still runs all 4 providers — see
-  `shared/CLAUDE.md`'s `MODELS`/`HOSTED_MODELS` entry for the full
-  reasoning. Atomically claims the
+- **`run-scan-background.mts`** — the actual scan (a 5-prompt slice ×
+  `HOSTED_MODELS`) (`-background` filename suffix required by Netlify's
+  convention). Call count has moved several times — 5×4=20 (2026-08-13) →
+  5×2=10 (2026-09-04's free-only cost-control pass, `HOSTED_MODELS` filtered
+  to `google/`/`anthropic/` only) → **5×5=25 calls, current as of
+  2026-09-14**, when `HOSTED_MODELS` was restored to the full 5-provider
+  `MODELS` list (the original 4 plus Mistral, added the same day) at Marc's
+  explicit request, once live Pro billing was back (2026-09-11). See
+  `shared/CLAUDE.md`'s `MODELS`/`HOSTED_MODELS` entry for the full history —
+  `proof-script` was unaffected throughout, it always imports `MODELS`
+  directly regardless of what the hosted site's `HOSTED_MODELS` filters to.
+  Atomically claims the
   scan (`UPDATE ... WHERE status='pending'`) so a duplicate trigger is a
   cheap no-op instead of double-spending Perplexity calls, then updates the
-  row to `completed`/`failed`. `CALL_TIMEOUT_MS` (60000) is shared by 3 of
-  the 4 models; `xai/grok-4.6` gets its own longer 100000ms override
+  row to `completed`/`failed`. `CALL_TIMEOUT_MS` (60000) is shared by 4 of
+  the 5 models; `xai/grok-4.6` gets its own longer 100000ms override
   (`CALL_TIMEOUT_MS_BY_MODEL`, added 2026-08-17 per
   `docs/grok-timeout-investigation.md`) since its documented 30-50s+
   typical latency was already brushing the old flat ceiling.

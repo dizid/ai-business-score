@@ -227,9 +227,10 @@ enterprise deal requiring a DPA).
   the complete file list. **Reverted 2026-09-11** — see the pricing-restore
   entry below; the "to revert" recipe that used to sit here was executed,
   not just documented. `run-scan-background.mts`'s `HOSTED_MODELS` cut (2
-  providers instead of 4) was deliberately left as-is — pricing and provider
-  count are independent decisions, and reverting the cost cut wasn't part of
-  what was asked.
+  providers instead of 4) was deliberately left as-is at the time — pricing
+  and provider count are independent decisions, and reverting the cost cut
+  wasn't part of what was asked then. **This changed 2026-09-14** — see the
+  dedicated entry below; `HOSTED_MODELS` is no longer cut.
   **2026-09-11 — live two-tier Pro billing restored, $19 single-scan SKU
   removed for good (not just re-disabled).** Marc: keep it simple — 3 free
   scans (unchanged), then $99/month Pro, nothing in between. Checkout is
@@ -349,14 +350,40 @@ enterprise deal requiring a DPA).
   header comment for the full response-shape detail. Set on Netlify
   (`envVarIsSecret: false`, context `all`). No Perplexity-gateway fallback
   exists for `mistral/*` (`requireOwnKey: true` in `registry.mjs`, same as
-  anthropic/google/xai). **Not added to `run-scan-background.mts`'s
-  `HOSTED_MODELS`** — that stays a deliberate cost-control filter
-  (google+anthropic only, see `shared/CLAUDE.md`), a separate decision from
-  making the provider available. `apiKeys.mistral` is threaded through both
-  `proof-script/index.mjs` (runs the full unfiltered `MODELS`, so it will
-  actually call mistral) and `run-scan-background.mts` (read into
-  `apiKeys` for consistency with `xai`, even though `HOSTED_MODELS`
-  doesn't currently dispatch to it).
+  anthropic/google/xai). Landed alongside `HOSTED_MODELS` being restored to
+  the full provider set the same day (see the dedicated entry below) — so
+  unlike the four earlier providers, Mistral was never a "registered but not
+  dispatched to" state on the hosted site; it was live in the hosted scan
+  from the moment it existed. `apiKeys.mistral` is threaded through both
+  `proof-script/index.mjs` and `run-scan-background.mts`, both of which
+  actually call it.
+
+- **Hosted scan restored to all 5 AI providers, 2026-09-14.** Marc:
+  "i want openai, anthropic, google, and mistral and xai" — explicit
+  request to stop running the reduced 2-provider (`google`+`anthropic`)
+  hosted scan that had been in place since 2026-09-04's free-only
+  cost-control pass (see that entry above), now that live Pro billing is
+  back (2026-09-11) and Mistral had just landed as a 5th provider (see
+  above). `run-scan-background.mts`'s `HOSTED_MODELS` constant changed from
+  a `MODELS.filter(...)` down-select to a plain `const HOSTED_MODELS =
+  MODELS;` alias — kept as a named constant rather than removed, so a
+  future cost-control pass has one obvious place to reintroduce a filter.
+  Hosted scan is now 5 prompts × 5 models = **25 calls/scan**, up from 10 —
+  more than double the previous cost per scan, and more than the original
+  4-provider/20-call scan this app ran before 2026-09-04. **Not
+  re-examined as part of this change**: `PRO_PLAN_MONTHLY_SCAN_LIMIT` (50,
+  raised 2026-09-07 specifically against the 10-call/scan cost basis — see
+  `netlify/functions/CLAUDE.md`'s `_shared/plan.mts` entry) and
+  `CONCURRENCY_LIMIT_BY_PROVIDER`/`CALL_TIMEOUT_MS_BY_MODEL` (Mistral gets
+  no explicit entry in either, so it falls back to
+  `DEFAULT_PROVIDER_CONCURRENCY = 1` — the conservative default the code
+  was already designed to apply to an unlisted provider, not a gap). Also
+  **not live-verified**: no real timed scan has been run against all 5
+  providers together through the full concurrency/deadline/retry machinery
+  since this change — see `shared/CLAUDE.md`'s own "verify live before
+  trusting" note on this, now reapplying to the hosted site and not just
+  `proof-script`. `npm run build`/`type-check` pass; that's a syntax/type
+  check, not a live-cost or live-timing confirmation.
 
 ## Commands
 

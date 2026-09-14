@@ -78,5 +78,5 @@ check yours before you assume you already know.
 get](/blog/anatomy-of-an-ai-answer/) — the actual mechanism behind why some
 businesses get named and others don't.
 
-— Marc. I build [Foreground](/), which checks exactly this across four AI
+— Marc. I build [Foreground](/), which checks exactly this across five AI
 models. [See if it's you](/app/signup) — free, no credit card required.

@@ -33,8 +33,8 @@ barely a tenth. Diminishing, fast, deliberately — because that's roughly
 how much attention a real person pays past the first name in a
 spoken-style answer.
 
-Run that same question through four different models — I use GPT-5 mini,
-Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6, because they don't agree
+Run that same question through five different models — I use GPT-5 mini,
+Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, and Mistral Small, because they don't agree
 with each other nearly as often as you'd expect — and you start to see
 that "AI visibility" isn't one number, it's a pattern. A business might get
 named first by one model and skipped entirely by another, and that gap
@@ -69,6 +69,6 @@ about their AI visibility right now aren't asking that question at all.
 job](/blog/seo-vs-geo-concretely/) — why the tactics that win a Google
 ranking don't automatically win a mention.
 
-— Marc. [Foreground](/) runs this exact check — five questions, four
-models, twenty data points — so you're not guessing at the pattern by hand.
+— Marc. [Foreground](/) runs this exact check — five questions, five
+models, twenty-five data points — so you're not guessing at the pattern by hand.
 [Try it free](/app/signup).

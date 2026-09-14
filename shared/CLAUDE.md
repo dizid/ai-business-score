@@ -226,9 +226,12 @@ The single source of truth, imported by every consumer:
     behaves correctly across a real scan's mix of all 4 providers. Do that
     once, timed, before fully trusting this the way past model/concurrency
     changes in this file were each verified live before being trusted.
-    **Superseded 2026-09-04 for the hosted site specifically** — see the
-    `HOSTED_MODELS` entry immediately below; this "full 4-provider scan"
-    verification gap now only applies to `proof-script`.
+    **Was superseded 2026-09-04→2026-09-14 for the hosted site specifically**
+    (the `HOSTED_MODELS` cost-control filter below meant the hosted site ran
+    a reduced 2-provider scan during that window, so this gap only applied
+    to `proof-script`) — since `HOSTED_MODELS` was reverted 2026-09-14 to
+    the full 5-provider set (4 original + Mistral), this verification gap is
+    back to applying to the hosted site too, not just `proof-script`.
 - **`HOSTED_MODELS` (2026-09-04, free-only cost-control pass)** —
   `run-scan-background.mts` gained a local constant,
   `MODELS.filter((m) => m.startsWith('google/') || m.startsWith('anthropic/'))`,
@@ -256,10 +259,16 @@ The single source of truth, imported by every consumer:
   that entry below). Don't remove `OPENAI_API_KEY` from Netlify thinking
   it's dead config. `XAI_API_KEY` genuinely is unused by the hosted app
   now (still read into `apiKeys.xai`, never dispatched to) but was left set
-  on Netlify anyway — out of scope for this pass, harmless. **Revert**:
-  change `run-scan-background.mts`'s main loop back to
-  `for (const model of MODELS)` (or delete the `HOSTED_MODELS` line) to
-  restore all 4 providers.
+  on Netlify anyway — out of scope for this pass, harmless.
+  **Reverted 2026-09-14**, at Marc's explicit request, once live Pro
+  billing was back (2026-09-11) and a 5th provider (Mistral, see below)
+  had just landed — `HOSTED_MODELS` in `run-scan-background.mts` is now
+  `const HOSTED_MODELS = MODELS;` (all 5 providers), not the filtered
+  subset described above. This paragraph is kept as the historical record
+  of the 2026-09-04→2026-09-14 cost-control window, not the current state
+  — the hosted main loop is back to 5 prompts × 5 models = 25 calls.
+  `OPENAI_API_KEY`/`XAI_API_KEY` are no longer a special case now that
+  both providers are back in the main loop.
 - **5th provider added 2026-09-14: `mistral/mistral-small-latest`.** First
   provider added since the 2026-09-12 registry refactor —
   `shared/aivis/providers/mistral.mjs` + one `PROVIDER_ADAPTERS` entry +
@@ -286,10 +295,11 @@ The single source of truth, imported by every consumer:
   match the other four's cheap-tier naming convention (mini/flash/haiku);
   not cost-compared against Mistral's other tiers (no per-call cost data
   exists anywhere in this codebase for any provider, same caveat
-  `HOSTED_MODELS` above already notes). **Deliberately not added to
-  `HOSTED_MODELS`** — that stays a separate cost-control decision, untouched
-  by this addition. `MISTRAL_API_KEY` set on Netlify — see root
-  `CLAUDE.md`'s Deployment section. Regression coverage in
+  `HOSTED_MODELS` above already notes). Landed the same day `HOSTED_MODELS`
+  was restored to the full provider set (see above) — Mistral is included
+  in the hosted scan from the moment it existed, not added to `MODELS`
+  first and wired into the hosted loop later. `MISTRAL_API_KEY` set on
+  Netlify — see root `CLAUDE.md`'s Deployment section. Regression coverage in
   `tests/aivis-providers.test.mjs`: request-shape (`inputs` not `messages`),
   missing-key-doesn't-fall-back, and a `parseResponse` test built from a
   trimmed real captured response (text-chunk concatenation + citation

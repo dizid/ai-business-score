@@ -1,6 +1,6 @@
 ---
 title: AI visibility and GEO tools compared — Profound, Otterly, Peec AI, Scrunch, and where Foreground fits
-description: A grounded look at the AI-visibility/GEO tool landscape — Profound, Otterly, Peec AI, Scrunch — and where a $19, no-account scan like Foreground fits.
+description: A grounded look at the AI-visibility/GEO tool landscape — Profound, Otterly, Peec AI, Scrunch — and where a free, five-model scan like Foreground fits.
 date: 2026-09-08
 ---
 
@@ -50,7 +50,7 @@ here.
 
 | Tool | Best for | Entry price | Engines tracked | No-account option |
 |---|---|---|---|---|
-| Foreground | A solo business wanting one honest answer, fast | Free, or $19 one-time for a single scan (Pro at $99/mo — purchasing is paused right now, see the [pricing FAQ](/#pricing)) | 2 (Gemini 3 Flash, Claude Haiku 4.5) | Yes — $19 scan, no signup |
+| Foreground | A solo business wanting one honest answer, fast | Free (3 scans), then $99/mo Pro | 5 (GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, Mistral Small) | No — free signup required, no card |
 | Profound | Enterprise GEO analytics at scale | ~$99+/mo | 10+ | No |
 | Otterly.AI | SMB AI-search monitoring on a budget | ~$29/mo | Fewer, SMB-tier | No |
 | Peec AI | Fast-growing share-of-voice tracking | ~$95/mo | Multiple | No |
@@ -60,12 +60,12 @@ here.
 
 ## Where Foreground actually fits
 
-Two models, by deliberate choice, not by budget accident: Gemini and
-Claude queried directly against their own provider APIs, which keeps a
-scan fast and cheap enough to sell a single one for $19 with no account.
-That's the actual trade-off against Profound's ten-plus engines — fewer
-data points per scan, but a genuinely lower floor to try it, and nothing
-to cancel if you only need to check once.
+Five models, queried directly against their own provider APIs — GPT-5
+mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, and Mistral Small — kept
+cheap enough to give away three full scans free, no card required. That's
+the actual trade-off against Profound's ten-plus engines: fewer data
+points per scan, but a genuinely lower floor to try it, and a real free
+tier instead of a sales call.
 
 If you run one local or small-business brand and want a plain "does AI
 mention me" answer without committing to a monitoring subscription,
@@ -85,5 +85,5 @@ worth reading before you buy anything, mine included.
 exist](/blog/ai-visibility-checklist/) — the free, no-tool-required version
 of this same check.
 
-— Marc. [Foreground](/) is the $19-no-account version of everything above.
+— Marc. [Foreground](/) is the free, five-model version of everything above.
 [Try it free](/app/signup).
