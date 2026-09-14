@@ -61,7 +61,16 @@
      2026-09-11 — live two-tier Pro billing restored (see root CLAUDE.md's
      Deployment section): checkout is live again and the $19 single-scan
      SKU was removed for good (not just marked unavailable) as part of a
-     KISS pricing simplification to Free + Pro only. -->
+     KISS pricing simplification to Free + Pro only.
+
+     2026-09-14 — HOSTED_MODELS restored to the full 5-provider set (GPT-5
+     mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, Mistral joining as a
+     5th provider the same day) — the "Which AI models does it check?" FAQ
+     answer above was missed by that pass (still said the stale 2-model
+     text in both the JSON-LD and the matching <details> block below,
+     breaking the string-identical requirement this comment itself
+     documents) and was fixed here as a follow-up, not part of the original
+     sweep. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -140,7 +149,7 @@
           "name": "Which AI models does it check?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Google's Gemini 3 Flash and Anthropic's Claude Haiku 4.5 — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data."
+            "text": "OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, xAI's Grok 4.6, and Mistral's Mistral Small — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data."
           }
         },
         {
@@ -306,7 +315,7 @@
       </details>
       <details>
         <summary>Which AI models does it check?</summary>
-        <p>Google's Gemini 3 Flash and Anthropic's Claude Haiku 4.5 — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data.</p>
+        <p>OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, xAI's Grok 4.6, and Mistral's Mistral Small — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data.</p>
       </details>
       <details>
         <summary>What does it cost?</summary>
