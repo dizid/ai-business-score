@@ -55,13 +55,14 @@ function competitorAppearances(name: string) {
     <div class="board-row" v-for="row in scoreboardRows" :key="row.name + row.isYou">
       <div class="board-label">
         <span class="board-name" :title="row.name">{{ row.name }}<span v-if="row.isYou" class="you-tag"> (you)</span></span>
-        <span class="board-count">{{ row.mentionCount }}/{{ payload.completedCalls }} · {{ rowSharePct(row) }}% share of voice</span>
+        <span class="board-count" title="Mentions out of total checks · this name's share of all mentions across brand + competitors">{{ row.mentionCount }}/{{ payload.completedCalls }} · {{ rowSharePct(row) }}% share of voice</span>
       </div>
       <div class="board-track"><div class="board-fill" :class="row.isYou ? 'you' : 'rival'" :style="{ width: rowPct(row) + '%' }"></div></div>
       <button
         v-if="!row.isYou && row.beatBrandCount > 0"
         type="button"
         class="board-beat board-beat-toggle"
+        title="Number of checks where AI named this competitor before naming you"
         :aria-expanded="expandedCompetitors.has(row.name)"
         @click="toggleCompetitorExpanded(row.name)"
       >beat you {{ row.beatBrandCount }}&times; <span class="board-beat-chevron">{{ expandedCompetitors.has(row.name) ? '▲' : '▼' }}</span></button>

@@ -16,7 +16,7 @@ import {
   deriveRank1Count, deriveBeatenCount, deriveHeadlineKind, deriveScoreboardRows, deriveExecutiveSummary,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveVisibleAdvice,
   deriveHarmoniaPillars, deriveHarmoniaBand, cwvRating, formatSeconds, deriveScanDurationLabel,
-  confidenceLabel, deriveKeyMetrics, deriveExtraPsiScores, deriveAdditionalAuditRows,
+  confidenceLabel, deriveKeyMetrics, deriveExtraPsiScores, deriveAdditionalAuditRows, resolveCitationTitle,
 } from './scanDerived';
 import Scoreboard from './Scoreboard.vue';
 import { buildScanReportMarkdown, downloadMarkdown } from './scanReport';
@@ -393,14 +393,17 @@ function copySchema(example: string, index: number) {
         <div class="key-metric-tile">
           <div class="key-metric-value">{{ keyMetrics.recommendationRatePct }}%</div>
           <div class="key-metric-label">AI recommendation rate</div>
+          <div class="key-metric-caption">Mentioned at all, in any position, across {{ payload.completedCalls }} checks</div>
         </div>
         <div class="key-metric-tile">
           <div class="key-metric-value">{{ keyMetrics.firstChoiceRatePct }}%</div>
           <div class="key-metric-label">AI first-choice rate</div>
+          <div class="key-metric-caption">Named first, ahead of every competitor</div>
         </div>
         <div class="key-metric-tile" v-if="keyMetrics.topCompetitorName">
           <div class="key-metric-value">{{ keyMetrics.topCompetitorTakeoverRatePct }}%</div>
           <div class="key-metric-label">Taken by {{ keyMetrics.topCompetitorName }}</div>
+          <div class="key-metric-caption">Checks where {{ keyMetrics.topCompetitorName }} was named first instead</div>
         </div>
       </div>
 
@@ -417,6 +420,12 @@ function copySchema(example: string, index: number) {
       <!-- scoreboard: emphasis bar chart (brand = accent, rivals = de-emphasis gray) -->
       <template v-if="scoreboardRows.length">
         <h2>Scoreboard</h2>
+        <p class="section-caption">
+          Ranked by mentions across all {{ payload.completedCalls }} checks.
+          <strong>Share of voice</strong> is each name's slice of every mention here (you + competitors combined) —
+          it adds up to 100% across the board, not per row.
+          <strong>"Beat you N×"</strong> counts checks where AI named that competitor before naming you.
+        </p>
         <Scoreboard :payload="payload" />
       </template>
 
@@ -771,7 +780,7 @@ function copySchema(example: string, index: number) {
               </div>
               <div class="check-sources" v-if="c.citations.length">
                 Sources:
-                <a v-for="(cit, j) in c.citations" :key="j" :href="cit.url" target="_blank" rel="noopener">{{ cit.title || cit.url }}</a>
+                <a v-for="(cit, j) in c.citations" :key="j" :href="cit.url" target="_blank" rel="noopener">{{ resolveCitationTitle(cit.title, cit.url) }}</a>
               </div>
               <div class="check-sentiment" v-if="sentimentByKey.get(sentimentKey(group.promptIndex, c.model))">
                 {{ sentimentByKey.get(sentimentKey(group.promptIndex, c.model))!.reasoning }}
@@ -900,6 +909,7 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 }
 .key-metric-value { font-size: 1.4rem; font-weight: 700; font-variant-numeric: proportional-nums; }
 .key-metric-label { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.key-metric-caption { font-size: 0.72rem; color: var(--faint); margin-top: 4px; line-height: 1.3; }
 
 .warn {
   background: color-mix(in srgb, var(--warning) 16%, var(--card));
@@ -1008,6 +1018,8 @@ h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 2px; }
 
 h2 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 28px 0 10px; }
 h2:first-of-type { margin-top: 0; }
+.section-caption { font-size: 0.82rem; color: var(--muted); margin: -4px 0 12px; line-height: 1.4; }
+.section-caption strong { color: var(--fg); font-weight: 600; }
 
 /* ---- citation-URL attribution ---- */
 .citations-card { padding: 16px 20px; }
