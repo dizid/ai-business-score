@@ -18,6 +18,7 @@ import {
   deriveSentimentSummaryRows, deriveSentimentAdvice, deriveVisibleAdvice, deriveHarmoniaPillars, deriveHarmoniaBand,
   deriveCheckBreakdown, deriveFailureRows, deriveOwnSiteCitationRows, deriveScanDurationLabel, cwvRating,
   formatSeconds, sentimentKey, deriveSentimentByKey, deriveExtraPsiScores, deriveAdditionalAuditRows,
+  resolveCitationTitle,
 } from './scanDerived';
 import { scoreBand } from '../../shared/aivis-core.mjs';
 
@@ -346,7 +347,7 @@ export function buildScanReportMarkdown(payload: ValidatedPayload): string {
         push(blockquote(c.text));
         push();
         if (c.citations.length) {
-          push('Sources: ' + c.citations.map((cit) => `[${mdEscapeCell(cit.title || cit.url)}](${cit.url})`).join(', '));
+          push('Sources: ' + c.citations.map((cit) => `[${mdEscapeCell(resolveCitationTitle(cit.title, cit.url))}](${cit.url})`).join(', '));
           push();
         }
         if (judgment) {
