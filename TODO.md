@@ -23,6 +23,23 @@ assuming nothing else is in flight.
 
 ## Marc
 
+- [ ] **Supply `sameAs` profile URLs (LinkedIn/X/GitHub, whichever exist)**
+      to unblock Phase 6 of the 2026-09-14 deep-research improvement pass
+      (plan: `~/.claude/plans/do-deep-research-and-cozy-neumann.md`) —
+      strengthening the bare `{name: "Marc de Ruijter"}`/`{name:
+      "Foreground"}` JSON-LD `Person`/`Organization` nodes (appear in
+      `index.html`, `scripts/build-blog.mjs`'s per-post `@graph`, and
+      could extend to `privacy.html`/`terms.html`) with `sameAs`/`jobTitle`/
+      `@id` for real E-E-A-T signal. Deliberately not guessed — see that
+      plan's Phase 6 for the full scope, which also adds `BreadcrumbList`/
+      `HowTo` schema to blog posts (no input needed for that half, still
+      open).
+- [ ] **Decide on Phase 7 of the same plan** (new citable content): a
+      glossary/definitions page ("What is GEO?", etc.) and, separately, an
+      explicit go-ahead before running the "we scanned ourselves" self-scan
+      case study — that one spends real API money (25 live calls against
+      Foreground's own listing), same standing "ask before spending" rule
+      this repo's `CLAUDE.md` has used everywhere else. Not started.
 - [ ] **Supply a real prospect list (10-15 local businesses)** to unblock
       cold outreach — plumbers/dentists/contractors/HVAC/local law-
       accounting type "who does X near me" categories, per
@@ -86,6 +103,39 @@ assuming nothing else is in flight.
 
 ## Claude
 
+- [ ] **Local dev server can't reach the real Neon database from this
+      sandbox — investigate whether this reproduces outside it.** Found
+      2026-09-14 while verifying Phases 2-5 of the deep-research pass:
+      `npm run dev`'s Netlify Functions emulator consistently returned
+      `NeonDbError: Error connecting to database: fetch failed` (a raw
+      network-level error, not a SQL error) for `GET /companies` and
+      friends, while the exact same queries run fine via the Neon MCP tool
+      (a different network path) — confirmed by running several of them by
+      hand. Worked around by verifying UI pieces via isolated preview
+      harnesses (mounting the real components against synthetic/mocked
+      `window.fetch` data — see the commit `01727fb` message) and DB logic
+      directly via Neon MCP `run_sql`, rather than a real logged-in
+      browser round trip. Never got to the bottom of *why* — check whether
+      a fresh session (or Marc's own machine) hits the same wall; if not,
+      it's this sandbox's network egress, not a real bug.
+- [ ] **Separately found the same day**: `npm run dev` serves a **stale
+      built `dist/app.html`** (hashed asset filenames from whatever
+      `npm run build` last produced) for any `/app/*` path instead of the
+      live dev bundle — only the bare `/app.html` path serves correctly;
+      client-side `history.pushState` + a `popstate` dispatch from there
+      works as a manual reroute. Pre-existing dev-tooling quirk, unrelated
+      to the pass above; not investigated further, flagged so it doesn't
+      look like a regression next time someone hits it.
+- [ ] **Real logged-in-browser check still owed** for the new pieces from
+      the 2026-09-14 deep-research pass (commit `01727fb`), once the two
+      items above are sorted out enough to make that possible: the
+      "Which AI favors you" GEO-section addition, "Who else gets cited",
+      the scan-history "Auto" badge, "Compare to previous scan", and
+      `/app/competitors`. All were verified functionally correct (isolated
+      component harnesses with synthetic data, DB logic verified directly
+      via Neon MCP for the alerts dismiss flow) but never seen rendered
+      end-to-end against a real account's real scan history the way this
+      repo's own "verify live before trusting" discipline expects.
 - [ ] **Calibrate the clarity check before fully trusting it.** Shipped
       2026-09-04 (`shared/aivis-core.mjs`'s `buildClarityCheckPrompt`/
       `parseClarityCheckResponse`, wired into `run-scan-background.mts`,
