@@ -1,4 +1,5 @@
 .env
+prospects.json
 results/
 tracking.csv
 node_modules/

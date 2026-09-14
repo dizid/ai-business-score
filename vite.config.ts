@@ -75,6 +75,9 @@ export default defineConfig({
         howItWorks: 'how-it-works.html',
         privacy: 'privacy.html',
         terms: 'terms.html',
+        // Added 2026-09-15 (Phase 7 of the deep-research pass) — same
+        // static-HTML-for-crawlability reasoning as the four entries above.
+        glossary: 'glossary.html',
       },
     },
   },

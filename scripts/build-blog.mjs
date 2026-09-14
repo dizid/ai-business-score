@@ -30,6 +30,44 @@ const distDir = path.join(rootDir, 'dist');
 const partialsDir = path.join(rootDir, 'partials');
 const siteUrl = 'https://foreground.info';
 
+// Manually authored HowTo steps for specific posts — added 2026-09-15
+// (Phase 6 of the deep-research improvement pass), mirroring
+// how-it-works.html's own "no steps invented beyond what's on the page"
+// discipline: every name/text below is drawn verbatim from that post's real
+// body copy, not summarized or invented. Keyed by slug; only posts whose
+// content is genuinely step-shaped get an entry — most posts won't.
+const HOWTO_STEPS = {
+  'ai-visibility-checklist': {
+    totalTime: 'PT40M',
+    steps: [
+      {
+        name: 'Ask the question yourself, more than once',
+        text: 'Open ChatGPT, Gemini, whatever you’ve got, and type the question a real customer would type — "best [what you do] in [where you are]." Don’t ask about your business by name. Ask the way a stranger would ask. Do it in two or three different tools if you can, because they genuinely don’t agree with each other.',
+      },
+      {
+        name: 'Read what it says about the businesses it does name, not just who it names',
+        text: 'If the model says "Business A is known for fast emergency response" and "Business B offers plumbing services," pay attention to which sentence you just read. One of those is a fact a model could find and repeat. The other is filler it generated because it had nothing sharper to say.',
+      },
+      {
+        name: 'Go find that sharp sentence about yourself, and if it doesn’t exist yet, write it',
+        text: 'Not "quality you can trust" — a model can’t repeat that, because it’s not a fact, it’s a mood. Something specific: what you actually do differently, who you’re actually for, a number if you have one worth saying. Put it in plain text on your site, not inside an image, not buried three clicks deep in a PDF.',
+      },
+      {
+        name: 'Check that the basics are actually readable by something that isn’t a browser',
+        text: 'Name, location, category, hours — in real text, not a logo graphic, not a JavaScript widget that never renders for anything that isn’t doing a full browser render pass.',
+      },
+      {
+        name: 'Don’t stop at your own site',
+        text: 'A lot of what these models pull from isn’t your homepage — it’s your Google Business Profile, directory listings, review sites, anywhere your name and category already sit together in public text.',
+      },
+      {
+        name: 'Recheck in a month',
+        text: 'These answers move. Models get updated, retrained, re-indexed, and an answer that named a competitor in June can name you in September for reasons that have nothing to do with anything you changed — or everything to do with it.',
+      },
+    ],
+  },
+};
+
 // partials/nav.html includes <script type="module" src="/src/marketing/
 // authNav.ts">, which the four Vite-built static pages (index.html etc.)
 // get bundled/hashed automatically by vite build's own HTML pipeline. This
@@ -230,8 +268,34 @@ function buildPostPage(post) {
         publisher: { '@id': `${siteUrl}/#organization` },
         mainEntityOfPage: `${siteUrl}/blog/${post.slug}/`,
       },
+      // BreadcrumbList — added 2026-09-15 (Phase 6), matching the pattern
+      // the static pages (how-it-works.html etc.) already use; blog posts
+      // previously had no breadcrumb schema at all.
+      {
+        '@type': 'BreadcrumbList',
+        '@id': `${siteUrl}/blog/${post.slug}/#breadcrumb`,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${siteUrl}/` },
+          { '@type': 'ListItem', position: 2, name: 'Blog', item: `${siteUrl}/blog/` },
+          { '@type': 'ListItem', position: 3, name: post.title, item: `${siteUrl}/blog/${post.slug}/` },
+        ],
+      },
     ],
   };
+  // HowTo — only for posts with a HOWTO_STEPS entry above (genuinely
+  // step-shaped content, not every post). Added 2026-09-15 (Phase 6).
+  const howTo = HOWTO_STEPS[post.slug];
+  if (howTo) {
+    jsonLd['@graph'].push({
+      '@type': 'HowTo',
+      '@id': `${siteUrl}/blog/${post.slug}/#howto`,
+      name: post.title,
+      description: post.description,
+      totalTime: howTo.totalTime,
+      mainEntityOfPage: `${siteUrl}/blog/${post.slug}/`,
+      step: howTo.steps.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, name: s.name, text: s.text })),
+    });
+  }
   const updatedNote = post.updated && post.updated !== post.date
     ? ` &middot; updated ${formatDate(post.updated)}`
     : '';

@@ -40,6 +40,10 @@
   from = "/terms"
   to = "/terms.html"
   status = 200
+[[redirects]]
+  from = "/glossary"
+  to = "/glossary.html"
+  status = 200
 
 # 301s from the old in-app-shell URLs (now retired, see router.ts) so
 # pre-existing links/bookmarks don't break.

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Search & GEO Glossary — Foreground</title>
+<meta name="description" content="Plain-English definitions of GEO, AI search visibility, citations, presence detection, share of voice, and other terms this site uses — written to be quoted." />
+<link rel="canonical" href="https://foreground.info/glossary" />
+<!--#include:llms-link-->
+<!--#include:favicon-->
+<!-- Matches --stage-black in public/marketing-theme.css. -->
+<meta name="theme-color" content="#0a0a0d" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="AI Search & GEO Glossary — Foreground" />
+<meta property="og:description" content="Plain-English definitions of GEO, AI search visibility, citations, presence detection, share of voice, and other terms this site uses — written to be quoted." />
+<meta property="og:url" content="https://foreground.info/glossary" />
+<meta property="og:image" content="https://foreground.info/og-image.png" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="AI Search & GEO Glossary — Foreground" />
+<meta name="twitter:description" content="Plain-English definitions of GEO, AI search visibility, citations, presence detection, share of voice, and other terms this site uses — written to be quoted." />
+<meta name="twitter:image" content="https://foreground.info/og-image.png" />
+<!-- Self-contained @graph, same reasoning as how-it-works.html's own
+     comment: this is a separate HTTP document, so the WebSite/Organization
+     nodes need to be redefined here too, not just referenced by @id.
+     FAQPage requires the JSON-LD acceptedAnswer.text to match the visible
+     <p> text verbatim for each term — same constraint index.html's own FAQ
+     already documents and follows; kept in sync here the same way. Added
+     2026-09-15 (Phase 7 of the deep-research improvement pass) — this
+     page's whole premise is content AI answer engines can cite verbatim,
+     which the blog's own essays argue for but nothing on the site
+     practiced yet. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://foreground.info/#website",
+      "url": "https://foreground.info/",
+      "name": "Foreground",
+      "publisher": { "@id": "https://foreground.info/#organization" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://foreground.info/#organization",
+      "name": "Foreground",
+      "url": "https://foreground.info/",
+      "logo": "https://foreground.info/og-image.png",
+      "founder": { "@type": "Person", "name": "Marc de Ruijter" },
+      "foundingDate": "2026-07-29",
+      "slogan": "Get in the foreground."
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://foreground.info/glossary#breadcrumb",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://foreground.info/" },
+        { "@type": "ListItem", "position": 2, "name": "Glossary", "item": "https://foreground.info/glossary" }
+      ]
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://foreground.info/glossary#webpage",
+      "url": "https://foreground.info/glossary",
+      "name": "AI Search & GEO Glossary — Foreground",
+      "description": "Plain-English definitions of GEO, AI search visibility, citations, presence detection, share of voice, and other terms this site uses — written to be quoted.",
+      "isPartOf": { "@id": "https://foreground.info/#website" },
+      "publisher": { "@id": "https://foreground.info/#organization" }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://foreground.info/glossary#faq",
+      "isPartOf": { "@id": "https://foreground.info/#website" },
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is GEO (Generative Engine Optimization)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "GEO is the practice of making a business more likely to be mentioned when an AI system — ChatGPT, Gemini, Claude, Grok, Perplexity, and similar tools — answers a question in that business's category. It's the same underlying goal as traditional SEO (being found), aimed at a different surface: instead of ranking in a list of links, GEO is about being one of the few names an AI model actually says out loud in a generated answer."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is AI search visibility?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "AI search visibility is whether a business shows up when someone asks an AI system a question in that business's category — \"best plumber near me,\" \"who does custom furniture in Rotterdam.\" Unlike a traditional search results page, an AI-generated answer has no fixed number of slots and no way to scroll to page two: it's a short paragraph with room for only a few names, and a business is either one of them or it isn't."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is a citation in AI search?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A citation is the specific web page an AI model points to as the source for a claim in its answer, when that model's answer is grounded in live web search rather than only its training data. Which pages get cited is a real, actionable signal: a page that never gets cited as a source is a page these models effectively can't see, no matter how good the business is."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is presence detection?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Presence detection is checking whether a business's name appears in an AI-generated answer at all, independent of tone — a business mentioned only in passing, or only as \"beaten\" by a competitor's recommendation, still counts as present. It's a narrower, more mechanical signal than sentiment (how positively a business was described), and the two are usually measured separately rather than conflated into one number."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is share of voice (in AI search)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Share of voice is a business's mentions divided by the total mentions of every business — the business itself plus every named competitor — across a set of AI-answered questions. It answers a different question than a raw mention count does: not just \"how often do I show up,\" but \"of everyone who showed up, what fraction of the conversation was me.\""
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is an AI hallucination, in this context?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A hallucination is when an AI model states something as fact that isn't true — inventing a business, misattributing a service, or citing a source that doesn't actually say what the model claims. It's a real, known limitation of these systems and one reason a single AI-generated answer is treated as a directional signal worth tracking over time, not a certified, always-correct measurement."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is an AI answer engine?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "An AI answer engine is any AI system people actually ask questions to expecting a direct answer instead of a list of links — ChatGPT, Gemini, Claude, Grok, Perplexity, and Microsoft Copilot are the best-known examples. The distinction from a traditional search engine matters: an answer engine returns one synthesized response instead of ranked results, so there's no \"page one\" to check by hand."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is web-search grounding?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Web-search grounding is when an AI model's answer is generated using live search results fetched at the moment of the question, instead of relying only on whatever it learned during training. A grounded answer can cite real, current pages as sources; an ungrounded answer can only draw on facts baked into the model's training data, which may be stale or simply never included a given business at all."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+<!-- Display font (Space Grotesk) — see public/marketing-theme.css. -->
+<!--#include:fonts-->
+
+<!-- Shared Spotlight theme — see brand/BRAND.md. -->
+<!--#include:marketing-theme-link-->
+
+<!-- Google Analytics (GA4) — see index.html's identical snippet for the
+     no-op-until-configured guard and rationale. -->
+<!--#include:ga4-->
+</head>
+<body>
+
+<div class="wrap">
+  <!--#include:nav-->
+
+  <main class="legal">
+    <a class="back" href="/">← Back to Foreground</a>
+
+    <h1>AI search &amp; GEO glossary</h1>
+    <p class="lead">
+      Plain-English definitions of the terms this site uses, written to
+      stand on their own — the same discipline the rest of Foreground's
+      copy tries to follow: specific facts, not vague marketing mood.
+    </p>
+
+    <section>
+      <h2>What is GEO (Generative Engine Optimization)?</h2>
+      <p>
+        GEO is the practice of making a business more likely to be
+        mentioned when an AI system — ChatGPT, Gemini, Claude, Grok,
+        Perplexity, and similar tools — answers a question in that
+        business's category. It's the same underlying goal as traditional
+        SEO (being found), aimed at a different surface: instead of
+        ranking in a list of links, GEO is about being one of the few
+        names an AI model actually says out loud in a generated answer.
+      </p>
+    </section>
+
+    <section>
+      <h2>What is AI search visibility?</h2>
+      <p>
+        AI search visibility is whether a business shows up when someone
+        asks an AI system a question in that business's category — "best
+        plumber near me," "who does custom furniture in Rotterdam." Unlike
+        a traditional search results page, an AI-generated answer has no
+        fixed number of slots and no way to scroll to page two: it's a
+        short paragraph with room for only a few names, and a business is
+        either one of them or it isn't.
+      </p>
+    </section>
+
+    <section>
+      <h2>What is a citation in AI search?</h2>
+      <p>
+        A citation is the specific web page an AI model points to as the
+        source for a claim in its answer, when that model's answer is
+        grounded in live web search rather than only its training data.
+        Which pages get cited is a real, actionable signal: a page that
+        never gets cited as a source is a page these models effectively
+        can't see, no matter how good the business is.
+      </p>
+    </section>
+
+    <section>
+      <h2>What is presence detection?</h2>
+      <p>
+        Presence detection is checking whether a business's name appears
+        in an AI-generated answer at all, independent of tone — a business
+        mentioned only in passing, or only as "beaten" by a competitor's
+        recommendation, still counts as present. It's a narrower, more
+        mechanical signal than sentiment (how positively a business was
+        described), and the two are usually measured separately rather
+        than conflated into one number.
+      </p>
+    </section>
+
+    <section>
+      <h2>What is share of voice (in AI search)?</h2>
+      <p>
+        Share of voice is a business's mentions divided by the total
+        mentions of every business — the business itself plus every named
+        competitor — across a set of AI-answered questions. It answers a
+        different question than a raw mention count does: not just "how
+        often do I show up," but "of everyone who showed up, what fraction
+        of the conversation was me."
+      </p>
+    </section>
+
+    <section>
+      <h2>What is an AI hallucination, in this context?</h2>
+      <p>
+        A hallucination is when an AI model states something as fact that
+        isn't true — inventing a business, misattributing a service, or
+        citing a source that doesn't actually say what the model claims.
+        It's a real, known limitation of these systems and one reason a
+        single AI-generated answer is treated as a directional signal
+        worth tracking over time, not a certified, always-correct
+        measurement.
+      </p>
+    </section>
+
+    <section>
+      <h2>What is an AI answer engine?</h2>
+      <p>
+        An AI answer engine is any AI system people actually ask questions
+        to expecting a direct answer instead of a list of links — ChatGPT,
+        Gemini, Claude, Grok, Perplexity, and Microsoft Copilot are the
+        best-known examples. The distinction from a traditional search
+        engine matters: an answer engine returns one synthesized response
+        instead of ranked results, so there's no "page one" to check by
+        hand.
+      </p>
+    </section>
+
+    <section>
+      <h2>What is web-search grounding?</h2>
+      <p>
+        Web-search grounding is when an AI model's answer is generated
+        using live search results fetched at the moment of the question,
+        instead of relying only on whatever it learned during training. A
+        grounded answer can cite real, current pages as sources; an
+        ungrounded answer can only draw on facts baked into the model's
+        training data, which may be stale or simply never included a given
+        business at all.
+      </p>
+    </section>
+
+    <section>
+      <p>
+        See <a href="/how-it-works">how Foreground's own scan works</a>
+        for how these ideas turn into an actual 0-100 score, or
+        <a href="/app/signup">check your own business for free</a>.
+      </p>
+    </section>
+  </main>
+
+  <!--#include:footer-->
+</div>
+
+</body>
+</html>
