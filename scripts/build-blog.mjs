@@ -30,6 +30,18 @@ const distDir = path.join(rootDir, 'dist');
 const partialsDir = path.join(rootDir, 'partials');
 const siteUrl = 'https://foreground.info';
 
+// Marc's/Foreground's social profiles — added 2026-09-15 (the last open
+// item from Phase 6 of the deep-research pass, see TODO.md) to strengthen
+// the previously-bare Organization/Person JSON-LD nodes below. Same three
+// URLs used for both the founder/author Person node and the Organization
+// node, since Marc is the solo founder and "dizid" is his shared handle
+// across all three platforms.
+const FOUNDER_SAME_AS = [
+  'https://www.linkedin.com/in/dizid/',
+  'https://github.com/dizid',
+  'https://x.com/dizid',
+];
+
 // Manually authored HowTo steps for specific posts — added 2026-09-15
 // (Phase 6 of the deep-research improvement pass), mirroring
 // how-it-works.html's own "no steps invented beyond what's on the page"
@@ -248,9 +260,10 @@ function buildPostPage(post) {
         name: 'Foreground',
         url: `${siteUrl}/`,
         logo: `${siteUrl}/og-image.png`,
-        founder: { '@type': 'Person', name: 'Marc de Ruijter' },
+        founder: { '@type': 'Person', name: 'Marc de Ruijter', sameAs: FOUNDER_SAME_AS },
         foundingDate: '2026-07-29',
         slogan: 'Get in the foreground.',
+        sameAs: FOUNDER_SAME_AS,
       },
       {
         '@type': 'BlogPosting',
@@ -264,7 +277,7 @@ function buildPostPage(post) {
         // post.date so existing posts (none of which set this field yet)
         // are unaffected.
         dateModified: post.updated || post.date,
-        author: { '@type': 'Person', name: 'Marc de Ruijter' },
+        author: { '@type': 'Person', name: 'Marc de Ruijter', sameAs: FOUNDER_SAME_AS },
         publisher: { '@id': `${siteUrl}/#organization` },
         mainEntityOfPage: `${siteUrl}/blog/${post.slug}/`,
       },
@@ -355,9 +368,10 @@ ${items}
         name: 'Foreground',
         url: `${siteUrl}/`,
         logo: `${siteUrl}/og-image.png`,
-        founder: { '@type': 'Person', name: 'Marc de Ruijter' },
+        founder: { '@type': 'Person', name: 'Marc de Ruijter', sameAs: FOUNDER_SAME_AS },
         foundingDate: '2026-07-29',
         slogan: 'Get in the foreground.',
+        sameAs: FOUNDER_SAME_AS,
       },
       {
         '@type': 'CollectionPage',

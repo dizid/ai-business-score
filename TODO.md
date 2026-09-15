@@ -23,21 +23,21 @@ assuming nothing else is in flight.
 
 ## Marc
 
-- [ ] **Still open: supply `sameAs` profile URLs (LinkedIn/X/GitHub)**,
-      Phase 6 of the 2026-09-14 deep-research pass (plan:
-      `~/.claude/plans/do-deep-research-and-cozy-neumann.md`) —
-      strengthening the bare `{name: "Marc de Ruijter"}`/`{name:
-      "Foreground"}` JSON-LD `Person`/`Organization` nodes with `sameAs`/
-      `jobTitle`/`@id`. **Deliberately skipped, not guessed**, when the
-      rest of Phase 6/7 shipped 2026-09-15 (commits `dc6f3d3` + the one
-      after) — no real URLs were available and fabricating one risks a
-      broken or simply wrong link on the live site. The rest of Phase 6
-      (BreadcrumbList + HowTo schema on blog posts) and all of Phase 7
-      (the `/glossary` page, and the "we scanned ourselves" self-scan case
-      study — Marc's 2026-09-15 "just do it" covered the real API spend)
-      are done; this one field is the only piece still open. Trivial to
-      add once URLs exist: `index.html`'s Organization/founder nodes and
-      `scripts/build-blog.mjs`'s per-post `@graph`.
+- [x] ~~Supply `sameAs` profile URLs (LinkedIn/X/GitHub)~~ **Done
+      2026-09-15** — Marc supplied `linkedin.com/in/dizid`,
+      `github.com/dizid`, `x.com/dizid`. Added as a `sameAs` array on both
+      the founder/author `Person` node and the `Organization` node (same
+      three URLs on each, since Marc is the solo founder and "dizid" is
+      his shared handle across all three platforms) across all 6 JSON-LD
+      locations: `index.html`, `how-it-works.html`, `privacy.html`,
+      `terms.html`, `glossary.html`, and both generated-page functions in
+      `scripts/build-blog.mjs` (now sharing a `FOUNDER_SAME_AS` constant
+      instead of the literal repeated 6x). `jobTitle`/`@id` on the Person
+      node were not part of this pass — not asked for, and `@id` isn't
+      needed since these are the only Person nodes in each document's
+      graph. Verified: `npm run build` clean, plus a direct JSON.parse of
+      each static page's JSON-LD block and of `dist/blog/index.html`'s
+      generated output confirmed valid JSON with `sameAs` present.
 - [ ] **Supply a real prospect list (10-15 local businesses)** to unblock
       cold outreach — plumbers/dentists/contractors/HVAC/local law-
       accounting type "who does X near me" categories, per
