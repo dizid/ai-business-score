@@ -265,6 +265,59 @@ assuming nothing else is in flight.
 Everything below this line is the former `TODOS.md`, moved here verbatim
 (headings demoted one level) as part of the 2026-08-26 merge. Newest first.
 
+### STATUS 2026-09-15: Deep-research improvement pass (all 8 phases) — SHIPPED
+
+**Trigger:** Marc asked for deep research into making Foreground "more
+usable, more information (master detail), and more SEO/GEO" — an
+open-ended improvement pass. Three parallel research agents audited the
+authenticated app's master-detail views, the scan/scoring data model, and
+the marketing site's SEO/GEO signals; findings became an 8-phase plan
+(`~/.claude/plans/do-deep-research-and-cozy-neumann.md`), executed across
+two sessions.
+
+**Phases 0-5, 8** (commits `01727fb`, `a469bb5`, `dc6f3d3`, `c284f5f`):
+fixed a live "2 models" vs. "5 models" self-contradiction on the homepage
+hero and an oversized `how-it-works.html` title; attached model identity
+to per-prompt rank data (`aggregate.mjs`), unlocking a per-provider score
+breakdown + trend chart ("which AI favors you," on the vs.-Competitors
+page); added "who else gets cited" third-party citation intelligence;
+surfaced `trigger_source`/`total_tokens` (scan-history "Auto" badge, scan
+metadata); made score-regression alerts dismissible with a full history
+page (`score_alerts.dismissed_at` migration, two new endpoints); added a
+scan-vs-previous-scan diff view and a portfolio-wide competitor rollup
+page; added `OAI-SearchBot`/`Applebot-Extended`/`Amazonbot` to
+`robots.txt` and an optional blog `updated` frontmatter field for a real
+`dateModified`. All DB/live-network pieces were verified two ways: direct
+SQL via Neon MCP against real inserted-then-deleted test rows (this
+sandbox's local dev server couldn't reach the real Neon endpoint from the
+function runtime — an environment limitation, confirmed by the same
+queries succeeding via Neon MCP), and isolated component-harness renders
+against synthetic/mocked data for the UI pieces.
+
+**Phase 6/7** (commits `dc6f3d3`, `c284f5f`, `fe077bd`): `BreadcrumbList`
+on every blog post + `HowTo` schema on the checklist post (steps drawn
+verbatim from that post's own body copy); a new `/glossary` page (8 terms,
+`FAQPage` JSON-LD, verified to match visible text exactly); a real
+self-scan of Foreground's own listing (proof-script, all 5 providers, 50
+live calls, run against production API keys pulled via the linked
+`netlify` CLI) written up honestly as a blog post
+(`we-scanned-ourselves.md`) — the real finding was that most models don't
+reliably know *which* "Foreground" is meant (confused with an unrelated
+nonprofit, an unrelated app, and in Gemini's worst answer, a partly
+hallucinated fictional "$1,997 Foreground Digital" service), which
+presence-only detection silently counts as a citation regardless. The
+`sameAs` profile-URL piece was deliberately left unfilled rather than
+guessed (no real URLs were available) — Marc supplied the real ones in a
+concurrent session the same day (commit `fe077bd`), closing out the plan's
+last open item.
+
+**Not part of this pass, landed the same day by a concurrent session**:
+`5228091` folded `reap-stuck-scans.mts` into the daily rescan cron after
+root-causing it as the dominant driver of a real Neon compute-cost spike
+(147.1 compute hours / $15.64 over two weeks) — unrelated to the
+deep-research plan, flagged here only so it isn't mistaken for part of it
+if this entry is read back later.
+
 ### STATUS 2026-09-04: Free-only mode with cost control — SHIPPED
 
 **Trigger:** Marc, mid-beta: "for now: i need free version with cost
