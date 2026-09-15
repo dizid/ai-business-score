@@ -251,9 +251,8 @@ before this folder existed stays in this file's prose.
   `new Response(JSON.stringify(...), {...})` call sites that had
   accumulated with no shared helper. `cors` stays an explicit opt-in
   parameter (never a default) matching `cors.mts`'s own design — webhook/
-  cron/background functions (`stripe-webhook.mts`, `reap-stuck-scans.mts`,
-  `ops-failure-digest.mts`, `scheduled-rescan.mts`, `run-scan-background.mts`)
-  pass none. Most functions have been migrated to these helpers; a few
+  cron/background functions (`stripe-webhook.mts`, `ops-failure-digest.mts`,
+  `scheduled-rescan.mts`, `run-scan-background.mts`) pass none. Most functions have been migrated to these helpers; a few
   intentional exceptions remain byte-for-byte as they were — `enrich.mts`'s
   "Method not allowed" response is plain text, not JSON, predating this
   helper, and was left as-is rather than silently changed to JSON.
@@ -593,7 +592,15 @@ gap this update fixes rather than something built this session.
   fetch comes from `Netlify.env.get('URL')` (no incoming `Request` to
   derive one from the way `scan.mts` does) — **not yet live-verified
   post-deploy** that this resolves correctly, per this file's own
-  "verify live before trusting" discipline.
+  "verify live before trusting" discipline. **2026-09-15**: now also reaps
+  stuck scans (`status='running'`/`'pending'` past `STUCK_THRESHOLD_MINUTES`
+  = 20) right before the `due` query runs — previously a separate standalone
+  cron, `reap-stuck-scans.mts`, on its own 15-then-30-minute schedule;
+  folded in here and that file deleted after it was root-caused as the
+  dominant driver of a real Neon compute-cost spike (its wake-up frequency
+  kept the endpoint from auto-suspending) while a DB check showed it had
+  reaped exactly zero scans in ~10 days of running. See this function's own
+  header comment for the full reasoning.
 - **`ops-failure-digest.mts`** — added 2026-08-31 for
   `docs/improvement-roadmap.md`'s long-standing reliability gap (the
   `xai/grok-4.6` timeout incident was only caught via a user screenshot —

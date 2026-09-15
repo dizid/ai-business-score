@@ -20,8 +20,50 @@ import { PRO_PLAN_MONTHLY_SCAN_LIMIT } from './_shared/plan.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
+// Stuck-scan reap, folded in here 2026-09-15 (was its own standalone cron,
+// reap-stuck-scans.mts, every 15-then-30 minutes). Why it exists at all:
+// run-scan-background.mts's atomic pending->running claim always reaches an
+// UPDATE ... SET status='completed'|'failed' on every normal exit path, but
+// nothing catches the abnormal ones (the Background Function process itself
+// getting killed — platform ceiling, OOM, a cold-start crash, or an
+// uncaught error outside that try block). When that happens, a scan row is
+// left at status='running' (or 'pending', if the trigger fetch was dropped
+// before scan.mts's own catch block could run) forever — and the `due`
+// query directly below explicitly excludes any company with a
+// pending/running scan, so one permanently-stuck scan would silently and
+// permanently disable that company's weekly Pro auto-rescan with no error,
+// no email, no way to notice short of manually querying `scans`.
+//
+// Moved here (rather than kept as its own cron) after root-causing a real
+// Neon cost spike Marc flagged (147.1 compute hours / $15.64 for two weeks)
+// down to that standalone cron's wake-up frequency keeping the Neon
+// compute endpoint from ever fully auto-suspending, while a DB check showed
+// **zero scans had ever actually been reaped** in the ~10 days that cron
+// ran — the failure mode this protects against is real but has not
+// happened yet in this app's history. Rather than delete the safety net
+// outright, it now rides for free on this function's own once-daily
+// schedule instead of paying for a dedicated 15/30-minute one. The only
+// give-up: a genuinely stuck scan now shows as "running" in the live-
+// polling UI for up to ~24h (until the next daily run) instead of ~20-50
+// min — an acceptable trade given it's never fired once, and this is a
+// silent-breakage safety net, not a user-facing SLA.
+const STUCK_THRESHOLD_MINUTES = 20;
+
 export default async () => {
   const db = sql();
+
+  await db`
+    UPDATE public.scans
+    SET status = 'failed',
+        error_message = 'Scan did not finish in time (the background process likely crashed or was interrupted) — automatically marked as failed.'
+    WHERE status = 'running' AND started_at < now() - (${STUCK_THRESHOLD_MINUTES} * interval '1 minute')
+  `;
+  await db`
+    UPDATE public.scans
+    SET status = 'failed',
+        error_message = 'Scan was never picked up for processing — automatically marked as failed.'
+    WHERE status = 'pending' AND created_at < now() - (${STUCK_THRESHOLD_MINUTES} * interval '1 minute')
+  `;
 
   // Due: scan_frequency='weekly', owner is currently Pro (a downgraded
   // owner's companies just stop matching here — no separate reset needed),
