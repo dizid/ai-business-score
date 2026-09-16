@@ -8,7 +8,7 @@
 import type { Config } from '@netlify/functions';
 import { authenticate } from './_shared/auth.mts';
 import { sql } from './_shared/db.mts';
-import { FREE_PLAN_SCAN_LIMIT, PRO_PLAN_MONTHLY_SCAN_LIMIT, isPro } from './_shared/plan.mts';
+import { FREE_PLAN_SCAN_LIMIT, isPro, resolveMonthlyScanLimit } from './_shared/plan.mts';
 import { corsHeaders, handleOptions } from './_shared/cors.mts';
 import { jsonResponse, errorResponse } from './_shared/http.mts';
 
@@ -46,7 +46,7 @@ export default async (req: Request) => {
   }
   const company = companies[0];
 
-  const profiles = await db`SELECT plan_tier FROM public.user_profiles WHERE user_id = ${userId}`;
+  const profiles = await db`SELECT plan_tier, monthly_scan_limit_override FROM public.user_profiles WHERE user_id = ${userId}`;
   if (!isPro(profiles[0]?.plan_tier)) {
     const [{ count }] = await db`
       SELECT count(*)::int AS count FROM public.scans s
@@ -63,18 +63,21 @@ export default async (req: Request) => {
     }
   } else {
     // Pro fair-use cap — monthly, not lifetime (see PRO_PLAN_MONTHLY_SCAN_LIMIT's
-    // comment in _shared/plan.mts).
+    // comment in _shared/plan.mts). resolveMonthlyScanLimit lets a handful of
+    // test accounts run above the standard cap via a hand-set DB override —
+    // see that function's own comment.
+    const scanLimit = resolveMonthlyScanLimit(profiles[0]?.monthly_scan_limit_override);
     const [{ count }] = await db`
       SELECT count(*)::int AS count FROM public.scans s
       JOIN public.companies c ON c.id = s.company_id
       WHERE c.owner_user_id = ${userId} AND s.created_at >= date_trunc('month', now())
     `;
 
-    if (count >= PRO_PLAN_MONTHLY_SCAN_LIMIT) {
+    if (count >= scanLimit) {
       return errorResponse(
-        `Pro plan is limited to ${PRO_PLAN_MONTHLY_SCAN_LIMIT} scans this month (fair use) — resets at the start of next month.`,
+        `Pro plan is limited to ${scanLimit} scans this month (fair use) — resets at the start of next month.`,
         402,
-        { limit: PRO_PLAN_MONTHLY_SCAN_LIMIT },
+        { limit: scanLimit },
         cors
       );
     }

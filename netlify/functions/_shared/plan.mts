@@ -40,3 +40,15 @@ export const REGRESSION_ALERT_THRESHOLD = 15;
 export function isPro(planTier: string | null | undefined): boolean {
   return planTier === 'pro';
 }
+
+// Per-user override, added 2026-09-16 alongside the 50 -> 20 cap drop —
+// Marc wants a handful of test accounts running above the new cap without
+// raising it for every Pro user. Backed by user_profiles.monthly_scan_limit_override
+// (nullable integer, additive migration), set by hand via a direct SQL
+// UPDATE, same pattern as the existing "manually granting a beta tester
+// Pro" recipe in netlify/functions/CLAUDE.md's Billing section — no UI or
+// code path writes this automatically. NULL (the default) means "use the
+// global PRO_PLAN_MONTHLY_SCAN_LIMIT constant".
+export function resolveMonthlyScanLimit(override: number | null | undefined): number {
+  return override ?? PRO_PLAN_MONTHLY_SCAN_LIMIT;
+}

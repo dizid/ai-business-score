@@ -35,8 +35,8 @@ barely a tenth. Diminishing, fast, deliberately — because that's roughly
 how much attention a real person pays past the first name in a
 spoken-style answer.
 
-Run that same question through five different models — I use GPT-5 mini,
-Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, and Mistral Small, because they don't agree
+Run that same question through four different models — I use GPT-5 mini,
+Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6, because they don't agree
 with each other nearly as often as you'd expect — and you start to see
 that "AI visibility" isn't one number, it's a pattern. A business might get
 named first by one model and skipped entirely by another, and that gap
@@ -87,8 +87,8 @@ basically different outcomes, not points on the same scale.
 Second ≈60%. Third ≈30%. A passing mention ≈10%. Diminishing fast, on
 purpose.
 
-5/ Run the same question through 5 different models (GPT-5 mini, Gemini 3
-Flash, Claude Haiku 4.5, Grok 4.6, Mistral Small) and they often don't agree.
+5/ Run the same question through 4 different models (GPT-5 mini, Gemini 3
+Flash, Claude Haiku 4.5, Grok 4.6) and they often don't agree.
 
 6/ That disagreement usually means: the model that skipped you didn't have
 a clean, specific, quotable fact to attach to your name.

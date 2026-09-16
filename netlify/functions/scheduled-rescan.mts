@@ -16,7 +16,7 @@
 // non-request context like this one.
 import type { Config } from '@netlify/functions';
 import { sql } from './_shared/db.mts';
-import { PRO_PLAN_MONTHLY_SCAN_LIMIT } from './_shared/plan.mts';
+import { resolveMonthlyScanLimit } from './_shared/plan.mts';
 
 declare const Netlify: { env: { get(key: string): string | undefined } };
 
@@ -72,7 +72,7 @@ export default async () => {
   // failed ones — generated_at is only ever set on completion, never on
   // failure) is due every day until one succeeds.
   const due = await db`
-    SELECT c.id, c.brand, c.website, c.category, c.owner_user_id
+    SELECT c.id, c.brand, c.website, c.category, c.owner_user_id, up.monthly_scan_limit_override
     FROM public.companies c
     JOIN public.user_profiles up ON up.user_id = c.owner_user_id
     WHERE c.scan_frequency = 'weekly'
@@ -109,12 +109,13 @@ export default async () => {
     // specifically added for when model count grew per-scan cost. Silent
     // skip for v1, no "you hit your limit" notification — deliberately out
     // of scope, see the implementation plan.
+    const scanLimit = resolveMonthlyScanLimit(company.monthly_scan_limit_override);
     const [{ count }] = await db`
       SELECT count(*)::int AS count FROM public.scans s
       JOIN public.companies c ON c.id = s.company_id
       WHERE c.owner_user_id = ${company.owner_user_id} AND s.created_at >= date_trunc('month', now())
     `;
-    if (count >= PRO_PLAN_MONTHLY_SCAN_LIMIT) {
+    if (count >= scanLimit) {
       skippedOverLimit++;
       continue;
     }

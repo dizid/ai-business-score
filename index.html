@@ -43,34 +43,24 @@
 <meta name="twitter:description" content="ChatGPT and Gemini answer 'who does X near me' questions without ever showing a link. Foreground checks whether your business gets mentioned — or a competitor does instead." />
 <meta name="twitter:image" content="https://foreground.info/og-image.png" />
 
-<!-- Structured data: both plans now carry a machine-readable price — Pro
-     is $99/month (dropped from $199 on 2026-08-27, see
-     ~/.claude/plans/this-is-an-improvement-recursive-bubble.md — a
-     deliberate CEO pricing decision, not a correction like the earlier
-     $29→$199 fix). FAQ answers here are
-     kept string-identical to the visible <details> content below (Google's
-     FAQPage guidelines require the two to match) — including the model
-     lineup, corrected again on 2026-09-05 to the real 2-model / 5-prompt /
-     10-check scan (run-scan-background.mts's HOSTED_MODELS cut Google +
-     Anthropic only, dropped 2026-09-04 for cost — see root CLAUDE.md's
-     Deployment section), matching how-it-works.html. Previously said
-     4 models (stale from before that cut), and before that, briefly said
-     2 models for an unrelated reason — same number, different cause; don't
-     assume "2 models" here is inherited from that earlier state.
+<!-- Structured data: both plans now carry a machine-readable price. FAQ
+     answers here are kept string-identical to the visible <details>
+     content below (Google's FAQPage guidelines require the two to match),
+     matching how-it-works.html.
 
      2026-09-11 — live two-tier Pro billing restored (see root CLAUDE.md's
      Deployment section): checkout is live again and the $19 single-scan
      SKU was removed for good (not just marked unavailable) as part of a
      KISS pricing simplification to Free + Pro only.
 
-     2026-09-14 — HOSTED_MODELS restored to the full 5-provider set (GPT-5
-     mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, Mistral joining as a
-     5th provider the same day) — the "Which AI models does it check?" FAQ
-     answer above was missed by that pass (still said the stale 2-model
-     text in both the JSON-LD and the matching <details> block below,
-     breaking the string-identical requirement this comment itself
-     documents) and was fixed here as a follow-up, not part of the original
-     sweep. -->
+     2026-09-16 — Pro price $99 -> $129/month (new signups only — existing
+     subscribers stay on their current price, Stripe subscriptions don't
+     retroactively follow a Price swap), free-tier scan limit 3 -> 1, and
+     the model lineup dropped back to 4 (openai/google/anthropic/xai) —
+     mistral was pulled from HOSTED_MODELS the same day once a real
+     per-provider cost check found a scan could run $2-4 and the old
+     50-scan Pro cap could cost more than the $99 subscription covered.
+     See root CLAUDE.md's Deployment section for the full cost math. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -118,7 +108,7 @@
       "name": "Foreground",
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
-      "description": "Checks whether a business is mentioned when AI search engines like ChatGPT, Gemini, Claude, Grok, and Mistral are asked about its category, scores the result 0-100, and tracks it over time.",
+      "description": "Checks whether a business is mentioned when AI search engines like ChatGPT, Gemini, Claude, and Grok are asked about its category, scores the result 0-100, and tracks it over time.",
       "url": "https://foreground.info/",
       "publisher": { "@id": "https://foreground.info/#organization" },
       "offers": [
@@ -131,7 +121,7 @@
         {
           "@type": "Offer",
           "name": "Pro plan",
-          "price": "99",
+          "price": "129",
           "priceCurrency": "USD"
         }
       ]
@@ -162,7 +152,7 @@
           "name": "Which AI models does it check?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, xAI's Grok 4.6, and Mistral's Mistral Small — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data."
+            "text": "OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6 — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data."
           }
         },
         {
@@ -170,7 +160,7 @@
           "name": "What does it cost?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Free to try — one company and three scans, no credit card required. Upgrade to Pro for $99/month for unlimited companies, 50 scans a month, and unlimited AI-generated deep advice."
+            "text": "Free to try — one company and one scan, no credit card required. Upgrade to Pro for $129/month for unlimited companies, 20 scans a month, and unlimited AI-generated deep advice."
           }
         }
       ]
@@ -218,8 +208,8 @@
         <span class="hero-fact-label">your visibility score</span>
       </div>
       <div class="hero-fact">
-        <span class="hero-fact-num">5</span>
-        <span class="hero-fact-label">AI models checked — GPT-5&nbsp;mini, Gemini, Claude, Grok, Mistral</span>
+        <span class="hero-fact-num">4</span>
+        <span class="hero-fact-label">AI models checked — GPT-5&nbsp;mini, Gemini, Claude, Grok</span>
       </div>
       <div class="hero-fact">
         <span class="hero-fact-num">✓</span>
@@ -241,7 +231,7 @@
 
   <section>
     <h2>How a scan works</h2>
-    <p class="section-sub">Five prompts, five AI models, twenty-five checks, one score.</p>
+    <p class="section-sub">Five prompts, four AI models, twenty checks, one score.</p>
     <div class="steps">
       <div class="step">
         <span class="num">01</span>
@@ -251,7 +241,7 @@
       <div class="step">
         <span class="num">02</span>
         <h3>We ask AI search</h3>
-        <p>The same questions real customers ask — across GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, and Mistral Small, each grounded in live web results directly via that model's own provider.</p>
+        <p>The same questions real customers ask — across GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6, each grounded in live web results directly via that model's own provider.</p>
       </div>
       <div class="step">
         <span class="num">03</span>
@@ -270,8 +260,8 @@
         <p>How often your business is the name AI actually says — not just whether you rank on page one somewhere nobody reads anymore.</p>
       </div>
       <div class="demo-card">
-        <h3>Five models, not one</h3>
-        <p>GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, and Mistral Small — each grounded in live web results, so you see the real spread, not one model's opinion.</p>
+        <h3>Four models, not one</h3>
+        <p>GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 — each grounded in live web results, so you see the real spread, not one model's opinion.</p>
       </div>
       <div class="demo-card">
         <h3>See who's beating you</h3>
@@ -297,17 +287,17 @@
         <div class="price">$0</div>
         <ul>
           <li>1 company</li>
-          <li>3 scans total</li>
+          <li>1 scan total</li>
           <li>No credit card required</li>
         </ul>
         <a class="btn-secondary" href="/app/signup">Start free</a>
       </div>
       <div class="plan-card pro">
         <h3>Pro</h3>
-        <div class="price">$99<span> /month</span></div>
+        <div class="price">$129<span> /month</span></div>
         <ul>
           <li>Unlimited companies</li>
-          <li>50 scans/month (fair use)</li>
+          <li>20 scans/month (fair use)</li>
           <li>Unlimited AI-generated deep advice</li>
         </ul>
         <a class="btn-secondary" href="/app/signup">Start free, upgrade anytime</a>
@@ -328,11 +318,11 @@
       </details>
       <details>
         <summary>Which AI models does it check?</summary>
-        <p>OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, xAI's Grok 4.6, and Mistral's Mistral Small — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data.</p>
+        <p>OpenAI's GPT-5 mini, Google's Gemini 3 Flash, Anthropic's Claude Haiku 4.5, and xAI's Grok 4.6 — each queried directly against its own provider's API, so responses reflect real web results, not just each model's static training data.</p>
       </details>
       <details>
         <summary>What does it cost?</summary>
-        <p>Free to try — one company and three scans, no credit card required. Upgrade to Pro for $99/month for unlimited companies, 50 scans a month, and unlimited AI-generated deep advice.</p>
+        <p>Free to try — one company and one scan, no credit card required. Upgrade to Pro for $129/month for unlimited companies, 20 scans a month, and unlimited AI-generated deep advice.</p>
       </details>
     </div>
   </section>

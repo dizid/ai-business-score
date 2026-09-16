@@ -50,7 +50,7 @@ here.
 
 | Tool | Best for | Entry price | Engines tracked | No-account option |
 |---|---|---|---|---|
-| Foreground | A solo business wanting one honest answer, fast | Free (3 scans), then $99/mo Pro | 5 (GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, Mistral Small) | No — free signup required, no card |
+| Foreground | A solo business wanting one honest answer, fast | Free (1 scan), then $129/mo Pro | 4 (GPT-5 mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6) | No — free signup required, no card |
 | Profound | Enterprise GEO analytics at scale | ~$99+/mo | 10+ | No |
 | Otterly.AI | SMB AI-search monitoring on a budget | ~$29/mo | Fewer, SMB-tier | No |
 | Peec AI | Fast-growing share-of-voice tracking | ~$95/mo | Multiple | No |
@@ -60,9 +60,9 @@ here.
 
 ## Where Foreground actually fits
 
-Five models, queried directly against their own provider APIs — GPT-5
-mini, Gemini 3 Flash, Claude Haiku 4.5, Grok 4.6, and Mistral Small — kept
-cheap enough to give away three full scans free, no card required. That's
+Four models, queried directly against their own provider APIs — GPT-5
+mini, Gemini 3 Flash, Claude Haiku 4.5, and Grok 4.6 — kept
+cheap enough to give away a full scan free, no card required. That's
 the actual trade-off against Profound's ten-plus engines: fewer data
 points per scan, but a genuinely lower floor to try it, and a real free
 tier instead of a sales call.
