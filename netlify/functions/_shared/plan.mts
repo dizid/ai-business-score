@@ -4,7 +4,12 @@
 // below — "unlimited" stopped being literally true once model count started
 // growing (see aivis-core.mjs's MODELS comment).
 export const FREE_PLAN_COMPANY_LIMIT = 1;
-export const FREE_PLAN_SCAN_LIMIT = 3;
+// Dropped 3 -> 1 on 2026-09-16, the same cost-control pass that dropped
+// PRO_PLAN_MONTHLY_SCAN_LIMIT below — Marc's explicit call once the real
+// per-scan cost ($2-4) was known. Marketing/legal copy (index.html,
+// how-it-works.html, privacy.html, terms.html, public/llms.txt) was
+// updated to say "one scan" the same day.
+export const FREE_PLAN_SCAN_LIMIT = 1;
 
 // Pro fair-use cap, added 2026-08-13 alongside MODELS growing from 2 to 4.
 // Monthly, not lifetime like FREE_PLAN_SCAN_LIMIT above — Pro is a real
