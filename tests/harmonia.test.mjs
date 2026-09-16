@@ -61,6 +61,36 @@ describe('parseHtml — new SEO signals (2026-08-31)', () => {
   });
 });
 
+describe('parseHtml — HTML entity decoding in title/meta-description (2026-09-15)', () => {
+  const origin = 'https://example.com';
+
+  it('decodes named and numeric entities so length checks see real character counts, not markup', () => {
+    const html = `
+      <html><head>
+        <title>Smith &amp; Sons Roofing &mdash; Trusted Roof Repairs</title>
+        <meta name="description" content="Family owned &amp; operated since 1998 &#8212; free quotes.">
+      </head></html>
+    `;
+    const page = parseHtml(html, origin);
+    expect(page.title).toBe('Smith & Sons Roofing — Trusted Roof Repairs');
+    expect(page.metaDescription).toBe('Family owned & operated since 1998 — free quotes.');
+  });
+
+  it('does not let entity-inflated raw length fail a title that is actually within the 10-60 char range', () => {
+    // Raw markup is 53 chars (over some naive 50-char budget); decoded it's 43.
+    const html = '<title>Smith &amp; Sons Roofing &mdash; Trusted Roof Repairs</title>';
+    const page = parseHtml(html, origin);
+    expect(page.title.length).toBe(43);
+    expect(page.title.length).toBeLessThanOrEqual(60);
+  });
+
+  it('leaves plain text without entities untouched', () => {
+    const html = '<title>Plain Title With No Entities</title>';
+    const page = parseHtml(html, origin);
+    expect(page.title).toBe('Plain Title With No Entities');
+  });
+});
+
 describe('validateJsonLdBlocks — @graph context inheritance (2026-09-05)', () => {
   it('treats a @graph node as valid when it inherits the parent @context (Yoast SEO shape)', () => {
     // Real-world shape: @context declared once on the wrapper, not repeated

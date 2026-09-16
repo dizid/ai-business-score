@@ -130,9 +130,38 @@ function extractTags(html, tagName) {
   return html.match(re) || [];
 }
 
+// Named-entity table covering what actually shows up in real <title>/
+// meta-description text — ampersands and CMS-typeset punctuation — not the
+// full HTML5 named-entity list. Numeric entities (&#39; / &#x27;) are
+// handled generically in decodeHtmlEntities below, independent of this table.
+const NAMED_ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  mdash: '—', ndash: '–', hellip: '…',
+  lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
+  copy: '©', reg: '®', trade: '™',
+};
+
+// <title>/meta-description text is captured straight out of the raw HTML
+// (see parseHtml below), so any HTML entity in it — very common, CMSes and
+// templating engines routinely escape text nodes — inflates .length past
+// what the entity actually renders as (e.g. "Smith &amp; Sons" is 5 chars
+// longer than "Smith & Sons"). Decode before either length check runs, or a
+// correctly-sized title/description can read as too long.
+function decodeHtmlEntities(str) {
+  if (!str) return str;
+  return str.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, body) => {
+    if (body[0] === '#') {
+      const codePoint = body[1].toLowerCase() === 'x' ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+      return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint);
+    }
+    const name = body.toLowerCase();
+    return name in NAMED_ENTITIES ? NAMED_ENTITIES[name] : match;
+  });
+}
+
 export function parseHtml(html, origin) {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim() : null;
+  const title = titleMatch ? decodeHtmlEntities(titleMatch[1].trim()) : null;
 
   const metaTags = extractTags(html, 'meta');
   const descriptionTag = metaTags.find((t) => (getAttr(t, 'name') || '').toLowerCase() === 'description');
@@ -196,7 +225,7 @@ export function parseHtml(html, origin) {
 
   return {
     title,
-    metaDescription: descriptionTag ? (getAttr(descriptionTag, 'content') || '') : null,
+    metaDescription: descriptionTag ? decodeHtmlEntities(getAttr(descriptionTag, 'content') || '') : null,
     viewportPresent: Boolean(viewportTag),
     ogTags,
     twitterTags,
