@@ -26,8 +26,15 @@ export function parseResponse(json) {
   }
   // Anthropic has no single total_tokens field like Perplexity/xAI/Google —
   // input_tokens + output_tokens is the live-confirmed equivalent.
+  // webSearchRequests (usage.server_tool_use.web_search_requests) is what
+  // Anthropic actually bills the ~$10/1,000 web-search fee against — never
+  // captured before this, so there was no data on whether calls typically
+  // use 1 search or exhaust the max_uses ceiling below.
   const usage = json.usage
-    ? { total_tokens: (json.usage.input_tokens ?? 0) + (json.usage.output_tokens ?? 0) }
+    ? {
+        total_tokens: (json.usage.input_tokens ?? 0) + (json.usage.output_tokens ?? 0),
+        webSearchRequests: json.usage.server_tool_use?.web_search_requests ?? 0,
+      }
     : null;
   return { text, usage, citations };
 }
@@ -44,7 +51,11 @@ export async function call(apiKey, modelId, prompt, signal) {
       model: modelId,
       max_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+      // max_uses lowered 3 -> 2 (2026-09-16, cost review): it's a ceiling,
+      // not a forced count, so this only bites calls that would have taken
+      // a 3rd search — the lowest-value one on a single focused question,
+      // and cuts the worst-case web-search fee per call from $0.03 to $0.02.
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 2 }],
     }),
     signal,
   });

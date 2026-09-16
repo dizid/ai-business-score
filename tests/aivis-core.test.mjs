@@ -207,7 +207,7 @@ describe('parseAnthropicResponse', () => {
           ],
         },
       ],
-      usage: { input_tokens: 10309, output_tokens: 132 },
+      usage: { input_tokens: 10309, output_tokens: 132, server_tool_use: { web_search_requests: 1 } },
     };
     const result = parseAnthropicResponse(json);
     expect(result.text).toBe(
@@ -216,7 +216,7 @@ describe('parseAnthropicResponse', () => {
     expect(result.citations).toEqual([
       { url: 'https://loodgieterskwartier.nl/en/plumber-Rotterdam/', title: 'Plumber Rotterdam' },
     ]);
-    expect(result.usage).toEqual({ total_tokens: 10441 });
+    expect(result.usage).toEqual({ total_tokens: 10441, webSearchRequests: 1 });
   });
 
   it('returns empty text/citations and null usage for a response with no text blocks', () => {
