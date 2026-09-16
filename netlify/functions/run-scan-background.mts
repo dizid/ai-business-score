@@ -364,11 +364,19 @@ export default async (req: Request) => {
   // three account-level blockers were fixed the same day (OpenAI billing
   // topped up, Anthropic's spend limit raised, Mistral moved to a paid
   // PAYG plan with a €30/month workspace spending cap — see root
-  // CLAUDE.md's Deployment section) — restored to the full `MODELS` set
-  // accordingly. If a 429/quota error reappears for any one of these,
-  // re-filter it back out individually rather than reverting to the
-  // 2-provider set wholesale.
-  const HOSTED_MODELS = MODELS;
+  // CLAUDE.md's Deployment section), briefly restoring the full `MODELS`
+  // set. Re-filtered out mistral specifically the same day, this time for
+  // cost rather than an account block: a real per-provider cost check
+  // (scans.total_tokens x current published pricing) found Mistral's
+  // $30/1,000-web_search-call fee is the single priciest line item of all
+  // 5 providers despite its cheap token price, and it's the one provider
+  // Marc chose to drop rather than pay for "for now" while the Pro price/
+  // scan-cap changes above take effect — see PRO_PLAN_MONTHLY_SCAN_LIMIT's
+  // comment in plan.mts for the full cost math this decision came out of.
+  // Mistral stays fully wired (registry.mjs, MISTRAL_API_KEY, the PAYG
+  // plan Marc just set up) — this is a one-line dispatch filter, not a
+  // removal; flip back to plain `MODELS` to re-include it later.
+  const HOSTED_MODELS = MODELS.filter((m) => !m.startsWith('mistral/'));
   const tasks: { prompt: string; model: string; promptIndex: number }[] = [];
   for (const model of HOSTED_MODELS) {
     for (const [promptIndex, template] of scanPrompts.entries()) {
