@@ -46,6 +46,31 @@ provider's calls for the scan, it doesn't fail the whole request. See root
 `CLAUDE.md`'s Deployment section for the full current list (Stripe,
 Resend, GA4, PageSpeed).
 
+### Plan limits
+
+- **Free** — 1 company, 1 scan (lifetime). `FREE_PLAN_COMPANY_LIMIT` /
+  `FREE_PLAN_SCAN_LIMIT` in `netlify/functions/_shared/plan.mts`.
+- **Pro** — $129/month (new signups as of 2026-09-16; existing subscribers
+  keep whatever price they signed up at — Stripe subscriptions don't
+  retroactively follow a Price swap), unlimited companies, **20 scans per
+  calendar month** fair-use cap (`PRO_PLAN_MONTHLY_SCAN_LIMIT`, dropped from
+  50 the same day a real per-provider cost check found a scan can run
+  $2-4 — see root `CLAUDE.md`'s Deployment section for the full math).
+- **Per-user override** — a handful of test/internal accounts need to run
+  above the 20-scan cap. `user_profiles.monthly_scan_limit_override`
+  (nullable integer) overrides `PRO_PLAN_MONTHLY_SCAN_LIMIT` for one
+  account when set; `NULL` (the default) just uses the global constant.
+  Nothing in the app sets this automatically — it's a hand-run SQL UPDATE
+  via Neon MCP (same pattern as manually granting a beta tester Pro, see
+  `netlify/functions/CLAUDE.md`'s Billing section):
+  ```sql
+  UPDATE public.user_profiles
+  SET monthly_scan_limit_override = 100
+  WHERE user_id = '<uuid>';
+  ```
+  Look up `user_id` by joining `neon_auth."user"` on email if only an
+  address is known. Set back to `NULL` to remove the override.
+
 ### Manual walkthrough
 
 `npm run test:run` (see "Automated tests" below) covers pure-function
