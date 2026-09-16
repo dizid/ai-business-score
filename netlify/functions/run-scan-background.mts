@@ -144,7 +144,10 @@ export default async (req: Request) => {
   // a missing/invalid key only nulls the UX Signals pillar — see
   // harmonia.mjs's fetchCoreWebVitals, never fails the scan.
   const psiApiKey = Netlify.env.get('GOOGLE_PAGESPEED_API_KEY') || apiKeys.google;
-  if (!apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai && !apiKeys.openai) {
+  // 2026-09-16: added !apiKeys.mistral — this guard predates the 5th
+  // provider and was never backported to include it; a Mistral-only
+  // config would have incorrectly failed the scan as "misconfigured".
+  if (!apiKeys.perplexity && !apiKeys.anthropic && !apiKeys.google && !apiKeys.xai && !apiKeys.openai && !apiKeys.mistral) {
     await db`
       UPDATE public.scans SET status = 'failed', error_message = 'Server misconfigured: no model API keys set'
       WHERE id = ${scanId}
@@ -210,8 +213,14 @@ export default async (req: Request) => {
   // same blocker the investigation doc hit) — worth confirming with one
   // timed live scan per this codebase's own "verify live before trusting"
   // discipline.
+  // 2026-09-16: bumped 100000 -> 150000 after a real production incident
+  // showed 0-3 of 5 xai calls timing out per scan even at 100s — see
+  // scan-result-15-of-partitioned-forest.md for the live scans.failures
+  // evidence. Concurrency for this provider also dropped 2 -> 1 below
+  // (CONCURRENCY_LIMIT_BY_PROVIDER) to reduce contention-driven latency
+  // variance within its own lane, not just widen the deadline.
   const CALL_TIMEOUT_MS_BY_MODEL: Record<string, number> = {
-    'xai/grok-4.6': 100000,
+    'xai/grok-4.6': 150000,
   };
   // Was 10 — live scans (TSMC, Google LLC, Hotel De Nara, 2026-08-13) showed
   // 16-18 of 20 calls failing with HTTP 429 request_rate_limit_exceeded,
@@ -288,7 +297,12 @@ export default async (req: Request) => {
     openai: 3,
     anthropic: 3,
     google: 3,
-    xai: 2,
+    // 2026-09-16: dropped 2 -> 1. A real production incident (see
+    // scan-result-15-of-partitioned-forest.md) showed 0-3 of 5 xai calls
+    // timing out per scan even at the 100s-then-150000ms ceiling below —
+    // reducing contention within this lane, alongside the timeout bump,
+    // to cut latency variance rather than just widening the deadline.
+    xai: 1,
   };
   // Was 100000, then 120000 (same-day intermediate fix, see above). Raised
   // further to 600000 (10 min) for fully-sequential 20-call scans — at
@@ -340,6 +354,20 @@ export default async (req: Request) => {
   // loop again. openai/gpt-5-mini's clarity-check and sentiment-judge
   // calls further down are unaffected either way — they're hardcoded to
   // that model directly, not sourced from this list.
+  // 2026-09-16: briefly filtered down to google+xai after a real multi-scan
+  // production test found openai (zero billing credits), anthropic (a
+  // configured spend/usage cap hit mid-session, self-resets 2026-10-01),
+  // and mistral (web_search tool rate limit exhausted on literally the
+  // first call of every scan) all 100% blocked at the account level — see
+  // ~/.claude/plans/scan-result-15-of-partitioned-forest.md for the full
+  // root-cause evidence (live scans.failures pulled via Neon SQL). All
+  // three account-level blockers were fixed the same day (OpenAI billing
+  // topped up, Anthropic's spend limit raised, Mistral moved to a paid
+  // PAYG plan with a €30/month workspace spending cap — see root
+  // CLAUDE.md's Deployment section) — restored to the full `MODELS` set
+  // accordingly. If a 429/quota error reappears for any one of these,
+  // re-filter it back out individually rather than reverting to the
+  // 2-provider set wholesale.
   const HOSTED_MODELS = MODELS;
   const tasks: { prompt: string; model: string; promptIndex: number }[] = [];
   for (const model of HOSTED_MODELS) {
